@@ -175,9 +175,60 @@ export class OfficeState {
   }
 
   private findFreeSeat(): string | null {
-    for (const [uid, seat] of this.seats) {
-      if (!seat.assigned) return uid;
+    // Build set of tiles occupied by electronics (PCs, monitors, etc.)
+    const electronicsTiles = new Set<string>();
+    for (const item of this.layout.furniture) {
+      const entry = getCatalogEntry(item.type);
+      if (!entry || entry.category !== 'electronics') continue;
+      for (let dr = 0; dr < entry.footprintH; dr++) {
+        for (let dc = 0; dc < entry.footprintW; dc++) {
+          electronicsTiles.add(`${item.col + dc},${item.row + dr}`);
+        }
+      }
     }
+
+    // Collect free seats, split into those facing electronics and the rest
+    const pcSeats: string[] = [];
+    const otherSeats: string[] = [];
+    for (const [uid, seat] of this.seats) {
+      if (seat.assigned) continue;
+
+      // Check if this seat faces electronics (same logic as auto-state detection)
+      let facesPC = false;
+      const dCol =
+        seat.facingDir === Direction.RIGHT ? 1 : seat.facingDir === Direction.LEFT ? -1 : 0;
+      const dRow = seat.facingDir === Direction.DOWN ? 1 : seat.facingDir === Direction.UP ? -1 : 0;
+      for (let d = 1; d <= AUTO_ON_FACING_DEPTH && !facesPC; d++) {
+        const tileCol = seat.seatCol + dCol * d;
+        const tileRow = seat.seatRow + dRow * d;
+        if (electronicsTiles.has(`${tileCol},${tileRow}`)) {
+          facesPC = true;
+          break;
+        }
+        if (dCol !== 0) {
+          if (
+            electronicsTiles.has(`${tileCol},${tileRow - 1}`) ||
+            electronicsTiles.has(`${tileCol},${tileRow + 1}`)
+          ) {
+            facesPC = true;
+            break;
+          }
+        } else {
+          if (
+            electronicsTiles.has(`${tileCol - 1},${tileRow}`) ||
+            electronicsTiles.has(`${tileCol + 1},${tileRow}`)
+          ) {
+            facesPC = true;
+            break;
+          }
+        }
+      }
+      (facesPC ? pcSeats : otherSeats).push(uid);
+    }
+
+    // Pick randomly: prefer PC seats, then any seat
+    if (pcSeats.length > 0) return pcSeats[Math.floor(Math.random() * pcSeats.length)];
+    if (otherSeats.length > 0) return otherSeats[Math.floor(Math.random() * otherSeats.length)];
     return null;
   }
 
@@ -390,49 +441,39 @@ export class OfficeState {
     const palette = parentCh ? parentCh.palette : 0;
     const hueShift = parentCh ? parentCh.hueShift : 0;
 
-    // Find the free seat closest to the parent agent
+    // Find the closest walkable tile to the parent, avoiding tiles occupied by other characters
     const parentCol = parentCh ? parentCh.tileCol : 0;
     const parentRow = parentCh ? parentCh.tileRow : 0;
     const dist = (c: number, r: number) => Math.abs(c - parentCol) + Math.abs(r - parentRow);
 
-    let bestSeatId: string | null = null;
-    let bestDist = Infinity;
-    for (const [uid, seat] of this.seats) {
-      if (!seat.assigned) {
-        const d = dist(seat.seatCol, seat.seatRow);
-        if (d < bestDist) {
-          bestDist = d;
-          bestSeatId = uid;
-        }
-      }
+    // Build set of tiles occupied by existing characters
+    const occupiedTiles = new Set<string>();
+    for (const [, other] of this.characters) {
+      occupiedTiles.add(`${other.tileCol},${other.tileRow}`);
     }
 
-    let ch: Character;
-    if (bestSeatId) {
-      const seat = this.seats.get(bestSeatId)!;
-      seat.assigned = true;
-      ch = createCharacter(id, palette, bestSeatId, seat, hueShift);
-    } else {
-      // No seats — spawn at closest walkable tile to parent
-      let spawn = { col: 1, row: 1 };
-      if (this.walkableTiles.length > 0) {
-        let closest = this.walkableTiles[0];
-        let closestDist = dist(closest.col, closest.row);
-        for (let i = 1; i < this.walkableTiles.length; i++) {
-          const d = dist(this.walkableTiles[i].col, this.walkableTiles[i].row);
-          if (d < closestDist) {
-            closest = this.walkableTiles[i];
-            closestDist = d;
-          }
+    let spawn = { col: parentCol, row: parentRow };
+    if (this.walkableTiles.length > 0) {
+      let closest = this.walkableTiles[0];
+      let closestDist = Infinity;
+      for (const tile of this.walkableTiles) {
+        if (occupiedTiles.has(`${tile.col},${tile.row}`)) continue;
+        const d = dist(tile.col, tile.row);
+        if (d < closestDist) {
+          closest = tile;
+          closestDist = d;
         }
-        spawn = closest;
       }
-      ch = createCharacter(id, palette, null, null, hueShift);
-      ch.x = spawn.col * TILE_SIZE + TILE_SIZE / 2;
-      ch.y = spawn.row * TILE_SIZE + TILE_SIZE / 2;
-      ch.tileCol = spawn.col;
-      ch.tileRow = spawn.row;
+      spawn = closest;
     }
+
+    const ch = createCharacter(id, palette, null, null, hueShift);
+    ch.x = spawn.col * TILE_SIZE + TILE_SIZE / 2;
+    ch.y = spawn.row * TILE_SIZE + TILE_SIZE / 2;
+    ch.tileCol = spawn.col;
+    ch.tileRow = spawn.row;
+    // Face the same direction as the parent agent
+    if (parentCh) ch.dir = parentCh.dir;
     ch.isSubagent = true;
     ch.parentAgentId = parentAgentId;
     ch.matrixEffect = 'spawn';
