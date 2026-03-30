@@ -1,6 +1,6 @@
 {
   "organization": "Just Curious",
-  "version": 1,
+  "version": 2,
   "members": [
     {
       "id": "eng-01",
@@ -11,238 +11,282 @@
       "layer": "L1",
       "zone": "dev",
       "hueShift": 210,
-      "deskId": "dev-desk-01"
+      "deskId": "dev-desk-01",
+      "accentColor": "#185FA5",
+      "breakBehavior": "arcade"
     },
     {
       "id": "eng-02",
       "name": "佐藤 涼",
       "nameEn": "Ryo Sato",
-      "role": "Backend",
+      "role": "Backend Specialist",
       "department": "engineering",
       "layer": "L2",
       "zone": "dev",
       "hueShift": 180,
-      "deskId": "dev-desk-02"
+      "deskId": "dev-desk-02",
+      "accentColor": "#0F6E56",
+      "breakBehavior": "coffee"
     },
     {
       "id": "eng-03",
       "name": "中村 陽菜",
       "nameEn": "Hina Nakamura",
-      "role": "Frontend",
+      "role": "Frontend Specialist",
       "department": "engineering",
       "layer": "L2",
       "zone": "dev",
       "hueShift": 270,
-      "deskId": "dev-desk-03"
+      "deskId": "dev-desk-03",
+      "accentColor": "#534AB7",
+      "breakBehavior": "bookshelf"
     },
     {
       "id": "eng-04",
       "name": "山本 真帆",
       "nameEn": "Maho Yamamoto",
-      "role": "PM",
+      "role": "PM / Director",
       "department": "engineering",
       "layer": "L2",
       "zone": "dev",
       "hueShift": 15,
-      "deskId": "dev-desk-04"
+      "deskId": "dev-desk-04",
+      "accentColor": "#D85A30",
+      "breakBehavior": "meeting"
     },
     {
       "id": "eng-05",
       "name": "藤井 蓮",
       "nameEn": "Ren Fujii",
-      "role": "Designer",
+      "role": "Web Designer",
       "department": "engineering",
       "layer": "L3",
       "zone": "dev",
       "hueShift": 330,
-      "deskId": "dev-desk-05"
+      "deskId": "dev-desk-05",
+      "accentColor": "#D4537E",
+      "breakBehavior": "sofa"
     },
     {
       "id": "eng-06",
       "name": "黒田 翔太",
       "nameEn": "Shota Kuroda",
-      "role": "Game Design",
+      "role": "Game Designer",
       "department": "engineering",
       "layer": "L3",
       "zone": "dev",
       "hueShift": 40,
-      "deskId": "dev-desk-06"
+      "deskId": "dev-desk-06",
+      "accentColor": "#BA7517",
+      "breakBehavior": "arcade"
     },
     {
       "id": "mkt-01",
       "name": "黒田 涼",
       "nameEn": "Ryo Kuroda",
-      "role": "Director",
+      "role": "Marketing Director",
       "department": "marketing",
       "layer": "L1",
       "zone": "marketing",
       "hueShift": 0,
-      "deskId": "mkt-desk-01"
+      "deskId": "mkt-desk-01",
+      "accentColor": "#A32D2D",
+      "breakBehavior": "sofa"
     },
     {
       "id": "mkt-02",
-      "name": "伊藤 美咲",
-      "nameEn": "Misaki Ito",
-      "role": "Strategic Advisor",
+      "name": "清水 夏希",
+      "nameEn": "Natsuki Shimizu",
+      "role": "Strategic Advisor / Systematic",
       "department": "marketing",
       "layer": "L2",
       "zone": "marketing",
       "hueShift": 50,
-      "deskId": "mkt-desk-02"
+      "deskId": "mkt-desk-02",
+      "accentColor": "#854F0B",
+      "breakBehavior": "coffee"
     },
     {
       "id": "mkt-03",
-      "name": "渡辺 蓮",
-      "nameEn": "Ren Watanabe",
-      "role": "Strategic Advisor",
+      "name": "トマス・ベガ",
+      "nameEn": "Tomás Vega",
+      "role": "Strategic Advisor / Empathy",
       "department": "marketing",
       "layer": "L2",
       "zone": "marketing",
       "hueShift": 55,
-      "deskId": "mkt-desk-03"
+      "deskId": "mkt-desk-03",
+      "accentColor": "#854F0B",
+      "breakBehavior": "sofa"
     },
     {
       "id": "mkt-04",
-      "name": "小林 萌",
-      "nameEn": "Moe Kobayashi",
-      "role": "Strategic Advisor",
+      "name": "サーシャ・ブレナン",
+      "nameEn": "Sasha Brennan",
+      "role": "Strategic Advisor / Craft",
       "department": "marketing",
       "layer": "L2",
       "zone": "marketing",
       "hueShift": 45,
-      "deskId": "mkt-desk-04"
+      "deskId": "mkt-desk-04",
+      "accentColor": "#854F0B",
+      "breakBehavior": "coffee"
     },
     {
       "id": "mkt-05",
-      "name": "加藤 翼",
-      "nameEn": "Tsubasa Kato",
-      "role": "Strategic Advisor",
+      "name": "足立 賢治",
+      "nameEn": "Kenji Adachi",
+      "role": "Strategic Advisor / Purpose",
       "department": "marketing",
       "layer": "L2",
       "zone": "marketing",
       "hueShift": 60,
-      "deskId": "mkt-desk-05"
+      "deskId": "mkt-desk-05",
+      "accentColor": "#854F0B",
+      "breakBehavior": "sofa"
     },
     {
       "id": "mkt-06",
       "name": "高橋 里奈",
       "nameEn": "Rina Takahashi",
-      "role": "Ops Manager",
+      "role": "Operations Manager / 部署PM",
       "department": "marketing",
       "layer": "L2",
       "zone": "marketing",
       "hueShift": 10,
-      "deskId": "mkt-desk-06"
+      "deskId": "mkt-desk-06",
+      "accentColor": "#993C1D",
+      "breakBehavior": "meeting"
     },
     {
       "id": "mkt-07",
-      "name": "松本 芽衣",
-      "nameEn": "Mei Matsumoto",
-      "role": "Analyst",
+      "name": "谷口 芽依",
+      "nameEn": "Mei Taniguchi",
+      "role": "CRM Strategist",
       "department": "marketing",
       "layer": "L3",
       "zone": "marketing",
       "hueShift": 120,
-      "deskId": "mkt-desk-07"
+      "deskId": "mkt-desk-07",
+      "accentColor": "#3B6D11",
+      "breakBehavior": "coffee"
     },
     {
       "id": "mkt-08",
-      "name": "井上 花",
-      "nameEn": "Hana Inoue",
-      "role": "Content",
+      "name": "ジェイク・フローレス＝太田",
+      "nameEn": "Jake Flores-Ota",
+      "role": "Campaign Architect",
       "department": "marketing",
       "layer": "L3",
       "zone": "marketing",
       "hueShift": 130,
-      "deskId": "mkt-desk-08"
+      "deskId": "mkt-desk-08",
+      "accentColor": "#3B6D11",
+      "breakBehavior": "arcade"
     },
     {
       "id": "mkt-09",
-      "name": "木村 翔",
-      "nameEn": "Sho Kimura",
-      "role": "Executor",
+      "name": "北川 花",
+      "nameEn": "Hana Kitagawa",
+      "role": "Content & Social Lead",
       "department": "marketing",
       "layer": "L4",
       "zone": "marketing",
       "hueShift": 175,
-      "deskId": "mkt-desk-09"
+      "deskId": "mkt-desk-09",
+      "accentColor": "#0F6E56",
+      "breakBehavior": "sofa"
     },
     {
       "id": "mkt-10",
-      "name": "林 優衣",
-      "nameEn": "Yui Hayashi",
-      "role": "Executor",
+      "name": "森 大地",
+      "nameEn": "Daichi Mori",
+      "role": "Event Marketing Lead",
       "department": "marketing",
       "layer": "L4",
       "zone": "marketing",
       "hueShift": 185,
-      "deskId": "mkt-desk-10"
+      "deskId": "mkt-desk-10",
+      "accentColor": "#0F6E56",
+      "breakBehavior": "coffee"
     },
     {
       "id": "mkt-11",
-      "name": "清水 大地",
-      "nameEn": "Daichi Shimizu",
-      "role": "Executor",
+      "name": "レナ・パク",
+      "nameEn": "Lena Park",
+      "role": "Media & Growth Planner",
       "department": "marketing",
       "layer": "L4",
       "zone": "marketing",
       "hueShift": 190,
-      "deskId": "mkt-desk-11"
+      "deskId": "mkt-desk-11",
+      "accentColor": "#0F6E56",
+      "breakBehavior": "sofa"
     },
     {
       "id": "res-01",
-      "name": "Owner",
+      "name": "Research Lead",
       "nameEn": "Owner",
-      "role": "Research Lead",
+      "role": "Research Lead (Owner兼務)",
       "department": "research",
       "layer": "L1",
       "zone": "research",
       "hueShift": 260,
-      "deskId": "res-desk-01"
+      "deskId": "res-desk-01",
+      "accentColor": "#993C1D",
+      "breakBehavior": "coffee"
     },
     {
       "id": "res-02",
-      "name": "田村 結月",
-      "nameEn": "Yuzuki Tamura",
-      "role": "SNS Specialist",
+      "name": "Sora Miyake",
+      "nameEn": "Sora Miyake",
+      "role": "X/Twitter Specialist",
       "department": "research",
       "layer": "L2",
       "zone": "research",
       "hueShift": 240,
-      "deskId": "res-desk-02"
+      "deskId": "res-desk-02",
+      "accentColor": "#993C1D",
+      "breakBehavior": "sofa"
     },
     {
       "id": "res-03",
-      "name": "森 颯太",
-      "nameEn": "Sota Mori",
-      "role": "SNS Specialist",
+      "name": "Marina Ríos-Delgado",
+      "nameEn": "Marina Ríos-Delgado",
+      "role": "Instagram Specialist",
       "department": "research",
       "layer": "L2",
       "zone": "research",
       "hueShift": 250,
-      "deskId": "res-desk-03"
+      "deskId": "res-desk-03",
+      "accentColor": "#993C1D",
+      "breakBehavior": "coffee"
     },
     {
       "id": "res-04",
-      "name": "山口 凛",
-      "nameEn": "Rin Yamaguchi",
-      "role": "SNS Specialist",
+      "name": "Kai Nakamura-Chen",
+      "nameEn": "Kai Nakamura-Chen",
+      "role": "TikTok Specialist",
       "department": "research",
       "layer": "L2",
       "zone": "research",
       "hueShift": 230,
-      "deskId": "res-desk-04"
+      "deskId": "res-desk-04",
+      "accentColor": "#993C1D",
+      "breakBehavior": "arcade"
     },
     {
       "id": "res-05",
-      "name": "中島 悠人",
-      "nameEn": "Yuto Nakajima",
-      "role": "SNS Specialist",
+      "name": "Dr. Priya Okonkwo-Singh",
+      "nameEn": "Dr. Priya Okonkwo-Singh",
+      "role": "YouTube Specialist",
       "department": "research",
       "layer": "L2",
       "zone": "research",
       "hueShift": 220,
-      "deskId": "res-desk-05"
+      "deskId": "res-desk-05",
+      "accentColor": "#993C1D",
+      "breakBehavior": "bookshelf"
     },
     {
       "id": "res-06",
@@ -253,34 +297,16 @@
       "layer": "L3",
       "zone": "research",
       "hueShift": 0,
-      "deskId": "res-desk-06"
+      "deskId": "res-desk-06",
+      "accentColor": "#999999",
+      "breakBehavior": "sofa"
     }
   ],
   "exec": [
-    {
-      "id": "exec-01",
-      "name": "Owner / COO",
-      "role": "Owner",
-      "zone": "exec"
-    },
-    {
-      "id": "exec-02",
-      "name": "CEO",
-      "role": "CEO",
-      "zone": "exec"
-    },
-    {
-      "id": "exec-03",
-      "name": "秘書",
-      "role": "Secretary",
-      "zone": "exec"
-    },
-    {
-      "id": "exec-04",
-      "name": "PM",
-      "role": "PM",
-      "zone": "exec"
-    }
+    { "id": "exec-01", "name": "Owner / COO", "role": "Owner", "zone": "exec" },
+    { "id": "exec-02", "name": "CEO", "role": "CEO", "zone": "exec" },
+    { "id": "exec-03", "name": "秘書", "role": "Secretary", "zone": "exec" },
+    { "id": "exec-04", "name": "PM", "role": "PM", "zone": "exec" }
   ],
   "mapping": {
     "rules": [

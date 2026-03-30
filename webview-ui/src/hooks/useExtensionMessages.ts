@@ -3,11 +3,14 @@ import { useEffect, useRef, useState } from 'react';
 import type { JCState } from '../jc/index.js';
 import {
   JC_ENTRANCE,
+  jcGetBreakTarget,
+  jcGetPokerSeat,
   jcLoadConfig,
   jcMemberArriving,
   jcMemberDeparted,
   jcMemberLeaving,
   jcMemberStateChange,
+  jcTriggerLiaison,
   jcUpdateMappings,
 } from '../jc/index.js';
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js';
@@ -532,9 +535,31 @@ export function useExtensionMessages(
             os.sendToSeat(agentId);
           } else if (jcState === 'break') {
             ch.currentTool = null;
-            ch.isActive = false; // wander in break zone
+            ch.isActive = false;
+            // Walk to break zone target based on member's breakBehavior
+            const memberId = msg.memberId as string;
+            const target = jcGetBreakTarget(memberId);
+            os.walkToTile(agentId, target.col, target.row);
+          } else if (jcState === 'meeting') {
+            ch.currentTool = null;
+            ch.isActive = false;
+            // Walk to poker table
+            const seatIdx = Array.from(os.characters.keys()).indexOf(agentId);
+            const seat = jcGetPokerSeat(seatIdx >= 0 ? seatIdx : 0);
+            os.walkToTile(agentId, seat.col, seat.row);
+          } else if (jcState === 'handoff') {
+            ch.currentTool = null;
+            ch.isActive = false;
+            // Walk to poker table for handoff discussion
+            const handoffIdx = Array.from(os.characters.keys()).indexOf(agentId);
+            const handoffSeat = jcGetPokerSeat(handoffIdx >= 0 ? handoffIdx : 0);
+            os.walkToTile(agentId, handoffSeat.col, handoffSeat.row);
           }
         }
+      } else if (msg.type === 'jcLiaison') {
+        const fromMemberId = msg.fromMemberId as string;
+        const toMemberId = msg.toMemberId as string;
+        jcTriggerLiaison(fromMemberId, toMemberId);
       } else if (msg.type === 'jcMappingUpdate') {
         jcUpdateMappings(msg.mappings);
       }

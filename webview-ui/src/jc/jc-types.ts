@@ -39,6 +39,8 @@ export interface JCMemberConfig {
   zone: ZoneType;
   hueShift: number;
   deskId: string;
+  accentColor?: string;
+  breakBehavior?: 'coffee' | 'sofa' | 'arcade' | 'bookshelf' | 'meeting';
 }
 
 /** Exec config */

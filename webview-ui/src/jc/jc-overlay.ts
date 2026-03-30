@@ -6,6 +6,7 @@
 import type { Character } from '../office/types.js';
 import { CharacterState, TILE_SIZE } from '../office/types.js';
 import {
+  jcGetActiveLiaisons,
   jcGetExecPositions,
   jcGetMemberForAgent,
   jcGetMemberRuntime,
@@ -53,16 +54,22 @@ const BUBBLE_EMOJIS: Record<string, string> = {
   coffee: '☕',
 };
 
+// Liaison beam effect
+const LIAISON_COLOR_RESEARCH = 'rgba(100, 100, 255, 0.4)';
+const LIAISON_COLOR_MARKETING = 'rgba(255, 100, 100, 0.4)';
+const LIAISON_LINE_WIDTH = 2;
+const LIAISON_PARTICLE_SIZE = 3;
+
 // ── Zone labels ──────────────────────────────────────────────────
 const ZONE_LABELS: Array<{ text: string; col: number; row: number }> = [
   { text: 'ENTRANCE', col: 1, row: 2 },
-  { text: 'EXEC', col: 15, row: 2 },
-  { text: 'MEETING', col: 3, row: 6 },
-  { text: 'BREAK', col: 7, row: 6 },
-  { text: 'ENGINEERING', col: 14, row: 6 },
+  { text: 'EXEC AREA', col: 15, row: 2 },
+  { text: 'POKER TABLE', col: 3, row: 6 },
+  { text: 'BREAK ZONE', col: 7, row: 6 },
+  { text: 'DEV ZONE', col: 14, row: 6 },
   { text: 'MARKETING', col: 2, row: 12 },
-  { text: 'RESEARCH', col: 15, row: 12 },
-  { text: 'OPS', col: 8, row: 18 },
+  { text: 'RESEARCH LAB', col: 14, row: 12 },
+  { text: 'OPS HUB', col: 8, row: 18 },
 ];
 
 // ── Main render function ─────────────────────────────────────────
@@ -94,6 +101,9 @@ export function renderJCOverlay(
 
   // 4. Exec icons
   renderExecIcons(ctx, offsetX, offsetY, s, zoom);
+
+  // 4.5. Department liaison beams
+  renderLiaisonBeams(ctx, offsetX, offsetY, s, zoom);
 
   // 5. JC state bubbles above characters
   if (characters) {
@@ -216,6 +226,51 @@ function renderExecIcons(
     ctx.textBaseline = 'top';
     ctx.fillText(exec.label, x + iconS / 2, y + iconS + 2);
   }
+  ctx.restore();
+}
+
+function renderLiaisonBeams(
+  ctx: CanvasRenderingContext2D,
+  offsetX: number,
+  offsetY: number,
+  s: number,
+  zoom: number,
+): void {
+  const liaisons = jcGetActiveLiaisons();
+  if (liaisons.length === 0) return;
+
+  ctx.save();
+  const now = Date.now();
+
+  for (const liaison of liaisons) {
+    const progress = (now - liaison.startTime) / liaison.duration;
+    const alpha = progress < 0.2 ? progress / 0.2 : progress > 0.8 ? (1 - progress) / 0.2 : 1;
+
+    const x1 = offsetX + (liaison.fromCol + 0.5) * s;
+    const y1 = offsetY + (liaison.fromRow + 0.5) * s;
+    const x2 = offsetX + (liaison.toCol + 0.5) * s;
+    const y2 = offsetY + (liaison.toRow + 0.5) * s;
+
+    // Draw beam line
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle =
+      liaison.fromZone === 'research' ? LIAISON_COLOR_RESEARCH : LIAISON_COLOR_MARKETING;
+    ctx.lineWidth = LIAISON_LINE_WIDTH * zoom;
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.stroke();
+
+    // Draw moving particle along the beam
+    const px = x1 + (x2 - x1) * progress;
+    const py = y1 + (y2 - y1) * progress;
+    ctx.beginPath();
+    ctx.arc(px, py, LIAISON_PARTICLE_SIZE * zoom, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = alpha;
+    ctx.fill();
+  }
+
   ctx.restore();
 }
 

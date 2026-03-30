@@ -3,9 +3,11 @@
 export { renderJCBubble, renderJCOverlay } from './jc-overlay.js';
 export {
   JC_ENTRANCE,
+  jcGetBreakTarget,
   jcGetDeskPosition,
   jcGetMemberForAgent,
   jcGetMemberRuntime,
+  jcGetPokerSeat,
   jcGetPresentMemberIds,
   jcIsActive,
   jcLoadConfig,
@@ -13,7 +15,9 @@ export {
   jcMemberDeparted,
   jcMemberLeaving,
   jcMemberStateChange,
+  jcTriggerLiaison,
   jcUpdateMappings,
+  POKER_TABLE_SEATS,
 } from './jc-state.js';
 export type {
   JCBubbleType,
