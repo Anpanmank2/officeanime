@@ -8,6 +8,7 @@ import {
   ZOOM_MIN,
   ZOOM_SCROLL_THRESHOLD,
 } from '../../constants.js';
+import { renderJCOverlay } from '../../jc/jc-overlay.js';
 import { unlockAudio } from '../../notificationSound.js';
 import { vscode } from '../../vscodeApi.js';
 import { canPlaceFurniture, getWallPlacementRow } from '../editor/editorActions.js';
@@ -269,6 +270,9 @@ export function OfficeCanvas({
           officeState.getLayout().rows,
         );
         offsetRef.current = { x: offsetX, y: offsetY };
+
+        // JC Virtual Office overlay (nameplates, zone labels, exec icons, stats)
+        renderJCOverlay(ctx, offsetX, offsetY, zoom, w);
 
         // Store delete/rotate button bounds for hit-testing
         deleteButtonBoundsRef.current = editorRender?.deleteButtonBounds ?? null;

@@ -129,6 +129,13 @@ export async function launchNewTerminal(
   console.log(`[Pixel Agents] Agent ${id}: created for terminal ${terminal.name}`);
   webview?.postMessage({ type: 'agentCreated', id, folderName });
 
+  // JC: Notify JC system of new agent
+  import('./jc/index.js').then((jc) => {
+    if (jc.isJCActive()) {
+      jc.onAgentCreated(id, agent, webview);
+    }
+  });
+
   ensureProjectScan(
     projectDir,
     knownJsonlFiles,

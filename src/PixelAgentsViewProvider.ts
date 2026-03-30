@@ -41,6 +41,12 @@ import {
   startExternalSessionScanning,
   startStaleExternalAgentCheck,
 } from './fileWatcher.js';
+import {
+  isJCActive,
+  onAgentCreated as jcOnAgentCreated,
+  onAgentRemoved as jcOnAgentRemoved,
+  sendJCConfig,
+} from './jc/index.js';
 import type { LayoutWatcher } from './layoutPersistence.js';
 import { readLayoutFromFile, watchLayoutFile, writeLayoutToFile } from './layoutPersistence.js';
 import type { AgentState } from './types.js';
@@ -407,6 +413,14 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           }
         })();
         sendExistingAgents(this.agents, this.context, this.webview);
+
+        // JC: Send config to webview after initialization
+        if (isJCActive() && this.webview) {
+          sendJCConfig(this.webview);
+        }
+      } else if (message.type === 'jcAssignMapping') {
+        // JC: Handle manual member assignment from webview
+        // (handled via agent-mapper in jc/index.ts)
       } else if (message.type === 'requestDiagnostics') {
         // Send connection diagnostics for all agents to the Debug View
         const diagnostics: Array<Record<string, unknown>> = [];
@@ -536,6 +550,10 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
             this.persistAgents,
           );
           webviewView.webview.postMessage({ type: 'agentClosed', id });
+          // JC: Notify JC system of agent removal
+          if (isJCActive()) {
+            jcOnAgentRemoved(id, webviewView.webview);
+          }
         }
       }
     });

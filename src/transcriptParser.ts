@@ -108,6 +108,13 @@ export function processTranscriptLine(
               toolId: block.id,
               status,
             });
+
+            // JC: Notify tool start for state tracking
+            import('./jc/index.js').then((jc) => {
+              if (jc.isJCActive()) {
+                jc.onToolStart(agentId, toolName, webview);
+              }
+            });
           }
         }
         if (hasNonExemptTool) {
@@ -277,6 +284,13 @@ export function processTranscriptLine(
         type: 'agentStatus',
         id: agentId,
         status: 'waiting',
+      });
+
+      // JC: Notify idle/waiting state
+      import('./jc/index.js').then((jc) => {
+        if (jc.isJCActive()) {
+          jc.onAgentIdle(agentId, webview);
+        }
       });
     } else if (record.type && !agent.seenUnknownRecordTypes.has(record.type)) {
       // Log first occurrence of unrecognized record types to help diagnose issues

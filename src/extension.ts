@@ -1,11 +1,16 @@
 import * as vscode from 'vscode';
 
 import { COMMAND_EXPORT_DEFAULT_LAYOUT, COMMAND_SHOW_PANEL, VIEW_ID } from './constants.js';
+import { initJC } from './jc/index.js';
 import { PixelAgentsViewProvider } from './PixelAgentsViewProvider.js';
 
 let providerInstance: PixelAgentsViewProvider | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
+  // Initialize Just Curious Virtual Office (no-op if jc-config.json not present)
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+  initJC(workspaceRoot);
+
   const provider = new PixelAgentsViewProvider(context);
   providerInstance = provider;
 

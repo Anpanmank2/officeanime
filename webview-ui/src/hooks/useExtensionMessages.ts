@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 
+import {
+  jcLoadConfig,
+  jcMemberArriving,
+  jcMemberLeaving,
+  jcMemberStateChange,
+  jcUpdateMappings,
+} from '../jc/index.js';
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import { setFloorSprites } from '../office/floorTiles.js';
@@ -425,6 +432,18 @@ export function useExtensionMessages(
         } catch (err) {
           console.error(`❌ Webview: Error processing furnitureAssetsLoaded:`, err);
         }
+      }
+      // ── JC Messages ──────────────────────────────────────────
+      else if (msg.type === 'jcConfigLoaded') {
+        jcLoadConfig(msg.config);
+      } else if (msg.type === 'jcMemberArriving') {
+        jcMemberArriving(msg.memberId);
+      } else if (msg.type === 'jcMemberLeaving') {
+        jcMemberLeaving(msg.memberId);
+      } else if (msg.type === 'jcMemberStateChange') {
+        jcMemberStateChange(msg.memberId, msg.jcState);
+      } else if (msg.type === 'jcMappingUpdate') {
+        jcUpdateMappings(msg.mappings);
       }
     };
     window.addEventListener('message', handler);
