@@ -82,9 +82,12 @@ export async function onAgentCreated(
     if (desk && member) {
       webview?.postMessage({
         type: 'jcMemberArriving',
+        agentId,
         memberId,
         deskId: desk.deskId,
+        seatUid: desk.deskId, // seat UID in the layout matches deskId
         hueShift: member.hueShift,
+        palette: member.hueShift === 0 ? 0 : undefined,
       });
     }
 
@@ -105,7 +108,7 @@ export function onAgentRemoved(agentId: number, webview: vscode.Webview | undefi
   const memberId = removeMapping(agentId);
   if (memberId) {
     memberStates.set(memberId, 'leaving');
-    webview?.postMessage({ type: 'jcMemberLeaving', memberId });
+    webview?.postMessage({ type: 'jcMemberLeaving', agentId, memberId });
     webview?.postMessage({ type: 'jcMappingUpdate', mappings: getAllMappings() });
   }
 }
@@ -131,6 +134,7 @@ export function onToolStart(
     memberStates.set(memberId, newState);
     webview?.postMessage({
       type: 'jcMemberStateChange',
+      agentId,
       memberId,
       jcState: newState,
     });
@@ -149,6 +153,7 @@ export function onAgentIdle(agentId: number, webview: vscode.Webview | undefined
   memberStates.set(memberId, 'idle');
   webview?.postMessage({
     type: 'jcMemberStateChange',
+    agentId,
     memberId,
     jcState: 'idle',
   });

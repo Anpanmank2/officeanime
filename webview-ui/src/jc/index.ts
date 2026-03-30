@@ -2,6 +2,8 @@
 
 export { renderJCBubble, renderJCOverlay } from './jc-overlay.js';
 export {
+  JC_ENTRANCE,
+  jcGetDeskPosition,
   jcGetMemberForAgent,
   jcGetMemberRuntime,
   jcGetPresentMemberIds,

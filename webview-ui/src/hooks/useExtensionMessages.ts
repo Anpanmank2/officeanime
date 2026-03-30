@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
 import {
+  JC_ENTRANCE,
   jcLoadConfig,
   jcMemberArriving,
+  jcMemberDeparted,
   jcMemberLeaving,
   jcMemberStateChange,
   jcUpdateMappings,
@@ -14,7 +16,7 @@ import { buildDynamicCatalog } from '../office/layout/furnitureCatalog.js';
 import { migrateLayoutColors } from '../office/layout/layoutSerializer.js';
 import { setCharacterTemplates } from '../office/sprites/spriteData.js';
 import { extractToolName } from '../office/toolUtils.js';
-import type { OfficeLayout, ToolActivity } from '../office/types.js';
+import { type OfficeLayout, TILE_SIZE, type ToolActivity } from '../office/types.js';
 import { setWallSprites } from '../office/wallTiles.js';
 import { vscode } from '../vscodeApi.js';
 
@@ -437,9 +439,69 @@ export function useExtensionMessages(
       else if (msg.type === 'jcConfigLoaded') {
         jcLoadConfig(msg.config);
       } else if (msg.type === 'jcMemberArriving') {
-        jcMemberArriving(msg.memberId);
+        const agentId = msg.agentId as number;
+        const memberId = msg.memberId as string;
+        const deskId = msg.deskId as string;
+        const hueShift = (msg.hueShift as number) ?? 0;
+        const seatUid = deskId; // seat UID in layout matches deskId
+
+        jcMemberArriving(memberId);
+
+        // Create character at the preferred seat with hueShift
+        os.addAgent(agentId, undefined, hueShift, seatUid, true);
+        const ch = os.characters.get(agentId);
+        if (ch) {
+          // Override position to entrance — character will walk to desk
+          ch.tileCol = JC_ENTRANCE.col;
+          ch.tileRow = JC_ENTRANCE.row;
+          ch.x = JC_ENTRANCE.col * TILE_SIZE + TILE_SIZE / 2;
+          ch.y = JC_ENTRANCE.row * TILE_SIZE + TILE_SIZE / 2;
+          // Trigger walk to assigned seat
+          os.sendToSeat(agentId);
+        }
       } else if (msg.type === 'jcMemberLeaving') {
-        jcMemberLeaving(msg.memberId);
+        const agentId = msg.agentId as number;
+        const memberId = msg.memberId as string;
+        jcMemberLeaving(memberId);
+
+        // Walk character to entrance, then despawn
+        const ch = os.characters.get(agentId);
+        if (ch) {
+          ch.isActive = false;
+          const walked = os.walkToTile(agentId, JC_ENTRANCE.col, JC_ENTRANCE.row);
+          if (!walked) {
+            // Can't pathfind — just remove immediately
+            jcMemberDeparted(memberId);
+            os.removeAgent(agentId);
+          } else {
+            // Poll for arrival at entrance, then despawn
+            const checkInterval = setInterval(() => {
+              const c = os.characters.get(agentId);
+              if (!c) {
+                clearInterval(checkInterval);
+                jcMemberDeparted(memberId);
+                return;
+              }
+              if (
+                c.tileCol === JC_ENTRANCE.col &&
+                c.tileRow === JC_ENTRANCE.row &&
+                c.path.length === 0
+              ) {
+                clearInterval(checkInterval);
+                jcMemberDeparted(memberId);
+                os.removeAgent(agentId);
+              }
+            }, 200);
+            // Safety timeout — despawn after 15s regardless
+            setTimeout(() => {
+              clearInterval(checkInterval);
+              if (os.characters.has(agentId)) {
+                jcMemberDeparted(memberId);
+                os.removeAgent(agentId);
+              }
+            }, 15000);
+          }
+        }
       } else if (msg.type === 'jcMemberStateChange') {
         jcMemberStateChange(msg.memberId, msg.jcState);
       } else if (msg.type === 'jcMappingUpdate') {
