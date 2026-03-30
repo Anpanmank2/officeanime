@@ -3,8 +3,16 @@
 // Called after the base renderFrame() to add nameplates, exec icons,
 // absence indicators, zone labels, and state bubbles.
 
-import { TILE_SIZE } from '../office/types.js';
-import { jcGetExecPositions, jcGetNameplates, jcGetStats, jcIsActive } from './jc-state.js';
+import type { Character } from '../office/types.js';
+import { CharacterState, TILE_SIZE } from '../office/types.js';
+import {
+  jcGetExecPositions,
+  jcGetMemberForAgent,
+  jcGetMemberRuntime,
+  jcGetNameplates,
+  jcGetStats,
+  jcIsActive,
+} from './jc-state.js';
 import type { JCBubbleType } from './jc-types.js';
 
 // ── Constants ────────────────────────────────────────────────────
@@ -69,6 +77,7 @@ export function renderJCOverlay(
   offsetY: number,
   zoom: number,
   canvasWidth: number,
+  characters?: Character[],
 ): void {
   if (!jcIsActive()) return;
 
@@ -86,7 +95,12 @@ export function renderJCOverlay(
   // 4. Exec icons
   renderExecIcons(ctx, offsetX, offsetY, s, zoom);
 
-  // 5. Stats bar (top-right corner)
+  // 5. JC state bubbles above characters
+  if (characters) {
+    renderJCCharacterBubbles(ctx, characters, offsetX, offsetY, zoom);
+  }
+
+  // 6. Stats bar (top-right corner, fixed position)
   renderStatsBar(ctx, canvasWidth);
 }
 
@@ -225,6 +239,34 @@ function renderStatsBar(ctx: CanvasRenderingContext2D, canvasWidth: number): voi
   ctx.textBaseline = 'top';
   ctx.fillText(text, x, y + 3);
   ctx.restore();
+}
+
+/**
+ * Render JC state bubbles for all mapped characters.
+ * Looks up each character's agentId → memberId → JC state → bubble type.
+ */
+function renderJCCharacterBubbles(
+  ctx: CanvasRenderingContext2D,
+  characters: Character[],
+  offsetX: number,
+  offsetY: number,
+  zoom: number,
+): void {
+  for (const ch of characters) {
+    if (ch.isSubagent) continue;
+    const memberId = jcGetMemberForAgent(ch.id);
+    if (!memberId) continue;
+    const runtime = jcGetMemberRuntime(memberId);
+    if (!runtime || !runtime.bubbleType) continue;
+
+    // Character pixel position → screen position
+    // Sitting offset: characters sit higher when in TYPE state
+    const sittingOff = ch.state === CharacterState.TYPE ? -4 : 0;
+    const screenX = offsetX + ch.x * zoom;
+    const screenY = offsetY + (ch.y + sittingOff) * zoom;
+
+    renderJCBubble(ctx, runtime.bubbleType, screenX, screenY, zoom);
+  }
 }
 
 /**

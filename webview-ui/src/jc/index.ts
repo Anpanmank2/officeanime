@@ -15,4 +15,10 @@ export {
   jcMemberStateChange,
   jcUpdateMappings,
 } from './jc-state.js';
-export type { JCBubbleType, JCConfigData, JCMemberRuntime, NameplateInfo } from './jc-types.js';
+export type {
+  JCBubbleType,
+  JCConfigData,
+  JCMemberRuntime,
+  JCState,
+  NameplateInfo,
+} from './jc-types.js';

@@ -272,7 +272,7 @@ export function OfficeCanvas({
         offsetRef.current = { x: offsetX, y: offsetY };
 
         // JC Virtual Office overlay (nameplates, zone labels, exec icons, stats)
-        renderJCOverlay(ctx, offsetX, offsetY, zoom, w);
+        renderJCOverlay(ctx, offsetX, offsetY, zoom, w, officeState.getCharacters());
 
         // Store delete/rotate button bounds for hit-testing
         deleteButtonBoundsRef.current = editorRender?.deleteButtonBounds ?? null;

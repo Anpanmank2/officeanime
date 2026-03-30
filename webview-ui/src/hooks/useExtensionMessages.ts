@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import type { JCState } from '../jc/index.js';
 import {
   JC_ENTRANCE,
   jcLoadConfig,
@@ -503,7 +504,37 @@ export function useExtensionMessages(
           }
         }
       } else if (msg.type === 'jcMemberStateChange') {
-        jcMemberStateChange(msg.memberId, msg.jcState);
+        const agentId = msg.agentId as number;
+        const jcState = msg.jcState as JCState;
+        jcMemberStateChange(msg.memberId, jcState);
+
+        // Sync character animation with JC state
+        const ch = os.characters.get(agentId);
+        if (ch) {
+          if (jcState === 'reading' || jcState === 'reviewing') {
+            ch.currentTool = 'Read'; // triggers reading animation
+            ch.isActive = true;
+            os.sendToSeat(agentId);
+          } else if (jcState === 'coding') {
+            ch.currentTool = 'Write'; // triggers typing animation
+            ch.isActive = true;
+            os.sendToSeat(agentId);
+          } else if (jcState === 'thinking') {
+            ch.currentTool = null;
+            ch.isActive = true;
+            os.sendToSeat(agentId);
+          } else if (jcState === 'idle') {
+            ch.currentTool = null;
+            ch.isActive = false; // will trigger idle wander
+          } else if (jcState === 'error') {
+            ch.currentTool = null;
+            ch.isActive = true;
+            os.sendToSeat(agentId);
+          } else if (jcState === 'break') {
+            ch.currentTool = null;
+            ch.isActive = false; // wander in break zone
+          }
+        }
       } else if (msg.type === 'jcMappingUpdate') {
         jcUpdateMappings(msg.mappings);
       }
