@@ -87,7 +87,7 @@ export async function onAgentCreated(
         deskId: desk.deskId,
         seatUid: desk.deskId, // seat UID in the layout matches deskId
         hueShift: member.hueShift,
-        palette: member.hueShift === 0 ? 0 : undefined,
+        palette: member.palette ?? 0,
       });
     }
 

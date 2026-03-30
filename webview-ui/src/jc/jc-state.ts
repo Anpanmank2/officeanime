@@ -232,6 +232,13 @@ export function jcGetMemberForAgent(agentId: number): string | undefined {
   return agentToMember.get(agentId);
 }
 
+/** Get full member runtime info for an agent ID (agent → member → runtime) */
+export function jcGetMemberInfo(agentId: number): JCMemberRuntime | null {
+  const memberId = agentToMember.get(agentId);
+  if (!memberId) return null;
+  return memberRuntimes.get(memberId) ?? null;
+}
+
 /** Get desk position by desk ID */
 export function jcGetDeskPosition(deskId: string): { col: number; row: number } | undefined {
   const pos = DESK_POSITIONS[deskId];

@@ -41,12 +41,16 @@ import {
   startExternalSessionScanning,
   startStaleExternalAgentCheck,
 } from './fileWatcher.js';
+import type { BrowserServer } from './jc/browser-server.js';
+import { startBrowserServer } from './jc/browser-server.js';
 import {
   isJCActive,
   onAgentCreated as jcOnAgentCreated,
   onAgentRemoved as jcOnAgentRemoved,
   sendJCConfig,
 } from './jc/index.js';
+import type { MessageBridge } from './jc/message-bridge.js';
+import { createMessageBridge } from './jc/message-bridge.js';
 import type { LayoutWatcher } from './layoutPersistence.js';
 import { readLayoutFromFile, watchLayoutFile, writeLayoutToFile } from './layoutPersistence.js';
 import type { AgentState } from './types.js';
@@ -86,6 +90,12 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
   // Cross-window layout sync
   layoutWatcher: LayoutWatcher | null = null;
 
+  // Browser viewing
+  private browserServer: BrowserServer | null = null;
+  private messageBridge: MessageBridge | null = null;
+  /** Track messages sent to webview for replay to late-connecting browser clients */
+  private sentMessages = new Map<string, unknown>();
+
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   private get extensionUri(): vscode.Uri {
@@ -104,6 +114,13 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
     this.webviewView = webviewView;
     webviewView.webview.options = { enableScripts: true };
     webviewView.webview.html = getWebviewContent(webviewView.webview, this.extensionUri);
+
+    // Intercept postMessage to track messages for browser replay and broadcast
+    const origPostMessage = webviewView.webview.postMessage.bind(webviewView.webview);
+    (webviewView.webview as any).postMessage = (message: any) => {
+      this.trackMessage(message);
+      return origPostMessage(message);
+    };
 
     webviewView.webview.onDidReceiveMessage(async (message) => {
       if (message.type === 'openClaude') {
@@ -628,7 +645,66 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  /** Track a message for potential browser replay */
+  private trackMessage(data: unknown): void {
+    const msg = data as { type?: string };
+    if (msg.type) {
+      this.sentMessages.set(msg.type, data);
+    }
+    // Also forward to browser clients if server is active
+    this.browserServer?.broadcast(data);
+  }
+
+  /** Send message to webview + all browser clients */
+  broadcastMessage(data: unknown): void {
+    this.webview?.postMessage(data);
+    this.trackMessage(data);
+  }
+
+  /** Start browser viewing: HTTP server + WS bridge, open in external browser */
+  async startBrowserViewing(): Promise<void> {
+    if (this.browserServer) {
+      // Already running — just open the URL
+      void vscode.env.openExternal(vscode.Uri.parse(`http://localhost:${this.browserServer.port}`));
+      return;
+    }
+
+    try {
+      const extensionPath = this.extensionUri.fsPath;
+      this.browserServer = await startBrowserServer(extensionPath);
+
+      // Create message bridge with replay buffer
+      this.messageBridge = createMessageBridge();
+
+      // Seed replay buffer from previously tracked messages
+      this.messageBridge.seedReplayBuffer([...this.sentMessages.values()]);
+
+      // Handle new WS connections
+      this.browserServer.wss.on('connection', (ws) => {
+        console.log('[JC] Browser client connected');
+        this.messageBridge?.sendInitialState(ws);
+
+        ws.on('message', (raw) => {
+          this.messageBridge?.handleWsMessage(ws, raw.toString());
+        });
+      });
+
+      // Open browser
+      void vscode.env.openExternal(vscode.Uri.parse(`http://localhost:${this.browserServer.port}`));
+
+      vscode.window.showInformationMessage(
+        `Pixel Agents: Browser view at http://localhost:${this.browserServer.port}`,
+      );
+    } catch (err) {
+      console.error('[JC] Failed to start browser server:', err);
+      vscode.window.showErrorMessage(`Pixel Agents: Failed to start browser server — ${err}`);
+    }
+  }
+
   dispose() {
+    this.browserServer?.close();
+    this.browserServer = null;
+    this.messageBridge = null;
     this.layoutWatcher?.dispose();
     this.layoutWatcher = null;
     for (const id of [...this.agents.keys()]) {

@@ -11,6 +11,7 @@
       "layer": "L1",
       "zone": "dev",
       "hueShift": 210,
+      "palette": 0,
       "deskId": "dev-desk-01",
       "accentColor": "#185FA5",
       "breakBehavior": "arcade"
@@ -24,6 +25,7 @@
       "layer": "L2",
       "zone": "dev",
       "hueShift": 180,
+      "palette": 1,
       "deskId": "dev-desk-02",
       "accentColor": "#0F6E56",
       "breakBehavior": "coffee"
@@ -37,6 +39,7 @@
       "layer": "L2",
       "zone": "dev",
       "hueShift": 270,
+      "palette": 2,
       "deskId": "dev-desk-03",
       "accentColor": "#534AB7",
       "breakBehavior": "bookshelf"
@@ -50,6 +53,7 @@
       "layer": "L2",
       "zone": "dev",
       "hueShift": 15,
+      "palette": 3,
       "deskId": "dev-desk-04",
       "accentColor": "#D85A30",
       "breakBehavior": "meeting"
@@ -63,6 +67,7 @@
       "layer": "L3",
       "zone": "dev",
       "hueShift": 330,
+      "palette": 4,
       "deskId": "dev-desk-05",
       "accentColor": "#D4537E",
       "breakBehavior": "sofa"
@@ -76,6 +81,7 @@
       "layer": "L3",
       "zone": "dev",
       "hueShift": 40,
+      "palette": 5,
       "deskId": "dev-desk-06",
       "accentColor": "#BA7517",
       "breakBehavior": "arcade"
@@ -89,6 +95,7 @@
       "layer": "L1",
       "zone": "marketing",
       "hueShift": 0,
+      "palette": 0,
       "deskId": "mkt-desk-01",
       "accentColor": "#A32D2D",
       "breakBehavior": "sofa"
@@ -102,6 +109,7 @@
       "layer": "L2",
       "zone": "marketing",
       "hueShift": 50,
+      "palette": 1,
       "deskId": "mkt-desk-02",
       "accentColor": "#854F0B",
       "breakBehavior": "coffee"
@@ -115,6 +123,7 @@
       "layer": "L2",
       "zone": "marketing",
       "hueShift": 55,
+      "palette": 2,
       "deskId": "mkt-desk-03",
       "accentColor": "#854F0B",
       "breakBehavior": "sofa"
@@ -128,6 +137,7 @@
       "layer": "L2",
       "zone": "marketing",
       "hueShift": 45,
+      "palette": 3,
       "deskId": "mkt-desk-04",
       "accentColor": "#854F0B",
       "breakBehavior": "coffee"
@@ -141,6 +151,7 @@
       "layer": "L2",
       "zone": "marketing",
       "hueShift": 60,
+      "palette": 4,
       "deskId": "mkt-desk-05",
       "accentColor": "#854F0B",
       "breakBehavior": "sofa"
@@ -154,6 +165,7 @@
       "layer": "L2",
       "zone": "marketing",
       "hueShift": 10,
+      "palette": 5,
       "deskId": "mkt-desk-06",
       "accentColor": "#993C1D",
       "breakBehavior": "meeting"
@@ -167,6 +179,7 @@
       "layer": "L3",
       "zone": "marketing",
       "hueShift": 120,
+      "palette": 0,
       "deskId": "mkt-desk-07",
       "accentColor": "#3B6D11",
       "breakBehavior": "coffee"
@@ -180,6 +193,7 @@
       "layer": "L3",
       "zone": "marketing",
       "hueShift": 130,
+      "palette": 1,
       "deskId": "mkt-desk-08",
       "accentColor": "#3B6D11",
       "breakBehavior": "arcade"
@@ -193,6 +207,7 @@
       "layer": "L4",
       "zone": "marketing",
       "hueShift": 175,
+      "palette": 2,
       "deskId": "mkt-desk-09",
       "accentColor": "#0F6E56",
       "breakBehavior": "sofa"
@@ -206,6 +221,7 @@
       "layer": "L4",
       "zone": "marketing",
       "hueShift": 185,
+      "palette": 3,
       "deskId": "mkt-desk-10",
       "accentColor": "#0F6E56",
       "breakBehavior": "coffee"
@@ -219,6 +235,7 @@
       "layer": "L4",
       "zone": "marketing",
       "hueShift": 190,
+      "palette": 4,
       "deskId": "mkt-desk-11",
       "accentColor": "#0F6E56",
       "breakBehavior": "sofa"
@@ -232,6 +249,7 @@
       "layer": "L1",
       "zone": "research",
       "hueShift": 260,
+      "palette": 5,
       "deskId": "res-desk-01",
       "accentColor": "#993C1D",
       "breakBehavior": "coffee"
@@ -245,6 +263,7 @@
       "layer": "L2",
       "zone": "research",
       "hueShift": 240,
+      "palette": 0,
       "deskId": "res-desk-02",
       "accentColor": "#993C1D",
       "breakBehavior": "sofa"
@@ -258,6 +277,7 @@
       "layer": "L2",
       "zone": "research",
       "hueShift": 250,
+      "palette": 1,
       "deskId": "res-desk-03",
       "accentColor": "#993C1D",
       "breakBehavior": "coffee"
@@ -271,6 +291,7 @@
       "layer": "L2",
       "zone": "research",
       "hueShift": 230,
+      "palette": 2,
       "deskId": "res-desk-04",
       "accentColor": "#993C1D",
       "breakBehavior": "arcade"
@@ -284,6 +305,7 @@
       "layer": "L2",
       "zone": "research",
       "hueShift": 220,
+      "palette": 3,
       "deskId": "res-desk-05",
       "accentColor": "#993C1D",
       "breakBehavior": "bookshelf"
@@ -297,6 +319,7 @@
       "layer": "L3",
       "zone": "research",
       "hueShift": 0,
+      "palette": 4,
       "deskId": "res-desk-06",
       "accentColor": "#999999",
       "breakBehavior": "sofa"

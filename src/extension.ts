@@ -27,6 +27,12 @@ export function activate(context: vscode.ExtensionContext) {
       provider.exportDefaultLayout();
     }),
   );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('pixel-agents.openInBrowser', () => {
+      provider.startBrowserViewing();
+    }),
+  );
 }
 
 export function deactivate() {

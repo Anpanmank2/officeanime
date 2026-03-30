@@ -47,6 +47,7 @@ export interface JCMember {
   layer: Layer;
   zone: ZoneType;
   hueShift: number;
+  palette?: number;
   deskId: string;
 }
 

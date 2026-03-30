@@ -10,6 +10,7 @@ import { PULSE_ANIMATION_DURATION_SEC } from './constants.js';
 import { useEditorActions } from './hooks/useEditorActions.js';
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js';
 import { useExtensionMessages } from './hooks/useExtensionMessages.js';
+import { JCMemberInfoPanel } from './jc/JCMemberInfoPanel.js';
 import { OfficeCanvas } from './office/components/OfficeCanvas.js';
 import { ToolOverlay } from './office/components/ToolOverlay.js';
 import { EditorState } from './office/editor/editorState.js';
@@ -126,8 +127,10 @@ function EditActionBar({
 function App() {
   // Browser runtime (dev or static dist): dispatch mock messages after the
   // useExtensionMessages listener has been registered.
+  // Skip if WebSocket bridge is active (real extension data will arrive via WS).
   useEffect(() => {
-    if (isBrowserRuntime) {
+    const hasWsPort = !!(window as unknown as Record<string, unknown>).__PIXEL_AGENTS_WS_PORT__;
+    if (isBrowserRuntime && !hasWsPort) {
       void import('./browserMock.js').then(({ dispatchMockMessages }) => dispatchMockMessages());
     }
   }, []);
@@ -405,6 +408,15 @@ function App() {
           panRef={editor.panRef}
           onCloseAgent={handleCloseAgent}
           alwaysShowOverlay={alwaysShowOverlay}
+        />
+      )}
+
+      {!isDebugMode && (
+        <JCMemberInfoPanel
+          officeState={officeState}
+          containerRef={containerRef}
+          zoom={editor.zoom}
+          panRef={editor.panRef}
         />
       )}
 

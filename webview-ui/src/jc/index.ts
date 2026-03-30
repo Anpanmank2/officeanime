@@ -6,6 +6,7 @@ export {
   jcGetBreakTarget,
   jcGetDeskPosition,
   jcGetMemberForAgent,
+  jcGetMemberInfo,
   jcGetMemberRuntime,
   jcGetPokerSeat,
   jcGetPresentMemberIds,

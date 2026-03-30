@@ -38,6 +38,7 @@ export interface JCMemberConfig {
   department: string;
   zone: ZoneType;
   hueShift: number;
+  palette?: number;
   deskId: string;
   accentColor?: string;
   breakBehavior?: 'coffee' | 'sofa' | 'arcade' | 'bookshelf' | 'meeting';

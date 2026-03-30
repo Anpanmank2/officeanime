@@ -447,12 +447,13 @@ export function useExtensionMessages(
         const memberId = msg.memberId as string;
         const deskId = msg.deskId as string;
         const hueShift = (msg.hueShift as number) ?? 0;
+        const palette = msg.palette as number | undefined;
         const seatUid = deskId; // seat UID in layout matches deskId
 
         jcMemberArriving(memberId);
 
-        // Create character at the preferred seat with hueShift
-        os.addAgent(agentId, undefined, hueShift, seatUid, true);
+        // Create character at the preferred seat with palette + hueShift
+        os.addAgent(agentId, palette, hueShift, seatUid, true);
         const ch = os.characters.get(agentId);
         if (ch) {
           // Override position to entrance — character will walk to desk
