@@ -120,6 +120,8 @@ export async function launchNewTerminal(
     lastDataAt: 0,
     linesProcessed: 0,
     seenUnknownRecordTypes: new Set(),
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
     folderName,
   };
 
@@ -320,6 +322,8 @@ export function restoreAgents(
       lastDataAt: 0,
       linesProcessed: 0,
       seenUnknownRecordTypes: new Set(),
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
       folderName: p.folderName,
     };
 

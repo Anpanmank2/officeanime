@@ -427,6 +427,8 @@ function adoptTerminalForFile(
     lastDataAt: 0,
     linesProcessed: 0,
     seenUnknownRecordTypes: new Set(),
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
   };
 
   agents.set(id, agent);
@@ -495,6 +497,8 @@ function adoptExternalSession(
     lastDataAt: Date.now(),
     linesProcessed: 0,
     seenUnknownRecordTypes: new Set(),
+    totalInputTokens: 0,
+    totalOutputTokens: 0,
     folderName,
   };
 

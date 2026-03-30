@@ -4,6 +4,7 @@ import { toMajorMinor } from './changelogData.js';
 import { BottomToolbar } from './components/BottomToolbar.js';
 import { ChangelogModal } from './components/ChangelogModal.js';
 import { DebugView } from './components/DebugView.js';
+import { TokenHPBar } from './components/TokenHPBar.js';
 import { VersionIndicator } from './components/VersionIndicator.js';
 import { ZoomControls } from './components/ZoomControls.js';
 import { PULSE_ANIMATION_DURATION_SEC } from './constants.js';
@@ -147,6 +148,7 @@ function App() {
     selectedAgent,
     agentTools,
     agentStatuses,
+    agentTokenUsage,
     subagentTools,
     subagentCharacters,
     layoutReady,
@@ -396,6 +398,17 @@ function App() {
             />
           );
         })()}
+
+      {!isDebugMode && (
+        <TokenHPBar
+          officeState={officeState}
+          agents={agents}
+          agentTokenUsage={agentTokenUsage}
+          containerRef={containerRef}
+          zoom={editor.zoom}
+          panRef={editor.panRef}
+        />
+      )}
 
       {!isDebugMode && (
         <ToolOverlay

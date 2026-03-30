@@ -59,11 +59,17 @@ export interface WorkspaceFolder {
   path: string;
 }
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export interface ExtensionMessageState {
   agents: number[];
   selectedAgent: number | null;
   agentTools: Record<number, ToolActivity[]>;
   agentStatuses: Record<number, string>;
+  agentTokenUsage: Record<number, TokenUsage>;
   subagentTools: Record<number, Record<string, ToolActivity[]>>;
   subagentCharacters: SubagentCharacter[];
   layoutReady: boolean;
@@ -111,6 +117,7 @@ export function useExtensionMessages(
   const [extensionVersion, setExtensionVersion] = useState('');
   const [watchAllSessions, setWatchAllSessions] = useState(false);
   const [alwaysShowLabels, setAlwaysShowLabels] = useState(false);
+  const [agentTokenUsage, setAgentTokenUsage] = useState<Record<number, TokenUsage>>({});
 
   // Track whether initial layout has been loaded (ref to avoid re-render)
   const layoutReadyRef = useRef(false);
@@ -175,6 +182,12 @@ export function useExtensionMessages(
           return next;
         });
         setAgentStatuses((prev) => {
+          if (!(id in prev)) return prev;
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        setAgentTokenUsage((prev) => {
           if (!(id in prev)) return prev;
           const next = { ...prev };
           delete next[id];
@@ -427,6 +440,14 @@ export function useExtensionMessages(
         if (Array.isArray(msg.dirs)) {
           setExternalAssetDirectories(msg.dirs as string[]);
         }
+      } else if (msg.type === 'tokenUsageUpdate') {
+        const id = msg.id as number;
+        const inputTokens = msg.inputTokens as number;
+        const outputTokens = msg.outputTokens as number;
+        setAgentTokenUsage((prev) => ({
+          ...prev,
+          [id]: { inputTokens, outputTokens },
+        }));
       } else if (msg.type === 'furnitureAssetsLoaded') {
         try {
           const catalog = msg.catalog as FurnitureAsset[];
@@ -575,6 +596,7 @@ export function useExtensionMessages(
     selectedAgent,
     agentTools,
     agentStatuses,
+    agentTokenUsage,
     subagentTools,
     subagentCharacters,
     layoutReady,

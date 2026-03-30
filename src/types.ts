@@ -27,6 +27,9 @@ export interface AgentState {
   linesProcessed: number;
   /** Set of record.type values we've already warned about (prevents log spam) */
   seenUnknownRecordTypes: Set<string>;
+  /** Cumulative token usage for this session */
+  totalInputTokens: number;
+  totalOutputTokens: number;
 }
 
 export interface PersistedAgent {

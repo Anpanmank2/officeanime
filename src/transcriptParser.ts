@@ -76,6 +76,30 @@ export function processTranscriptLine(
     // Claude Code may change the JSONL structure across versions
     const assistantContent = record.message?.content ?? record.content;
 
+    // Extract token usage from assistant records (accumulate across the session)
+    if (record.type === 'assistant') {
+      const usage = record.message?.usage ?? record.usage;
+      if (usage && typeof usage === 'object') {
+        const inputTokens =
+          (typeof usage.input_tokens === 'number' ? usage.input_tokens : 0) +
+          (typeof usage.cache_creation_input_tokens === 'number'
+            ? usage.cache_creation_input_tokens
+            : 0) +
+          (typeof usage.cache_read_input_tokens === 'number' ? usage.cache_read_input_tokens : 0);
+        const outputTokens = typeof usage.output_tokens === 'number' ? usage.output_tokens : 0;
+        if (inputTokens > 0 || outputTokens > 0) {
+          agent.totalInputTokens += inputTokens;
+          agent.totalOutputTokens += outputTokens;
+          webview?.postMessage({
+            type: 'tokenUsageUpdate',
+            id: agentId,
+            inputTokens: agent.totalInputTokens,
+            outputTokens: agent.totalOutputTokens,
+          });
+        }
+      }
+    }
+
     if (record.type === 'assistant' && Array.isArray(assistantContent)) {
       const blocks = assistantContent as Array<{
         type: string;
