@@ -108,11 +108,53 @@ export type JCMessageToWebview =
   | { type: 'jcMemberLeaving'; memberId: string }
   | { type: 'jcMemberStateChange'; memberId: string; jcState: JCState }
   | { type: 'jcConfigLoaded'; config: JCConfig }
-  | { type: 'jcMappingUpdate'; mappings: Record<number, string> };
+  | { type: 'jcMappingUpdate'; mappings: Record<number, string> }
+  | { type: 'jcAbsenceUpdate'; payload: AbsenceInfo }
+  | { type: 'jcAbsenceBulkSync'; payload: AbsenceInfo[] }
+  | { type: 'jcTaskUpdate'; task: TaskDefinition }
+  | { type: 'jcTasksBulkSync'; tasks: TaskDefinition[] };
 
 export type JCMessageToExtension =
   | { type: 'jcRequestMapping'; agentId: number }
-  | { type: 'jcAssignMapping'; agentId: number; memberId: string };
+  | { type: 'jcAssignMapping'; agentId: number; memberId: string }
+  | { type: 'jcLaunchAgent'; memberId: string }
+  | {
+      type: 'jcSubmitTask';
+      memberId: string;
+      prompt: string;
+      priority: number;
+      workingDirectory?: string;
+    };
+
+/** Task status values */
+export const TaskStatus = {
+  PENDING: 'pending',
+  RUNNING: 'running',
+  DONE: 'done',
+  ERROR: 'error',
+} as const;
+export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
+
+/** Task definition for the orchestrator */
+export interface TaskDefinition {
+  id: string;
+  assignee: string; // roster member ID e.g. "eng-02"
+  prompt: string; // Claude Code prompt
+  systemPrompt?: string;
+  workingDirectory?: string;
+  status: TaskStatus;
+  priority: number; // 1 = highest
+  createdAt: string; // ISO 8601
+  startedAt?: string;
+  completedAt?: string;
+  result?: string;
+}
+
+/** tasks.json file schema */
+export interface TasksFile {
+  version: 1;
+  tasks: TaskDefinition[];
+}
 
 /** Bubble overlay type for JC state visualization */
 export type JCBubbleType =
@@ -123,3 +165,17 @@ export type JCBubbleType =
   | 'meeting' // 🤝
   | 'coffee' // ☕
   | null;
+
+/** Absence tracking info for JC members without active agents */
+export interface AbsenceInfo {
+  memberId: string;
+  memberName: string;
+  role: string;
+  department: string;
+  status: 'active' | 'absent' | 'idle';
+  lastActivity: number; // Unix timestamp (ms)
+  lastTool?: string;
+  lastFile?: string;
+  sessionDuration?: number; // cumulative seconds today
+  absentSince?: number; // timestamp when absence started
+}

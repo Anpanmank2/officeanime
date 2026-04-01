@@ -127,6 +127,7 @@ export function BottomToolbar({
           onContextMenu={handleAgentRightClick}
           onMouseEnter={() => setHovered('agent')}
           onMouseLeave={() => setHovered(null)}
+          aria-label="Add new agent (right-click for options)"
           style={{
             ...btnBase,
             padding: '5px 12px',

@@ -310,63 +310,54 @@ function scanForNewJsonlFiles(
     // Non-adopted files stay OUT of knownJsonlFiles so the per-agent /clear
     // check can find them when the idle check passes (up to 5s later).
 
-    // Try to adopt the focused terminal (for manually-opened Claude terminals)
-    const activeTerminal = vscode.window.activeTerminal;
-    if (activeTerminal) {
-      let owned = false;
-      for (const agent of agents.values()) {
-        if (agent.terminalRef === activeTerminal) {
-          owned = true;
-          break;
-        }
-      }
-      if (!owned) {
-        knownJsonlFiles.add(file); // Claimed by terminal adoption
-        adoptTerminalForFile(
-          activeTerminal,
-          file,
-          projectDir,
-          nextAgentIdRef,
-          agents,
-          activeAgentIdRef,
-          fileWatchers,
-          pollingTimers,
-          waitingTimers,
-          permissionTimers,
-          webview,
-          persistAgents,
-        );
-      } else {
-        // No active agent -- scan all terminals (not just the focused one)
-        // to find an untracked Claude terminal that may own this JSONL file
-        for (const terminal of vscode.window.terminals) {
-          let owned = false;
-          for (const agent of agents.values()) {
-            if (agent.terminalRef === terminal) {
-              owned = true;
-              break;
-            }
-          }
-          if (!owned) {
-            knownJsonlFiles.add(file); // Claimed by terminal adoption
-            adoptTerminalForFile(
-              terminal,
-              file,
-              projectDir,
-              nextAgentIdRef,
-              agents,
-              activeAgentIdRef,
-              fileWatchers,
-              pollingTimers,
-              waitingTimers,
-              permissionTimers,
-              webview,
-              persistAgents,
-            );
-            break;
-          }
-        }
-      }
+    // Prefer the focused terminal, but fall back to any unowned Claude terminal.
+    // If none can be matched, still adopt the JSONL as an external session so
+    // the character appears and follows transcript activity.
+    let targetTerminal = vscode.window.activeTerminal;
+    if (targetTerminal && isTerminalOwned(targetTerminal, agents)) {
+      targetTerminal = undefined;
+    }
+    if (!targetTerminal) {
+      targetTerminal = vscode.window.terminals.find(
+        (terminal) =>
+          !isTerminalOwned(terminal, agents) && terminal.name.toLowerCase().includes('claude'),
+      );
+    }
+    if (!targetTerminal) {
+      targetTerminal = vscode.window.terminals.find(
+        (terminal) => !isTerminalOwned(terminal, agents),
+      );
+    }
+
+    knownJsonlFiles.add(file);
+    if (targetTerminal) {
+      adoptTerminalForFile(
+        targetTerminal,
+        file,
+        projectDir,
+        nextAgentIdRef,
+        agents,
+        activeAgentIdRef,
+        fileWatchers,
+        pollingTimers,
+        waitingTimers,
+        permissionTimers,
+        webview,
+        persistAgents,
+      );
+    } else {
+      adoptExternalSession(
+        file,
+        projectDir,
+        nextAgentIdRef,
+        agents,
+        fileWatchers,
+        pollingTimers,
+        waitingTimers,
+        permissionTimers,
+        webview,
+        persistAgents,
+      );
     }
   }
 
@@ -390,6 +381,15 @@ function scanForNewJsonlFiles(
       webview?.postMessage({ type: 'agentClosed', id });
     }
   }
+}
+
+function isTerminalOwned(terminal: vscode.Terminal, agents: Map<number, AgentState>): boolean {
+  for (const agent of agents.values()) {
+    if (agent.terminalRef === terminal) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function adoptTerminalForFile(

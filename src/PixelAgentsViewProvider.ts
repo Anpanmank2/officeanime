@@ -48,6 +48,8 @@ import {
   onAgentCreated as jcOnAgentCreated,
   onAgentRemoved as jcOnAgentRemoved,
   sendJCConfig,
+  setLaunchFunction,
+  submitTask,
 } from './jc/index.js';
 import type { MessageBridge } from './jc/message-bridge.js';
 import { createMessageBridge } from './jc/message-bridge.js';
@@ -438,6 +440,37 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
       } else if (message.type === 'jcAssignMapping') {
         // JC: Handle manual member assignment from webview
         // (handled via agent-mapper in jc/index.ts)
+      } else if (message.type === 'jcLaunchAgent') {
+        // JC: Launch a new agent for a specific member
+        const memberId = message.memberId as string;
+        if (memberId) {
+          void launchNewTerminal(
+            this.nextAgentId,
+            this.nextTerminalIndex,
+            this.agents,
+            this.activeAgentId,
+            this.knownJsonlFiles,
+            this.fileWatchers,
+            this.pollingTimers,
+            this.waitingTimers,
+            this.permissionTimers,
+            this.jsonlPollTimers,
+            this.projectScanTimer,
+            this.webview,
+            this.persistAgents,
+          );
+        }
+      } else if (message.type === 'jcSubmitTask') {
+        // JC: Submit a task via the orchestrator
+        const { memberId, prompt, priority, workingDirectory } = message as {
+          memberId: string;
+          prompt: string;
+          priority: number;
+          workingDirectory?: string;
+        };
+        if (memberId && prompt) {
+          submitTask(memberId, prompt, priority, workingDirectory);
+        }
       } else if (message.type === 'requestDiagnostics') {
         // Send connection diagnostics for all agents to the Debug View
         const diagnostics: Array<Record<string, unknown>> = [];
@@ -574,6 +607,36 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         }
       }
     });
+  }
+
+  /** Launch a terminal for a task orchestrator task */
+  async launchForTask(memberId: string, prompt: string, workingDir?: string): Promise<void> {
+    const folderPath = workingDir || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    await launchNewTerminal(
+      this.nextAgentId,
+      this.nextTerminalIndex,
+      this.agents,
+      this.activeAgentId,
+      this.knownJsonlFiles,
+      this.fileWatchers,
+      this.pollingTimers,
+      this.waitingTimers,
+      this.permissionTimers,
+      this.jsonlPollTimers,
+      this.projectScanTimer,
+      this.webview,
+      this.persistAgents,
+      folderPath,
+    );
+    // After launching, send the prompt to the most recently created terminal
+    // The terminal was just created so it's the last one
+    const lastAgent = [...this.agents.values()].at(-1);
+    if (lastAgent?.terminalRef) {
+      // Wait for Claude to initialize, then send the prompt
+      setTimeout(() => {
+        lastAgent.terminalRef?.sendText(prompt);
+      }, 3000);
+    }
   }
 
   /** Export current saved layout as a versioned default-layout-{N}.json (dev utility) */

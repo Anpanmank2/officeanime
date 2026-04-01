@@ -87,3 +87,41 @@ export interface NameplateInfo {
   isPresent: boolean;
   zone: ZoneType;
 }
+
+/** Absence tracking info for JC members without active agents */
+export interface AbsenceInfo {
+  memberId: string;
+  memberName: string;
+  role: string;
+  department: string;
+  status: 'active' | 'absent' | 'idle';
+  lastActivity: number;
+  lastTool?: string;
+  lastFile?: string;
+  sessionDuration?: number;
+  absentSince?: number;
+}
+
+/** Task status values */
+export const TaskStatus = {
+  PENDING: 'pending',
+  RUNNING: 'running',
+  DONE: 'done',
+  ERROR: 'error',
+} as const;
+export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
+
+/** Task definition (mirrors extension-side) */
+export interface TaskDefinition {
+  id: string;
+  assignee: string;
+  prompt: string;
+  systemPrompt?: string;
+  workingDirectory?: string;
+  status: TaskStatus;
+  priority: number;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  result?: string;
+}

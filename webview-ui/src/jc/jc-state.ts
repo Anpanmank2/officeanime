@@ -1,11 +1,13 @@
 // ── Just Curious Virtual Office — Webview State Manager ─────────
 
 import type {
+  AbsenceInfo,
   JCBubbleType,
   JCConfigData,
   JCMemberRuntime,
   JCState,
   NameplateInfo,
+  TaskDefinition,
 } from './jc-types.js';
 
 /** Global JC webview state */
@@ -13,24 +15,24 @@ let jcConfig: JCConfigData | null = null;
 const memberRuntimes = new Map<string, JCMemberRuntime>();
 const agentToMember = new Map<number, string>();
 
-/** Entrance tile (spawn/despawn point) */
-export const JC_ENTRANCE = { col: 5, row: 3 };
+/** Entrance tile (spawn/despawn point) — top center of poker area */
+export const JC_ENTRANCE = { col: 12, row: 2 };
 
-/** Poker Table seats — meeting gathering point in break zone */
+/** Poker Table seats — meeting gathering point in entrance/poker zone */
 export const POKER_TABLE_SEATS = [
-  { col: 5, row: 7 },
-  { col: 6, row: 7 },
-  { col: 5, row: 8 },
-  { col: 6, row: 8 },
+  { col: 11, row: 3 },
+  { col: 12, row: 3 },
+  { col: 11, row: 4 },
+  { col: 12, row: 4 },
 ];
 
-/** Break zone target positions by breakBehavior type */
+/** Break zone target positions by breakBehavior type (cols 18-24, rows 2-5) */
 const BREAK_TARGETS: Record<string, { col: number; row: number }> = {
-  coffee: { col: 8, row: 7 }, // Coffee machine area
-  sofa: { col: 9, row: 9 }, // Sofa area
-  arcade: { col: 11, row: 7 }, // Arcade cabinet area
-  bookshelf: { col: 10, row: 8 }, // Bookshelf area
-  meeting: { col: 5, row: 7 }, // Poker table
+  coffee: { col: 21, row: 4 }, // Coffee table area
+  sofa: { col: 19, row: 3 }, // Sofa area
+  arcade: { col: 24, row: 3 }, // Arcade/bookshelf area
+  bookshelf: { col: 20, row: 3 }, // Bookshelf area
+  meeting: { col: 11, row: 3 }, // Poker table
 };
 
 /**
@@ -41,124 +43,142 @@ const DESK_POSITIONS: Record<
   string,
   { col: number; row: number; facingDir: number; nameplate: string; nameplateEn: string }
 > = {
-  // Engineering (cols 13-22, rows 6-10)
-  'dev-desk-01': { col: 14, row: 8, facingDir: 3, nameplate: '田中 健太', nameplateEn: 'K.Tanaka' },
-  'dev-desk-02': { col: 17, row: 8, facingDir: 3, nameplate: '佐藤 涼', nameplateEn: 'R.Sato' },
+  // Engineering — Dev Zone (cols 1-11, rows 7-13)
+  'dev-desk-01': { col: 4, row: 9, facingDir: 3, nameplate: '田中 健太', nameplateEn: 'K.Tanaka' },
+  'dev-desk-02': { col: 1, row: 9, facingDir: 3, nameplate: '佐藤 涼', nameplateEn: 'R.Sato' },
   'dev-desk-03': {
-    col: 20,
-    row: 8,
+    col: 7,
+    row: 9,
     facingDir: 3,
     nameplate: '中村 陽菜',
     nameplateEn: 'H.Nakamura',
   },
   'dev-desk-04': {
-    col: 15,
-    row: 10,
+    col: 2,
+    row: 12,
     facingDir: 3,
     nameplate: '山本 真帆',
     nameplateEn: 'M.Yamamoto',
   },
-  'dev-desk-05': { col: 18, row: 10, facingDir: 3, nameplate: '藤井 蓮', nameplateEn: 'R.Fujii' },
+  'dev-desk-05': { col: 5, row: 12, facingDir: 3, nameplate: '藤井 蓮', nameplateEn: 'R.Fujii' },
   'dev-desk-06': {
-    col: 21,
-    row: 10,
+    col: 8,
+    row: 12,
     facingDir: 3,
     nameplate: '黒田 翔太',
     nameplateEn: 'S.Kuroda',
   },
-  // Marketing (cols 1-11, rows 12-18)
-  'mkt-desk-01': { col: 1, row: 14, facingDir: 3, nameplate: '黒田 涼', nameplateEn: 'R.Kuroda' },
+  // Marketing Zone (cols 13-24, rows 7-13)
+  'mkt-desk-01': {
+    col: 14,
+    row: 9,
+    facingDir: 3,
+    nameplate: '黒田 涼',
+    nameplateEn: 'R.Kuroda',
+  },
   'mkt-desk-02': {
-    col: 4,
-    row: 14,
+    col: 17,
+    row: 9,
     facingDir: 3,
     nameplate: '清水 夏希',
     nameplateEn: 'N.Shimizu',
   },
   'mkt-desk-03': {
-    col: 7,
-    row: 14,
+    col: 20,
+    row: 9,
     facingDir: 3,
     nameplate: 'トマス・ベガ',
     nameplateEn: 'T.Vega',
   },
   'mkt-desk-04': {
-    col: 10,
-    row: 14,
+    col: 23,
+    row: 9,
     facingDir: 3,
     nameplate: 'サーシャ・ブレナン',
     nameplateEn: 'S.Brennan',
   },
-  'mkt-desk-05': { col: 1, row: 17, facingDir: 3, nameplate: '足立 賢治', nameplateEn: 'K.Adachi' },
+  'mkt-desk-05': {
+    col: 14,
+    row: 12,
+    facingDir: 3,
+    nameplate: '足立 賢治',
+    nameplateEn: 'K.Adachi',
+  },
   'mkt-desk-06': {
-    col: 4,
-    row: 17,
+    col: 17,
+    row: 12,
     facingDir: 3,
     nameplate: '高橋 里奈',
     nameplateEn: 'R.Takahashi',
   },
   'mkt-desk-07': {
-    col: 7,
-    row: 17,
+    col: 20,
+    row: 12,
     facingDir: 3,
     nameplate: '谷口 芽依',
     nameplateEn: 'M.Taniguchi',
   },
   'mkt-desk-08': {
-    col: 10,
-    row: 17,
+    col: 23,
+    row: 12,
     facingDir: 3,
     nameplate: 'ジェイク・フローレス＝太田',
     nameplateEn: 'J.Flores-Ota',
   },
-  'mkt-desk-09': { col: 3, row: 14, facingDir: 0, nameplate: '北川 花', nameplateEn: 'H.Kitagawa' },
-  'mkt-desk-10': { col: 6, row: 14, facingDir: 0, nameplate: '森 大地', nameplateEn: 'D.Mori' },
+  'mkt-desk-09': {
+    col: 16,
+    row: 9,
+    facingDir: 0,
+    nameplate: '北川 花',
+    nameplateEn: 'H.Kitagawa',
+  },
+  'mkt-desk-10': { col: 19, row: 9, facingDir: 0, nameplate: '森 大地', nameplateEn: 'D.Mori' },
   'mkt-desk-11': {
-    col: 9,
-    row: 14,
+    col: 22,
+    row: 9,
     facingDir: 0,
     nameplate: 'レナ・パク',
     nameplateEn: 'L.Park',
   },
-  // Research (cols 13-22, rows 12-18)
-  'res-desk-01': { col: 14, row: 14, facingDir: 3, nameplate: 'Owner', nameplateEn: 'Owner' },
+  // Research Lab (cols 1-11, rows 15-21)
+  'res-desk-01': { col: 1, row: 17, facingDir: 3, nameplate: 'Owner', nameplateEn: 'Owner' },
   'res-desk-02': {
-    col: 17,
-    row: 14,
+    col: 4,
+    row: 17,
     facingDir: 3,
     nameplate: 'Sora Miyake',
     nameplateEn: 'S.Miyake',
   },
   'res-desk-03': {
-    col: 20,
-    row: 14,
+    col: 7,
+    row: 17,
     facingDir: 3,
     nameplate: 'Marina Ríos-Delgado',
     nameplateEn: 'M.Rios',
   },
   'res-desk-04': {
-    col: 15,
-    row: 17,
+    col: 2,
+    row: 20,
     facingDir: 3,
     nameplate: 'Kai Nakamura-Chen',
     nameplateEn: 'K.Nakamura',
   },
   'res-desk-05': {
-    col: 18,
-    row: 17,
+    col: 5,
+    row: 20,
     facingDir: 3,
     nameplate: 'Dr. Priya Okonkwo-Singh',
     nameplateEn: 'P.Okonkwo',
   },
-  'res-desk-06': { col: 21, row: 17, facingDir: 3, nameplate: '空席', nameplateEn: 'Vacant' },
+  'res-desk-06': { col: 8, row: 20, facingDir: 3, nameplate: '空席', nameplateEn: 'Vacant' },
 };
 
-/** Exec positions — icon-only (no character), shown in exec area */
+/** Exec positions — icon-only (no character), shown in exec area (cols 1-6, rows 2-5) */
 const EXEC_POSITIONS: Array<{ id: string; col: number; row: number; label: string }> = [
-  { id: 'exec-01', col: 15, row: 3, label: 'Owner/COO' },
-  { id: 'exec-02', col: 17, row: 3, label: 'CEO' },
-  { id: 'exec-03', col: 19, row: 3, label: '秘書' },
-  { id: 'exec-04', col: 21, row: 3, label: 'PM' },
+  { id: 'exec-01', col: 2, row: 3, label: 'Owner/COO' },
+  { id: 'exec-02', col: 3, row: 3, label: 'CEO' },
+  { id: 'exec-03', col: 4, row: 3, label: '秘書' },
+  { id: 'exec-04', col: 5, row: 3, label: 'PM' },
 ];
 
 /** Initialize from config message */
@@ -294,9 +314,77 @@ export function jcGetStats(): { present: number; total: number } {
   return { present, total };
 }
 
+/** Get per-department member count stats */
+export function jcGetDeptStats(): Record<string, { present: number; total: number }> {
+  const deptStats: Record<string, { present: number; total: number }> = {};
+  for (const runtime of memberRuntimes.values()) {
+    const dept = runtime.config.department;
+    if (!deptStats[dept]) {
+      deptStats[dept] = { present: 0, total: 0 };
+    }
+    deptStats[dept].total++;
+    if (runtime.isPresent) {
+      deptStats[dept].present++;
+    }
+  }
+  return deptStats;
+}
+
 /** Get member runtime by ID */
 export function jcGetMemberRuntime(memberId: string): JCMemberRuntime | undefined {
   return memberRuntimes.get(memberId);
+}
+
+/** Per-member absence info (from extension's AbsenceTracker) */
+const memberAbsenceInfo = new Map<string, AbsenceInfo>();
+
+/** Handle individual absence update */
+export function jcAbsenceUpdate(info: AbsenceInfo): void {
+  memberAbsenceInfo.set(info.memberId, info);
+}
+
+/** Handle bulk absence sync */
+export function jcAbsenceBulkSync(infos: AbsenceInfo[]): void {
+  memberAbsenceInfo.clear();
+  for (const info of infos) {
+    memberAbsenceInfo.set(info.memberId, info);
+  }
+}
+
+/** Get absence info for a member */
+export function jcGetAbsenceInfo(memberId: string): AbsenceInfo | undefined {
+  return memberAbsenceInfo.get(memberId);
+}
+
+/**
+ * Check if a tile position corresponds to an absent member's desk.
+ * Returns the member's absence info if found, or null.
+ */
+export function jcGetAbsentMemberAtDesk(col: number, row: number): AbsenceInfo | null {
+  if (!jcConfig) return null;
+
+  // Check if this tile is within 1 tile of any desk position for an absent member
+  for (const [deskId, pos] of Object.entries(DESK_POSITIONS)) {
+    // Check if clicked tile is near this desk (seat position ± 1 tile)
+    if (Math.abs(pos.col - col) <= 1 && Math.abs(pos.row - row) <= 1) {
+      const member = jcConfig.members.find((m) => m.deskId === deskId);
+      if (!member) continue;
+      const runtime = memberRuntimes.get(member.id);
+      if (runtime && !runtime.isPresent) {
+        return (
+          memberAbsenceInfo.get(member.id) ?? {
+            memberId: member.id,
+            memberName: member.name,
+            role: member.role,
+            department: member.department,
+            status: 'absent',
+            lastActivity: 0,
+          }
+        );
+      }
+    }
+  }
+  return null;
 }
 
 /** Active department liaison effects */
@@ -367,6 +455,83 @@ export function jcGetBreakTarget(memberId: string): { col: number; row: number }
 /** Get the next available poker table seat */
 export function jcGetPokerSeat(index: number): { col: number; row: number } {
   return POKER_TABLE_SEATS[index % POKER_TABLE_SEATS.length];
+}
+
+// ── Task state management ─────────────────────────────────────
+
+const memberTasks = new Map<string, TaskDefinition[]>();
+
+/** Handle individual task update */
+export function jcTaskUpdate(task: TaskDefinition): void {
+  const existing = memberTasks.get(task.assignee) ?? [];
+  const idx = existing.findIndex((t) => t.id === task.id);
+  if (idx >= 0) {
+    existing[idx] = task;
+  } else {
+    existing.push(task);
+  }
+  memberTasks.set(task.assignee, existing);
+}
+
+/** Handle bulk task sync */
+export function jcTasksBulkSync(tasks: TaskDefinition[]): void {
+  memberTasks.clear();
+  for (const task of tasks) {
+    const existing = memberTasks.get(task.assignee) ?? [];
+    existing.push(task);
+    memberTasks.set(task.assignee, existing);
+  }
+}
+
+/** Get current task status for a member (most relevant active task) */
+export function jcGetMemberTaskStatus(memberId: string): TaskDefinition | null {
+  const tasks = memberTasks.get(memberId);
+  if (!tasks || tasks.length === 0) return null;
+  // Prefer running > pending > done/error
+  const running = tasks.find((t) => t.status === 'running');
+  if (running) return running;
+  const pending = tasks.find((t) => t.status === 'pending');
+  if (pending) return pending;
+  // Show most recent done/error briefly
+  const recent = tasks
+    .filter((t) => t.status === 'done' || t.status === 'error')
+    .sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
+  if (recent.length > 0) {
+    const completed = recent[0];
+    // Only show if completed within last 30 seconds
+    if (completed.completedAt) {
+      const elapsed = Date.now() - new Date(completed.completedAt).getTime();
+      if (elapsed < 30000) return completed;
+    }
+  }
+  return null;
+}
+
+/** Get all member tasks for a given desk (by finding member for that desk) */
+export function jcGetDeskTaskStatus(col: number, row: number): TaskDefinition | null {
+  if (!jcConfig) return null;
+  for (const [deskId, pos] of Object.entries(DESK_POSITIONS)) {
+    if (Math.abs(pos.col - col) <= 1 && Math.abs(pos.row - row) <= 1) {
+      const member = jcConfig.members.find((m) => m.deskId === deskId);
+      if (member) return jcGetMemberTaskStatus(member.id);
+    }
+  }
+  return null;
+}
+
+/** Get member info at a desk position (for context menu) */
+export function jcGetMemberAtDesk(
+  col: number,
+  row: number,
+): { memberId: string; name: string; deskId: string } | null {
+  if (!jcConfig) return null;
+  for (const [deskId, pos] of Object.entries(DESK_POSITIONS)) {
+    if (Math.abs(pos.col - col) <= 1 && Math.abs(pos.row - row) <= 1) {
+      const member = jcConfig.members.find((m) => m.deskId === deskId);
+      if (member) return { memberId: member.id, name: member.name, deskId };
+    }
+  }
+  return null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { JCState } from '../jc/index.js';
+import type { AbsenceInfo, JCState, TaskDefinition } from '../jc/index.js';
 import {
   JC_ENTRANCE,
+  jcAbsenceBulkSync,
+  jcAbsenceUpdate,
   jcGetBreakTarget,
   jcGetPokerSeat,
   jcLoadConfig,
@@ -10,6 +12,8 @@ import {
   jcMemberDeparted,
   jcMemberLeaving,
   jcMemberStateChange,
+  jcTasksBulkSync,
+  jcTaskUpdate,
   jcTriggerLiaison,
   jcUpdateMappings,
 } from '../jc/index.js';
@@ -584,6 +588,14 @@ export function useExtensionMessages(
         jcTriggerLiaison(fromMemberId, toMemberId);
       } else if (msg.type === 'jcMappingUpdate') {
         jcUpdateMappings(msg.mappings);
+      } else if (msg.type === 'jcAbsenceUpdate') {
+        jcAbsenceUpdate(msg.payload as AbsenceInfo);
+      } else if (msg.type === 'jcAbsenceBulkSync') {
+        jcAbsenceBulkSync(msg.payload as AbsenceInfo[]);
+      } else if (msg.type === 'jcTaskUpdate') {
+        jcTaskUpdate(msg.task as TaskDefinition);
+      } else if (msg.type === 'jcTasksBulkSync') {
+        jcTasksBulkSync(msg.tasks as TaskDefinition[]);
       }
     };
     window.addEventListener('message', handler);

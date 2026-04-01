@@ -9,6 +9,8 @@ import {
   ZOOM_SCROLL_THRESHOLD,
 } from '../../constants.js';
 import { renderJCOverlay } from '../../jc/jc-overlay.js';
+import { jcGetAbsentMemberAtDesk, jcGetMemberAtDesk } from '../../jc/jc-state.js';
+import type { AbsenceInfo } from '../../jc/jc-types.js';
 import { unlockAudio } from '../../notificationSound.js';
 import { vscode } from '../../vscodeApi.js';
 import { canPlaceFurniture, getWallPlacementRow } from '../editor/editorActions.js';
@@ -28,6 +30,12 @@ import { EditTool, TILE_SIZE } from '../types.js';
 interface OfficeCanvasProps {
   officeState: OfficeState;
   onClick: (agentId: number) => void;
+  onAbsentDeskClick?: (info: AbsenceInfo, screenPos: { x: number; y: number }) => void;
+  onDeskContextMenu?: (
+    memberId: string,
+    memberName: string,
+    screenPos: { x: number; y: number },
+  ) => void;
   isEditMode: boolean;
   editorState: EditorState;
   onEditorTileAction: (col: number, row: number) => void;
@@ -45,6 +53,8 @@ interface OfficeCanvasProps {
 export function OfficeCanvas({
   officeState,
   onClick,
+  onAbsentDeskClick,
+  onDeskContextMenu,
   isEditMode,
   editorState,
   onEditorTileAction,
@@ -731,8 +741,43 @@ export function OfficeCanvas({
         officeState.selectedAgentId = null;
         officeState.cameraFollowId = null;
       }
+
+      // Check if clicked on an absent member's desk area (JC mode)
+      if (onAbsentDeskClick) {
+        const tile = screenToTile(e.clientX, e.clientY);
+        if (tile) {
+          const absenceInfo = jcGetAbsentMemberAtDesk(tile.col, tile.row);
+          if (absenceInfo) {
+            // Convert tile position to screen position for popup placement
+            const el = containerRef.current;
+            if (el) {
+              const rect = el.getBoundingClientRect();
+              const dpr = window.devicePixelRatio || 1;
+              const canvasW = Math.round(rect.width * dpr);
+              const canvasH = Math.round(rect.height * dpr);
+              const layout = officeState.getLayout();
+              const mapW = layout.cols * TILE_SIZE * zoom;
+              const mapH = layout.rows * TILE_SIZE * zoom;
+              const deviceOffsetX = Math.floor((canvasW - mapW) / 2) + Math.round(panRef.current.x);
+              const deviceOffsetY = Math.floor((canvasH - mapH) / 2) + Math.round(panRef.current.y);
+              const screenX = (deviceOffsetX + (tile.col + 0.5) * TILE_SIZE * zoom) / dpr;
+              const screenY = (deviceOffsetY + tile.row * TILE_SIZE * zoom) / dpr;
+              onAbsentDeskClick(absenceInfo, { x: screenX, y: screenY });
+            }
+          }
+        }
+      }
     },
-    [officeState, onClick, screenToWorld, screenToTile, isEditMode],
+    [
+      officeState,
+      onClick,
+      onAbsentDeskClick,
+      screenToWorld,
+      screenToTile,
+      isEditMode,
+      zoom,
+      panRef,
+    ],
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -757,9 +802,37 @@ export function OfficeCanvas({
         if (tile) {
           officeState.walkToTile(officeState.selectedAgentId, tile.col, tile.row);
         }
+        return;
+      }
+      // Right-click on desk: show task assignment menu
+      if (onDeskContextMenu) {
+        const tile = screenToTile(e.clientX, e.clientY);
+        if (tile) {
+          const memberAtDesk = jcGetMemberAtDesk(tile.col, tile.row);
+          if (memberAtDesk) {
+            const el = containerRef.current;
+            if (el) {
+              const rect = el.getBoundingClientRect();
+              const dpr = window.devicePixelRatio || 1;
+              const canvasW = Math.round(rect.width * dpr);
+              const canvasH = Math.round(rect.height * dpr);
+              const layout = officeState.getLayout();
+              const mapW = layout.cols * TILE_SIZE * zoom;
+              const mapH = layout.rows * TILE_SIZE * zoom;
+              const deviceOffsetX = Math.floor((canvasW - mapW) / 2) + Math.round(panRef.current.x);
+              const deviceOffsetY = Math.floor((canvasH - mapH) / 2) + Math.round(panRef.current.y);
+              const screenX = (deviceOffsetX + (tile.col + 0.5) * TILE_SIZE * zoom) / dpr;
+              const screenY = (deviceOffsetY + tile.row * TILE_SIZE * zoom) / dpr;
+              onDeskContextMenu(memberAtDesk.memberId, memberAtDesk.name, {
+                x: screenX,
+                y: screenY,
+              });
+            }
+          }
+        }
       }
     },
-    [isEditMode, officeState, screenToTile],
+    [isEditMode, officeState, screenToTile, onDeskContextMenu, zoom, panRef],
   );
 
   // Wheel: Ctrl+wheel to zoom, plain wheel/trackpad to pan

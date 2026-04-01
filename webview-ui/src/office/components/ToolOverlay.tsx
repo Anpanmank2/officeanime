@@ -206,6 +206,8 @@ export function ToolOverlay({
                     onCloseAgent(id);
                   }}
                   title="Close agent"
+                  aria-label="Close agent"
+                  role="button"
                   style={{
                     background: 'none',
                     border: 'none',

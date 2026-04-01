@@ -7,6 +7,8 @@ import type { Character } from '../office/types.js';
 import { CharacterState, TILE_SIZE } from '../office/types.js';
 import {
   jcGetActiveLiaisons,
+  jcGetDeptStats,
+  jcGetDeskTaskStatus,
   jcGetExecPositions,
   jcGetMemberForAgent,
   jcGetMemberRuntime,
@@ -19,12 +21,12 @@ import type { JCBubbleType } from './jc-types.js';
 // ── Constants ────────────────────────────────────────────────────
 const NAMEPLATE_FONT = '7px "Press Start 2P", monospace';
 const NAMEPLATE_FALLBACK_FONT = '8px monospace';
-const NAMEPLATE_BG = 'rgba(0, 0, 0, 0.65)';
+const NAMEPLATE_BG = 'rgba(0, 0, 0, 0.7)';
 const NAMEPLATE_TEXT_COLOR = '#ffffff';
 const NAMEPLATE_PRESENT_COLOR = '#00ff88';
-const NAMEPLATE_ABSENT_COLOR = '#666666';
-const NAMEPLATE_PADDING_X = 2;
-const NAMEPLATE_PADDING_Y = 1;
+const NAMEPLATE_ABSENT_COLOR = '#555555';
+const NAMEPLATE_PADDING_X = 3;
+const NAMEPLATE_PADDING_Y = 2;
 const NAMEPLATE_OFFSET_Y = -2; // pixels above the seat tile
 
 const ZONE_LABEL_FONT = '9px "Press Start 2P", monospace';
@@ -41,7 +43,6 @@ const ABSENCE_DOT_RADIUS = 2;
 const ABSENCE_DOT_COLOR = 'rgba(80, 80, 80, 0.5)';
 
 const STATS_FALLBACK_FONT = '8px monospace';
-const STATS_BG = 'rgba(0, 0, 0, 0.7)';
 const STATS_COLOR = '#00ff88';
 
 // Bubble emoji sprites (drawn as text for now, can be replaced with sprites)
@@ -60,16 +61,28 @@ const LIAISON_COLOR_MARKETING = 'rgba(255, 100, 100, 0.4)';
 const LIAISON_LINE_WIDTH = 2;
 const LIAISON_PARTICLE_SIZE = 3;
 
+// Zone color themes
+const ZONE_COLORS: Record<string, string> = {
+  exec: 'rgba(200, 180, 120, 0.35)',
+  entrance: 'rgba(255, 255, 255, 0.25)',
+  poker: 'rgba(255, 255, 255, 0.20)',
+  break: 'rgba(255, 140, 60, 0.30)',
+  dev: 'rgba(90, 140, 255, 0.30)',
+  marketing: 'rgba(255, 107, 138, 0.30)',
+  research: 'rgba(140, 221, 106, 0.30)',
+  ops: 'rgba(180, 140, 255, 0.30)',
+};
+
 // ── Zone labels ──────────────────────────────────────────────────
-const ZONE_LABELS: Array<{ text: string; col: number; row: number }> = [
-  { text: 'ENTRANCE', col: 1, row: 2 },
-  { text: 'EXEC AREA', col: 15, row: 2 },
-  { text: 'POKER TABLE', col: 3, row: 6 },
-  { text: 'BREAK ZONE', col: 7, row: 6 },
-  { text: 'DEV ZONE', col: 14, row: 6 },
-  { text: 'MARKETING', col: 2, row: 12 },
-  { text: 'RESEARCH LAB', col: 14, row: 12 },
-  { text: 'OPS HUB', col: 8, row: 18 },
+const ZONE_LABELS: Array<{ text: string; col: number; row: number; zone: string }> = [
+  { text: 'EXEC AREA', col: 1, row: 2, zone: 'exec' },
+  { text: 'ENTRANCE', col: 10, row: 2, zone: 'entrance' },
+  { text: 'POKER TABLE', col: 10, row: 4, zone: 'poker' },
+  { text: 'BREAK ZONE', col: 18, row: 2, zone: 'break' },
+  { text: 'DEV ZONE', col: 1, row: 7, zone: 'dev' },
+  { text: 'MARKETING', col: 13, row: 7, zone: 'marketing' },
+  { text: 'RESEARCH LAB', col: 1, row: 15, zone: 'research' },
+  { text: 'OPS HUB', col: 13, row: 15, zone: 'ops' },
 ];
 
 // ── Main render function ─────────────────────────────────────────
@@ -95,6 +108,9 @@ export function renderJCOverlay(
 
   // 2. Absence indicators (dim dots on empty desks)
   renderAbsenceIndicators(ctx, offsetX, offsetY, s, zoom);
+
+  // 2.5. Task status indicators on desks
+  renderTaskIndicators(ctx, offsetX, offsetY, s, zoom);
 
   // 3. Name plates (above desks)
   renderNamePlates(ctx, offsetX, offsetY, s, zoom);
@@ -124,15 +140,25 @@ function renderZoneLabels(
   zoom: number,
 ): void {
   ctx.save();
-  ctx.font = zoom >= 3 ? ZONE_LABEL_FONT : ZONE_LABEL_FALLBACK_FONT;
-  ctx.fillStyle = ZONE_LABEL_COLOR;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
   for (const label of ZONE_LABELS) {
     const x = offsetX + label.col * s;
     const y = offsetY + label.row * s;
+    const zoneColor = ZONE_COLORS[label.zone] ?? ZONE_LABEL_COLOR;
+
+    // Draw zone label with department-specific color
+    ctx.font = zoom >= 3 ? ZONE_LABEL_FONT : ZONE_LABEL_FALLBACK_FONT;
+    ctx.fillStyle = zoneColor;
     ctx.fillText(label.text, x, y);
+
+    // Draw a subtle underline accent for department zones
+    if (label.zone === 'dev' || label.zone === 'marketing' || label.zone === 'research') {
+      const metrics = ctx.measureText(label.text);
+      ctx.fillStyle = zoneColor;
+      ctx.fillRect(x, y + (zoom >= 3 ? 11 : 12), metrics.width, Math.max(1, zoom * 0.5));
+    }
   }
   ctx.restore();
 }
@@ -159,6 +185,103 @@ function renderAbsenceIndicators(
   ctx.restore();
 }
 
+// Task status indicator colors
+const TASK_PENDING_COLOR = '#f0ad4e'; // yellow/amber
+const TASK_RUNNING_COLOR = '#3fb950'; // green
+const TASK_DONE_COLOR = '#58a6ff'; // blue
+const TASK_ERROR_COLOR = '#ff4444'; // red
+
+function renderTaskIndicators(
+  ctx: CanvasRenderingContext2D,
+  offsetX: number,
+  offsetY: number,
+  s: number,
+  zoom: number,
+): void {
+  const nameplates = jcGetNameplates();
+  if (zoom < 2) return; // Too small to see
+
+  ctx.save();
+
+  for (const np of nameplates) {
+    const task = jcGetDeskTaskStatus(np.col, np.row);
+    if (!task) continue;
+
+    const cx = offsetX + (np.col + 0.5) * s;
+    // Position the indicator above the desk, below the nameplate
+    const cy = offsetY + np.row * s - 2 * zoom;
+    const iconSize = Math.max(4, 3 * zoom);
+
+    if (task.status === 'pending') {
+      // Clock icon: small circle with hands
+      ctx.beginPath();
+      ctx.arc(cx, cy, iconSize / 2, 0, Math.PI * 2);
+      ctx.fillStyle = TASK_PENDING_COLOR;
+      ctx.globalAlpha = 0.8;
+      ctx.fill();
+      // Clock hands
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx, cy - iconSize / 3);
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + iconSize / 4, cy);
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = Math.max(1, zoom * 0.3);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else if (task.status === 'running') {
+      // Already handled by character typing animation — skip visual indicator
+      // (keep running indicator minimal: small green pulse dot)
+      const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
+      ctx.beginPath();
+      ctx.arc(cx, cy, (iconSize / 2) * (0.8 + 0.2 * pulse), 0, Math.PI * 2);
+      ctx.fillStyle = TASK_RUNNING_COLOR;
+      ctx.globalAlpha = 0.6 + 0.4 * pulse;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    } else if (task.status === 'done') {
+      // Checkmark
+      ctx.fillStyle = TASK_DONE_COLOR;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.arc(cx, cy, iconSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+      // Draw checkmark
+      ctx.beginPath();
+      const half = iconSize / 2;
+      ctx.moveTo(cx - half * 0.35, cy);
+      ctx.lineTo(cx - half * 0.05, cy + half * 0.3);
+      ctx.lineTo(cx + half * 0.4, cy - half * 0.3);
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = Math.max(1, zoom * 0.4);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else if (task.status === 'error') {
+      // Red exclamation
+      ctx.fillStyle = TASK_ERROR_COLOR;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.arc(cx, cy, iconSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = `bold ${iconSize}px monospace`;
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('!', cx, cy);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  ctx.restore();
+}
+
+// Nameplate zone accent colors (subtle left border)
+const NAMEPLATE_ZONE_COLORS: Record<string, string> = {
+  dev: '#5a8cff',
+  marketing: '#ff6b8a',
+  research: '#8cdd6a',
+};
+
 function renderNamePlates(
   ctx: CanvasRenderingContext2D,
   offsetX: number,
@@ -179,16 +302,24 @@ function renderNamePlates(
     const text = np.text;
     const metrics = ctx.measureText(text);
     const textW = metrics.width;
-    const textH = 8 * (zoom >= 3 ? 1 : 1);
+    const textH = 8;
+
+    const bgX = x - textW / 2 - NAMEPLATE_PADDING_X;
+    const bgY = y - textH - NAMEPLATE_PADDING_Y;
+    const bgW = textW + NAMEPLATE_PADDING_X * 2;
+    const bgH = textH + NAMEPLATE_PADDING_Y * 2;
 
     // Background
     ctx.fillStyle = NAMEPLATE_BG;
-    ctx.fillRect(
-      x - textW / 2 - NAMEPLATE_PADDING_X,
-      y - textH - NAMEPLATE_PADDING_Y,
-      textW + NAMEPLATE_PADDING_X * 2,
-      textH + NAMEPLATE_PADDING_Y * 2,
-    );
+    ctx.fillRect(bgX, bgY, bgW, bgH);
+
+    // Left accent bar (department color)
+    const zoneColor = NAMEPLATE_ZONE_COLORS[np.zone];
+    if (zoneColor) {
+      const accentW = Math.max(1, zoom * 0.5);
+      ctx.fillStyle = np.isPresent ? zoneColor : `${zoneColor}44`;
+      ctx.fillRect(bgX, bgY, accentW, bgH);
+    }
 
     // Text
     ctx.fillStyle = np.isPresent ? NAMEPLATE_PRESENT_COLOR : NAMEPLATE_ABSENT_COLOR;
@@ -274,25 +405,77 @@ function renderLiaisonBeams(
   ctx.restore();
 }
 
+// Department stats colors
+const DEPT_STAT_COLORS: Record<string, string> = {
+  engineering: '#5a8cff',
+  marketing: '#ff6b8a',
+  research: '#8cdd6a',
+};
+
 function renderStatsBar(ctx: CanvasRenderingContext2D, canvasWidth: number): void {
   const stats = jcGetStats();
-  const text = `${stats.present}/${stats.total}`;
+
+  // Gather per-department counts
+  const deptCounts = jcGetDeptStats();
 
   ctx.save();
   ctx.font = STATS_FALLBACK_FONT;
-  const metrics = ctx.measureText(text);
-  const x = canvasWidth - metrics.width - 12;
-  const y = 4;
-
-  // Background
-  ctx.fillStyle = STATS_BG;
-  ctx.fillRect(x - 4, y, metrics.width + 8, 14);
-
-  // Text
-  ctx.fillStyle = STATS_COLOR;
-  ctx.textAlign = 'left';
+  ctx.textAlign = 'right';
   ctx.textBaseline = 'top';
-  ctx.fillText(text, x, y + 3);
+
+  const lineHeight = 14;
+  const rightMargin = 12;
+  const topMargin = 4;
+  const padding = 6;
+
+  // Build text lines for measurement
+  const headerText = `${stats.present}/${stats.total} online`;
+  const deptLines: Array<{ label: string; text: string; color: string }> = [];
+  for (const [dept, count] of Object.entries(deptCounts)) {
+    if (count.total > 0) {
+      const deptLabel = dept === 'engineering' ? 'ENG' : dept === 'marketing' ? 'MKT' : 'RES';
+      deptLines.push({
+        label: deptLabel,
+        text: `${count.present}/${count.total}`,
+        color: DEPT_STAT_COLORS[dept] ?? STATS_COLOR,
+      });
+    }
+  }
+
+  // Measure max width needed
+  const headerMetrics = ctx.measureText(headerText);
+  let maxWidth = headerMetrics.width;
+  for (const line of deptLines) {
+    const lineWidth = ctx.measureText(`${line.label} ${line.text}`).width;
+    if (lineWidth > maxWidth) maxWidth = lineWidth;
+  }
+
+  const boxWidth = maxWidth + padding * 2;
+  const boxHeight = lineHeight + deptLines.length * lineHeight + padding * 2;
+  const boxX = canvasWidth - boxWidth - rightMargin;
+  const boxY = topMargin;
+
+  // Background with border
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+  ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
+
+  // Header
+  const textX = canvasWidth - rightMargin - padding;
+  let textY = boxY + padding;
+  ctx.fillStyle = STATS_COLOR;
+  ctx.fillText(headerText, textX, textY);
+  textY += lineHeight;
+
+  // Department lines
+  for (const line of deptLines) {
+    ctx.fillStyle = line.color;
+    ctx.fillText(`${line.label} ${line.text}`, textX, textY);
+    textY += lineHeight;
+  }
+
   ctx.restore();
 }
 

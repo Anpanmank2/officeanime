@@ -14,6 +14,39 @@ const STATE_DOT_COLORS: Record<string, string> = {
   idle: '#9e9e9e',
   break: '#ff5722',
   meeting: '#9c27b0',
+  arriving: '#66bb6a',
+  leaving: '#bdbdbd',
+  presenting: '#ab47bc',
+  handoff: '#7e57c2',
+  absent: '#616161',
+};
+
+const STATE_LABELS: Record<string, string> = {
+  coding: 'Coding',
+  thinking: 'Thinking',
+  reading: 'Reading',
+  reviewing: 'Reviewing',
+  error: 'Error',
+  idle: 'Idle',
+  break: 'On Break',
+  meeting: 'In Meeting',
+  arriving: 'Arriving',
+  leaving: 'Leaving',
+  presenting: 'Presenting',
+  handoff: 'Handoff',
+  absent: 'Absent',
+};
+
+const DEPT_COLORS: Record<string, string> = {
+  engineering: '#5a8cff',
+  marketing: '#ff6b8a',
+  research: '#8cdd6a',
+};
+
+const DEPT_LABELS: Record<string, string> = {
+  engineering: 'ENG',
+  marketing: 'MKT',
+  research: 'RES',
 };
 
 interface JCMemberInfoPanelProps {
@@ -67,6 +100,10 @@ export function JCMemberInfoPanel({
   const screenY = (deviceOffsetY + (ch.y + sittingOffset + 16) * zoom) / dpr;
 
   const dotColor = STATE_DOT_COLORS[memberInfo.jcState] ?? '#9e9e9e';
+  const stateLabel = STATE_LABELS[memberInfo.jcState] ?? memberInfo.jcState;
+  const deptColor = DEPT_COLORS[memberInfo.config.department] ?? 'var(--pixel-text-dim)';
+  const deptLabel = DEPT_LABELS[memberInfo.config.department] ?? memberInfo.config.department;
+  const accentColor = memberInfo.config.accentColor ?? deptColor;
 
   return (
     <div
@@ -81,32 +118,66 @@ export function JCMemberInfoPanel({
     >
       <div
         style={{
-          fontFamily: 'monospace',
-          background: '#1a1a2e',
+          background: 'var(--pixel-bg)',
           color: '#fff',
-          border: '1px solid #333',
-          borderRadius: 2,
-          padding: '4px 8px',
-          fontSize: '11px',
-          lineHeight: 1.4,
+          border: `2px solid ${accentColor}`,
+          borderRadius: 0,
+          padding: 0,
           whiteSpace: 'nowrap',
+          boxShadow: 'var(--pixel-shadow)',
+          minWidth: 120,
         }}
       >
-        <div style={{ fontWeight: 'bold', marginBottom: 2 }}>{memberInfo.config.name}</div>
-        <div style={{ color: '#aaa' }}>{memberInfo.config.role}</div>
-        <div style={{ color: '#888' }}>{memberInfo.config.department}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+        {/* Header bar with department badge */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: `${accentColor}33`,
+            borderBottom: `1px solid ${accentColor}55`,
+            padding: '3px 6px',
+          }}
+        >
+          <span style={{ fontSize: '22px', fontWeight: 'bold', color: '#fff' }}>
+            {memberInfo.config.name}
+          </span>
           <span
             style={{
-              width: 6,
-              height: 6,
-              borderRadius: '50%',
-              background: dotColor,
-              display: 'inline-block',
-              flexShrink: 0,
+              fontSize: '16px',
+              color: deptColor,
+              background: `${deptColor}22`,
+              border: `1px solid ${deptColor}55`,
+              padding: '0px 4px',
+              borderRadius: 0,
+              letterSpacing: '1px',
             }}
-          />
-          <span>{memberInfo.jcState}</span>
+          >
+            {deptLabel}
+          </span>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '4px 6px 5px' }}>
+          {/* Role */}
+          <div style={{ fontSize: '18px', color: 'var(--pixel-text-dim)', marginBottom: 3 }}>
+            {memberInfo.config.role}
+          </div>
+
+          {/* Status row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: dotColor,
+                display: 'inline-block',
+                flexShrink: 0,
+              }}
+            />
+            <span style={{ fontSize: '18px', color: dotColor }}>{stateLabel}</span>
+          </div>
         </div>
       </div>
     </div>

@@ -11,7 +11,10 @@ import { PULSE_ANIMATION_DURATION_SEC } from './constants.js';
 import { useEditorActions } from './hooks/useEditorActions.js';
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js';
 import { useExtensionMessages } from './hooks/useExtensionMessages.js';
+import { AbsentStatusPopup } from './jc/AbsentStatusPopup.js';
+import type { AbsenceInfo } from './jc/jc-types.js';
 import { JCMemberInfoPanel } from './jc/JCMemberInfoPanel.js';
+import { TaskInputForm } from './jc/TaskInputForm.js';
 import { OfficeCanvas } from './office/components/OfficeCanvas.js';
 import { ToolOverlay } from './office/components/ToolOverlay.js';
 import { EditorState } from './office/editor/editorState.js';
@@ -171,6 +174,55 @@ function App() {
   const [isDebugMode, setIsDebugMode] = useState(false);
   const [alwaysShowOverlay, setAlwaysShowOverlay] = useState(false);
 
+  // Absent desk popup state
+  const [absentPopup, setAbsentPopup] = useState<{
+    info: AbsenceInfo;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  const handleAbsentDeskClick = useCallback(
+    (info: AbsenceInfo, screenPos: { x: number; y: number }) => {
+      setAbsentPopup({ info, position: screenPos });
+    },
+    [],
+  );
+
+  const handleAbsentPopupClose = useCallback(() => {
+    setAbsentPopup(null);
+  }, []);
+
+  const handleAbsentPopupLaunch = useCallback((memberId: string) => {
+    vscode.postMessage({ type: 'jcLaunchAgent', memberId });
+    setAbsentPopup(null);
+  }, []);
+
+  // Task input form state
+  const [taskForm, setTaskForm] = useState<{
+    memberId: string;
+    memberName: string;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  const handleDeskContextMenu = useCallback(
+    (memberId: string, memberName: string, screenPos: { x: number; y: number }) => {
+      setTaskForm({ memberId, memberName, position: screenPos });
+      setAbsentPopup(null); // Close any open absent popup
+    },
+    [],
+  );
+
+  const handleTaskFormClose = useCallback(() => {
+    setTaskForm(null);
+  }, []);
+
+  const handleTaskFormSubmit = useCallback(
+    (memberId: string, prompt: string, priority: number, workingDirectory?: string) => {
+      vscode.postMessage({ type: 'jcSubmitTask', memberId, prompt, priority, workingDirectory });
+      setTaskForm(null);
+    },
+    [],
+  );
+
   const currentMajorMinor = toMajorMinor(extensionVersion);
 
   const handleWhatsNewDismiss = useCallback(() => {
@@ -285,6 +337,8 @@ function App() {
       <OfficeCanvas
         officeState={officeState}
         onClick={handleClick}
+        onAbsentDeskClick={handleAbsentDeskClick}
+        onDeskContextMenu={handleDeskContextMenu}
         isEditMode={editor.isEditMode}
         editorState={editorState}
         onEditorTileAction={editor.handleEditorTileAction}
@@ -441,6 +495,25 @@ function App() {
           agentStatuses={agentStatuses}
           subagentTools={subagentTools}
           onSelectAgent={handleSelectAgent}
+        />
+      )}
+
+      {absentPopup && (
+        <AbsentStatusPopup
+          info={absentPopup.info}
+          position={absentPopup.position}
+          onClose={handleAbsentPopupClose}
+          onLaunch={handleAbsentPopupLaunch}
+        />
+      )}
+
+      {taskForm && (
+        <TaskInputForm
+          memberId={taskForm.memberId}
+          memberName={taskForm.memberName}
+          position={taskForm.position}
+          onSubmit={handleTaskFormSubmit}
+          onClose={handleTaskFormClose}
         />
       )}
 

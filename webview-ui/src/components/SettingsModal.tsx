@@ -30,6 +30,30 @@ const menuItemBase: React.CSSProperties = {
   textAlign: 'left',
 };
 
+const checkboxStyle = (checked: boolean): React.CSSProperties => ({
+  width: 14,
+  height: 14,
+  border: '2px solid rgba(255, 255, 255, 0.5)',
+  borderRadius: 0,
+  background: checked ? 'rgba(90, 140, 255, 0.8)' : 'transparent',
+  flexShrink: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+});
+
+function PixelCheckbox({ checked }: { checked: boolean }) {
+  return (
+    <span style={checkboxStyle(checked)} aria-hidden="true">
+      {checked && (
+        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+          <path d="M2 5L4 7L8 3" stroke="#fff" strokeWidth="2" strokeLinecap="square" />
+        </svg>
+      )}
+    </span>
+  );
+}
+
 export function SettingsModal({
   isOpen,
   onClose,
@@ -93,6 +117,7 @@ export function SettingsModal({
             onClick={onClose}
             onMouseEnter={() => setHovered('close')}
             onMouseLeave={() => setHovered(null)}
+            aria-label="Close settings"
             style={{
               background: hovered === 'close' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
               border: 'none',
@@ -194,6 +219,7 @@ export function SettingsModal({
               }
               onMouseEnter={() => setHovered(`remove-${dir}`)}
               onMouseLeave={() => setHovered(null)}
+              aria-label={`Remove asset directory: ${dir.split(/[/\\]/).pop() ?? dir}`}
               style={{
                 background: hovered === `remove-${dir}` ? 'rgba(255, 80, 80, 0.2)' : 'transparent',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
@@ -210,6 +236,8 @@ export function SettingsModal({
           </div>
         ))}
         <button
+          role="switch"
+          aria-checked={soundLocal}
           onClick={() => {
             const newVal = !isSoundEnabled();
             setSoundEnabled(newVal);
@@ -224,26 +252,11 @@ export function SettingsModal({
           }}
         >
           <span>Sound Notifications</span>
-          <span
-            style={{
-              width: 14,
-              height: 14,
-              border: '2px solid rgba(255, 255, 255, 0.5)',
-              borderRadius: 0,
-              background: soundLocal ? 'rgba(90, 140, 255, 0.8)' : 'transparent',
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '12px',
-              lineHeight: 1,
-              color: '#fff',
-            }}
-          >
-            {soundLocal ? 'X' : ''}
-          </span>
+          <PixelCheckbox checked={soundLocal} />
         </button>
         <button
+          role="switch"
+          aria-checked={watchAllSessions}
           onClick={onToggleWatchAllSessions}
           onMouseEnter={() => setHovered('watchAll')}
           onMouseLeave={() => setHovered(null)}
@@ -253,26 +266,11 @@ export function SettingsModal({
           }}
         >
           <span>Watch All Sessions</span>
-          <span
-            style={{
-              width: 14,
-              height: 14,
-              border: '2px solid rgba(255, 255, 255, 0.5)',
-              borderRadius: 0,
-              background: watchAllSessions ? 'rgba(90, 140, 255, 0.8)' : 'transparent',
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '12px',
-              lineHeight: 1,
-              color: '#fff',
-            }}
-          >
-            {watchAllSessions ? 'X' : ''}
-          </span>
+          <PixelCheckbox checked={watchAllSessions} />
         </button>
         <button
+          role="switch"
+          aria-checked={alwaysShowOverlay}
           onClick={onToggleAlwaysShowOverlay}
           onMouseEnter={() => setHovered('overlay')}
           onMouseLeave={() => setHovered(null)}
@@ -282,24 +280,7 @@ export function SettingsModal({
           }}
         >
           <span>Always Show Labels</span>
-          <span
-            style={{
-              width: 14,
-              height: 14,
-              border: '2px solid rgba(255, 255, 255, 0.5)',
-              borderRadius: 0,
-              background: alwaysShowOverlay ? 'rgba(90, 140, 255, 0.8)' : 'transparent',
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '12px',
-              lineHeight: 1,
-              color: '#fff',
-            }}
-          >
-            {alwaysShowOverlay ? 'X' : ''}
-          </span>
+          <PixelCheckbox checked={alwaysShowOverlay} />
         </button>
         <button
           onClick={onToggleDebugMode}
