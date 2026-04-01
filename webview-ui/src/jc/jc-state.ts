@@ -457,6 +457,24 @@ export function jcGetPokerSeat(index: number): { col: number; row: number } {
   return POKER_TABLE_SEATS[index % POKER_TABLE_SEATS.length];
 }
 
+// ── Activity summary state ────────────────────────────────────
+
+const memberActivitySummaries = new Map<string, string>();
+
+/** Handle activity summary update from extension */
+export function jcActivitySummaryUpdate(memberId: string, summary: string | null): void {
+  if (summary) {
+    memberActivitySummaries.set(memberId, summary);
+  } else {
+    memberActivitySummaries.delete(memberId);
+  }
+}
+
+/** Get activity summary for a member */
+export function jcGetActivitySummary(memberId: string): string | null {
+  return memberActivitySummaries.get(memberId) ?? null;
+}
+
 // ── Task state management ─────────────────────────────────────
 
 const memberTasks = new Map<string, TaskDefinition[]>();
@@ -532,6 +550,25 @@ export function jcGetMemberAtDesk(
     }
   }
   return null;
+}
+
+/** Get all tasks across all members */
+export function jcGetAllTasks(): TaskDefinition[] {
+  const all: TaskDefinition[] = [];
+  for (const tasks of memberTasks.values()) {
+    all.push(...tasks);
+  }
+  return all;
+}
+
+/** Get map of memberId → member name from config */
+export function jcGetMemberNames(): Map<string, string> {
+  const names = new Map<string, string>();
+  if (!jcConfig) return names;
+  for (const member of jcConfig.members) {
+    names.set(member.id, member.name);
+  }
+  return names;
 }
 
 // ── Helpers ────────────────────────────────────────────────────

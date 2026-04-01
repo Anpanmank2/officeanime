@@ -7,6 +7,7 @@ import type { Character } from '../office/types.js';
 import { CharacterState, TILE_SIZE } from '../office/types.js';
 import {
   jcGetActiveLiaisons,
+  jcGetActivitySummary,
   jcGetDeptStats,
   jcGetDeskTaskStatus,
   jcGetExecPositions,
@@ -128,6 +129,11 @@ export function renderJCOverlay(
 
   // 6. Stats bar (top-right corner, fixed position)
   renderStatsBar(ctx, canvasWidth);
+
+  // 7. Activity summary speech bubbles above characters
+  if (characters) {
+    renderActivityBubbles(ctx, characters, offsetX, offsetY, zoom);
+  }
 }
 
 // ── Sub-renderers ────────────────────────────────────────────────
@@ -505,6 +511,74 @@ function renderJCCharacterBubbles(
 
     renderJCBubble(ctx, runtime.bubbleType, screenX, screenY, zoom);
   }
+}
+
+/** Render activity summary speech bubbles above characters */
+function renderActivityBubbles(
+  ctx: CanvasRenderingContext2D,
+  characters: Character[],
+  offsetX: number,
+  offsetY: number,
+  zoom: number,
+): void {
+  const BUBBLE_FONT = `${Math.max(6, 7 * zoom)}px "Press Start 2P", monospace`;
+  const BUBBLE_FALLBACK_FONT = `${Math.max(7, 8 * zoom)}px monospace`;
+  const BUBBLE_BG = 'rgba(30, 30, 46, 0.92)';
+  const BUBBLE_BORDER = 'rgba(255, 255, 255, 0.3)';
+  const BUBBLE_TEXT = '#e0e0e0';
+  const BUBBLE_PADDING_X = 4 * zoom;
+  const BUBBLE_PADDING_Y = 2 * zoom;
+  const BUBBLE_OFFSET_Y = -30 * zoom; // Above character + emoji bubble
+  const TAIL_SIZE = 3 * zoom;
+
+  ctx.save();
+  ctx.font = zoom >= 3 ? BUBBLE_FONT : BUBBLE_FALLBACK_FONT;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+
+  for (const ch of characters) {
+    if (ch.isSubagent) continue;
+    const memberId = jcGetMemberForAgent(ch.id);
+    if (!memberId) continue;
+    const summary = jcGetActivitySummary(memberId);
+    if (!summary) continue;
+
+    const sittingOff = ch.state === CharacterState.TYPE ? -4 : 0;
+    const screenX = offsetX + ch.x * zoom;
+    const screenY = offsetY + (ch.y + sittingOff) * zoom + BUBBLE_OFFSET_Y;
+
+    // Measure text
+    const metrics = ctx.measureText(summary);
+    const textW = metrics.width;
+    const textH = Math.max(6, 7 * zoom);
+
+    // Bubble background
+    const bgX = screenX - textW / 2 - BUBBLE_PADDING_X;
+    const bgY = screenY - textH - BUBBLE_PADDING_Y;
+    const bgW = textW + BUBBLE_PADDING_X * 2;
+    const bgH = textH + BUBBLE_PADDING_Y * 2;
+
+    // Draw rounded-ish bubble (pixel art style = sharp corners)
+    ctx.fillStyle = BUBBLE_BG;
+    ctx.fillRect(bgX, bgY, bgW, bgH);
+    ctx.strokeStyle = BUBBLE_BORDER;
+    ctx.lineWidth = Math.max(1, zoom * 0.5);
+    ctx.strokeRect(bgX, bgY, bgW, bgH);
+
+    // Draw tail (small triangle pointing down)
+    ctx.fillStyle = BUBBLE_BG;
+    ctx.beginPath();
+    ctx.moveTo(screenX - TAIL_SIZE, bgY + bgH);
+    ctx.lineTo(screenX, bgY + bgH + TAIL_SIZE);
+    ctx.lineTo(screenX + TAIL_SIZE, bgY + bgH);
+    ctx.fill();
+
+    // Draw text
+    ctx.fillStyle = BUBBLE_TEXT;
+    ctx.fillText(summary, screenX, screenY);
+  }
+
+  ctx.restore();
 }
 
 /**

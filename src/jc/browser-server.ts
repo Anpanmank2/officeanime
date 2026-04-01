@@ -25,7 +25,11 @@ export interface BrowserServer {
   close: () => void;
 }
 
-export function startBrowserServer(extensionPath: string, port = 8432): Promise<BrowserServer> {
+export function startBrowserServer(
+  extensionPath: string,
+  port = 8432,
+  onMessage?: (data: unknown, respond: (msg: unknown) => void) => void,
+): Promise<BrowserServer> {
   const webviewRoot = path.join(extensionPath, 'dist', 'webview');
   const assetsRoot = path.join(extensionPath, 'dist', 'assets');
 
@@ -77,9 +81,25 @@ export function startBrowserServer(extensionPath: string, port = 8432): Promise<
     const wss = new WebSocketServer({ server });
     const clients = new Set<WebSocket>();
 
+    const sendToClient = (ws: WebSocket, data: unknown): void => {
+      if (ws.readyState === ws.OPEN) {
+        ws.send(JSON.stringify(data));
+      }
+    };
+
     wss.on('connection', (ws) => {
       clients.add(ws);
       ws.on('close', () => clients.delete(ws));
+      if (onMessage) {
+        ws.on('message', (raw) => {
+          try {
+            const data = JSON.parse(raw.toString()) as unknown;
+            onMessage(data, (msg) => sendToClient(ws, msg));
+          } catch {
+            console.warn('[JC] Failed to parse WS message from browser client');
+          }
+        });
+      }
     });
 
     const broadcast = (data: unknown): void => {

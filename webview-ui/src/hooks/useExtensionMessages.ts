@@ -5,6 +5,7 @@ import {
   JC_ENTRANCE,
   jcAbsenceBulkSync,
   jcAbsenceUpdate,
+  jcActivitySummaryUpdate,
   jcGetBreakTarget,
   jcGetPokerSeat,
   jcLoadConfig,
@@ -596,6 +597,13 @@ export function useExtensionMessages(
         jcTaskUpdate(msg.task as TaskDefinition);
       } else if (msg.type === 'jcTasksBulkSync') {
         jcTasksBulkSync(msg.tasks as TaskDefinition[]);
+      } else if (msg.type === 'jcActivitySummary') {
+        const { memberId, summary } = msg as {
+          memberId: string;
+          summary: string | null;
+          type: string;
+        };
+        jcActivitySummaryUpdate(memberId, summary);
       }
     };
     window.addEventListener('message', handler);

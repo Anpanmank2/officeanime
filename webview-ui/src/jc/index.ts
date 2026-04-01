@@ -2,6 +2,12 @@
 
 export { renderJCBubble, renderJCOverlay } from './jc-overlay.js';
 export {
+  jcActivitySummaryUpdate,
+  jcGetActivitySummary,
+  jcGetAllTasks,
+  jcGetMemberNames,
+} from './jc-state.js';
+export {
   JC_ENTRANCE,
   jcAbsenceBulkSync,
   jcAbsenceUpdate,

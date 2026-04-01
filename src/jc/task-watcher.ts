@@ -244,6 +244,40 @@ export class TaskWatcher {
     this.webview.postMessage({ type: 'jcTasksBulkSync', tasks });
   }
 
+  /** Cancel a task by ID */
+  cancelTask(taskId: string): void {
+    const tasksFile = readTasksFile();
+    if (!tasksFile) return;
+    const task = tasksFile.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    task.status = TaskStatus.DONE;
+    task.completedAt = new Date().toISOString();
+    writeTasksFile(tasksFile);
+    this.webview?.postMessage({ type: 'jcTaskUpdate', task });
+  }
+
+  /** Update task status or priority */
+  updateTaskStatus(taskId: string, newStatus: TaskStatus): void {
+    const tasksFile = readTasksFile();
+    if (!tasksFile) return;
+    const task = tasksFile.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    task.status = newStatus;
+    writeTasksFile(tasksFile);
+    this.webview?.postMessage({ type: 'jcTaskUpdate', task });
+  }
+
+  /** Reassign a task to a different member */
+  reassignTask(taskId: string, newAssignee: string): void {
+    const tasksFile = readTasksFile();
+    if (!tasksFile) return;
+    const task = tasksFile.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    task.assignee = newAssignee;
+    writeTasksFile(tasksFile);
+    this.webview?.postMessage({ type: 'jcTaskUpdate', task });
+  }
+
   /** Get tasks for a specific member */
   getTasksForMember(memberId: string): TaskDefinition[] {
     const tasksFile = readTasksFile();

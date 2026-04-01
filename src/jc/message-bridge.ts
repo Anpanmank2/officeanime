@@ -24,9 +24,9 @@ export interface MessageBridge {
   handleWsMessage: (ws: WebSocket, raw: string) => void;
 }
 
-export function createMessageBridge(
-  browserMessageHandler?: (data: unknown) => void,
-): MessageBridge {
+export function createMessageBridge(options?: {
+  onBrowserCommand?: (data: unknown, respond: (msg: unknown) => void) => void;
+}): MessageBridge {
   /** Buffer of most recent message per type for replay */
   const replayBuffer = new Map<string, unknown>();
 
@@ -60,10 +60,17 @@ export function createMessageBridge(
     }
   };
 
-  const handleWsMessage = (_ws: WebSocket, raw: string): void => {
+  const handleWsMessage = (ws: WebSocket, raw: string): void => {
     try {
       const data = JSON.parse(raw) as unknown;
-      browserMessageHandler?.(data);
+      if (options?.onBrowserCommand) {
+        const respond = (msg: unknown): void => {
+          if (ws && ws.readyState === ws.OPEN) {
+            ws.send(JSON.stringify(msg));
+          }
+        };
+        options.onBrowserCommand(data, respond);
+      }
     } catch {
       console.warn('[JC] Failed to parse WS message:', raw);
     }

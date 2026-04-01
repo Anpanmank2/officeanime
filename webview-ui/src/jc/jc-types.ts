@@ -125,3 +125,17 @@ export interface TaskDefinition {
   completedAt?: string;
   result?: string;
 }
+
+/** Command types sent from webview to extension */
+export const CommandType = {
+  AGENT_INSTRUCT: 'agent:instruct',
+  AGENT_DIRECTIVE: 'agent:directive',
+  AGENT_FOCUS: 'agent:focus',
+  BROADCAST_SEND: 'broadcast:send',
+  TASK_CANCEL: 'task:cancel',
+  TASK_PRIORITIZE: 'task:prioritize',
+  TASK_REASSIGN: 'task:reassign',
+} as const;
+
+/** Instruction mode */
+export type InstructionMode = 'instant' | 'directive';

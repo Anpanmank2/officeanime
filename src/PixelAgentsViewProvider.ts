@@ -43,6 +43,8 @@ import {
 } from './fileWatcher.js';
 import type { BrowserServer } from './jc/browser-server.js';
 import { startBrowserServer } from './jc/browser-server.js';
+import type { CommandDispatcher } from './jc/command-dispatcher.js';
+import { createCommandDispatcher } from './jc/command-dispatcher.js';
 import {
   isJCActive,
   onAgentCreated as jcOnAgentCreated,
@@ -95,6 +97,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
   // Browser viewing
   private browserServer: BrowserServer | null = null;
   private messageBridge: MessageBridge | null = null;
+  private commandDispatcher: CommandDispatcher | null = null;
   /** Track messages sent to webview for replay to late-connecting browser clients */
   private sentMessages = new Map<string, unknown>();
 
@@ -471,6 +474,16 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         if (memberId && prompt) {
           submitTask(memberId, prompt, priority, workingDirectory);
         }
+      } else if (
+        message.type === 'agent:instruct' ||
+        message.type === 'agent:directive' ||
+        message.type === 'agent:focus' ||
+        message.type === 'broadcast:send' ||
+        message.type === 'task:cancel' ||
+        message.type === 'task:prioritize' ||
+        message.type === 'task:reassign'
+      ) {
+        this.commandDispatcher?.dispatch(message);
       } else if (message.type === 'requestDiagnostics') {
         // Send connection diagnostics for all agents to the Debug View
         const diagnostics: Array<Record<string, unknown>> = [];
@@ -734,10 +747,99 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 
     try {
       const extensionPath = this.extensionUri.fsPath;
-      this.browserServer = await startBrowserServer(extensionPath);
 
-      // Create message bridge with replay buffer
-      this.messageBridge = createMessageBridge();
+      // Create command dispatcher and wire context
+      const dispatcher = createCommandDispatcher();
+      dispatcher.setContext({
+        sendToTerminal: (agentId, text) => {
+          const agent = this.agents.get(agentId);
+          if (agent?.terminalRef) {
+            agent.terminalRef.sendText(text);
+          }
+        },
+        focusTerminal: (agentId) => {
+          const agent = this.agents.get(agentId);
+          if (agent?.terminalRef) {
+            agent.terminalRef.show();
+          }
+        },
+        closeAgent: (agentId) => {
+          const agent = this.agents.get(agentId);
+          if (agent?.terminalRef) {
+            agent.terminalRef.dispose();
+          }
+        },
+        openClaude: (options) => {
+          void launchNewTerminal(
+            this.nextAgentId,
+            this.nextTerminalIndex,
+            this.agents,
+            this.activeAgentId,
+            this.knownJsonlFiles,
+            this.fileWatchers,
+            this.pollingTimers,
+            this.waitingTimers,
+            this.permissionTimers,
+            this.jsonlPollTimers,
+            this.projectScanTimer,
+            this.webview,
+            this.persistAgents,
+            options?.folderPath,
+            options?.bypassPermissions,
+          );
+        },
+        getAgentIds: () => [...this.agents.keys()],
+        cancelTask: (taskId: string) => {
+          void import('./jc/index.js').then((jc) => {
+            const tw = jc.getTaskWatcher();
+            if (tw) tw.cancelTask(taskId);
+          });
+        },
+        updateTask: (taskId: string, updates: { status?: string; priority?: number }) => {
+          void import('./jc/index.js').then((jc) => {
+            const tw = jc.getTaskWatcher();
+            if (tw && updates.status) {
+              tw.updateTaskStatus(taskId, updates.status as import('./jc/types.js').TaskStatus);
+            }
+          });
+        },
+        reassignTask: (taskId: string, newAssignee: string) => {
+          void import('./jc/index.js').then((jc) => {
+            const tw = jc.getTaskWatcher();
+            if (tw) tw.reassignTask(taskId, newAssignee);
+          });
+        },
+        writeDirective: async (text: string) => {
+          const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+          if (!workspaceFolder) return;
+          const directivePath = vscode.Uri.joinPath(workspaceFolder.uri, '.jc', 'directives.md');
+          const timestamp = new Date().toISOString();
+          const entry = `\n## Directive [${timestamp}]\n\n${text}\n`;
+          try {
+            const existing = await vscode.workspace.fs.readFile(directivePath);
+            const content = new TextDecoder().decode(existing) + entry;
+            await vscode.workspace.fs.writeFile(directivePath, new TextEncoder().encode(content));
+          } catch {
+            // File doesn't exist — create with header
+            const content = `# JC Directives\n${entry}`;
+            await vscode.workspace.fs.createDirectory(
+              vscode.Uri.joinPath(workspaceFolder.uri, '.jc'),
+            );
+            await vscode.workspace.fs.writeFile(directivePath, new TextEncoder().encode(content));
+          }
+        },
+        forwardToWebviewHandler: (data) => {
+          this.webview?.postMessage(data);
+        },
+      });
+      this.commandDispatcher = dispatcher;
+
+      // Create message bridge with command dispatcher
+      this.messageBridge = createMessageBridge({
+        onBrowserCommand: (data, respond) => dispatcher.dispatch(data, respond),
+      });
+
+      this.browserServer = await startBrowserServer(extensionPath);
 
       // Seed replay buffer from previously tracked messages
       this.messageBridge.seedReplayBuffer([...this.sentMessages.values()]);
@@ -768,6 +870,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
     this.browserServer?.close();
     this.browserServer = null;
     this.messageBridge = null;
+    this.commandDispatcher = null;
     this.layoutWatcher?.dispose();
     this.layoutWatcher = null;
     for (const id of [...this.agents.keys()]) {

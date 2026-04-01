@@ -136,7 +136,7 @@ export function processTranscriptLine(
             // JC: Notify tool start for state tracking
             import('./jc/index.js').then((jc) => {
               if (jc.isJCActive()) {
-                jc.onToolStart(agentId, toolName, webview);
+                jc.onToolStart(agentId, toolName, status, webview);
               }
             });
           }

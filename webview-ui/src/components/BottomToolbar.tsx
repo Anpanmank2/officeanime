@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { WorkspaceFolder } from '../hooks/useExtensionMessages.js';
+import type { BroadcastMessage } from '../jc/BroadcastOverlay.js';
+import { BroadcastOverlay } from '../jc/BroadcastOverlay.js';
+import { jcGetAllTasks, jcGetMemberNames } from '../jc/jc-state.js';
+import { KanbanPanel } from '../jc/KanbanPanel.js';
 import { vscode } from '../vscodeApi.js';
 import { SettingsModal } from './SettingsModal.js';
 
@@ -68,21 +72,30 @@ export function BottomToolbar({
   const [isBypassMenuOpen, setIsBypassMenuOpen] = useState(false);
   const [hoveredFolder, setHoveredFolder] = useState<number | null>(null);
   const [hoveredBypass, setHoveredBypass] = useState<number | null>(null);
+  const [isKanbanOpen, setIsKanbanOpen] = useState(false);
+  const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
+  const [broadcastText, setBroadcastText] = useState('');
+  const [broadcastMode, setBroadcastMode] = useState<'instant' | 'directive'>('instant');
+  const [broadcastMsg, setBroadcastMsg] = useState<BroadcastMessage | null>(null);
   const folderPickerRef = useRef<HTMLDivElement>(null);
+  const broadcastRef = useRef<HTMLDivElement>(null);
   const pendingBypassRef = useRef(false);
 
-  // Close folder picker / bypass menu on outside click
+  // Close folder picker / bypass menu / broadcast on outside click
   useEffect(() => {
-    if (!isFolderPickerOpen && !isBypassMenuOpen) return;
+    if (!isFolderPickerOpen && !isBypassMenuOpen && !isBroadcastOpen) return;
     const handleClick = (e: MouseEvent) => {
       if (folderPickerRef.current && !folderPickerRef.current.contains(e.target as Node)) {
         setIsFolderPickerOpen(false);
         setIsBypassMenuOpen(false);
       }
+      if (broadcastRef.current && !broadcastRef.current.contains(e.target as Node)) {
+        setIsBroadcastOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [isFolderPickerOpen, isBypassMenuOpen]);
+  }, [isFolderPickerOpen, isBypassMenuOpen, isBroadcastOpen]);
 
   const hasMultipleFolders = workspaceFolders.length > 1;
 
@@ -116,6 +129,25 @@ export function BottomToolbar({
       setIsFolderPickerOpen(true);
     } else {
       vscode.postMessage({ type: 'openClaude', bypassPermissions });
+    }
+  };
+
+  const handleBroadcastSend = () => {
+    if (!broadcastText.trim()) return;
+    vscode.postMessage({
+      type: 'broadcast:send',
+      text: broadcastText.trim(),
+      mode: broadcastMode,
+    });
+    setBroadcastMsg({ text: broadcastText.trim(), timestamp: Date.now() });
+    setBroadcastText('');
+    setIsBroadcastOpen(false);
+  };
+
+  const handleBroadcastKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleBroadcastSend();
     }
   };
 
@@ -286,6 +318,152 @@ export function BottomToolbar({
           onToggleWatchAllSessions={onToggleWatchAllSessions}
         />
       </div>
+      {/* Tasks button */}
+      <button
+        onClick={() => setIsKanbanOpen((v) => !v)}
+        onMouseEnter={() => setHovered('tasks')}
+        onMouseLeave={() => setHovered(null)}
+        style={
+          isKanbanOpen
+            ? { ...btnActive }
+            : {
+                ...btnBase,
+                background: hovered === 'tasks' ? 'var(--pixel-btn-hover-bg)' : btnBase.background,
+              }
+        }
+        title="Task board"
+      >
+        Tasks
+      </button>
+      {/* Broadcast button */}
+      <div ref={broadcastRef} style={{ position: 'relative' }}>
+        <button
+          onClick={() => setIsBroadcastOpen((v) => !v)}
+          onMouseEnter={() => setHovered('broadcast')}
+          onMouseLeave={() => setHovered(null)}
+          style={
+            isBroadcastOpen
+              ? { ...btnActive, border: '2px solid #ffd700' }
+              : {
+                  ...btnBase,
+                  background:
+                    hovered === 'broadcast' ? 'var(--pixel-btn-hover-bg)' : btnBase.background,
+                  color: '#ffd700',
+                }
+          }
+          title="Broadcast to all agents"
+        >
+          Broadcast
+        </button>
+        {isBroadcastOpen && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '100%',
+              right: 0,
+              marginBottom: 4,
+              background: 'var(--pixel-bg)',
+              border: '2px solid #ffd700',
+              borderRadius: 0,
+              boxShadow: 'var(--pixel-shadow)',
+              minWidth: 240,
+              zIndex: 'var(--pixel-controls-z)',
+            }}
+          >
+            <div
+              style={{
+                padding: '4px 6px',
+                borderBottom: '1px solid #ffd70055',
+                color: '#ffd700',
+                fontSize: '16px',
+                letterSpacing: '1px',
+              }}
+            >
+              OWNER BROADCAST
+            </div>
+            <div style={{ padding: '6px' }}>
+              {/* Mode toggle */}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                <button
+                  onClick={() => setBroadcastMode('instant')}
+                  style={{
+                    flex: 1,
+                    padding: '2px 4px',
+                    fontSize: '14px',
+                    color: broadcastMode === 'instant' ? '#fff' : 'var(--pixel-text-dim)',
+                    background: broadcastMode === 'instant' ? '#ffd70044' : 'transparent',
+                    border: `1px solid ${broadcastMode === 'instant' ? '#ffd700' : 'var(--pixel-border)'}`,
+                    borderRadius: 0,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Send All
+                </button>
+                <button
+                  onClick={() => setBroadcastMode('directive')}
+                  style={{
+                    flex: 1,
+                    padding: '2px 4px',
+                    fontSize: '14px',
+                    color: broadcastMode === 'directive' ? '#fff' : 'var(--pixel-text-dim)',
+                    background: broadcastMode === 'directive' ? '#ffd70044' : 'transparent',
+                    border: `1px solid ${broadcastMode === 'directive' ? '#ffd700' : 'var(--pixel-border)'}`,
+                    borderRadius: 0,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Directive
+                </button>
+              </div>
+              {/* Textarea */}
+              <textarea
+                value={broadcastText}
+                onChange={(e) => setBroadcastText(e.target.value)}
+                onKeyDown={handleBroadcastKeyDown}
+                placeholder="Broadcast to all agents..."
+                style={{
+                  width: '100%',
+                  height: 48,
+                  padding: '4px',
+                  fontSize: '16px',
+                  color: 'var(--pixel-text)',
+                  background: 'rgba(0,0,0,0.3)',
+                  border: '1px solid var(--pixel-border)',
+                  borderRadius: 0,
+                  resize: 'vertical',
+                  fontFamily: 'inherit',
+                  boxSizing: 'border-box',
+                }}
+              />
+              {/* Send button */}
+              <button
+                onClick={handleBroadcastSend}
+                disabled={!broadcastText.trim()}
+                style={{
+                  width: '100%',
+                  marginTop: 4,
+                  padding: '4px 8px',
+                  fontSize: '16px',
+                  color: broadcastText.trim() ? '#fff' : 'var(--pixel-text-dim)',
+                  background: broadcastText.trim() ? '#ffd70066' : 'var(--pixel-btn-bg)',
+                  border: `2px solid ${broadcastText.trim() ? '#ffd700' : 'var(--pixel-border)'}`,
+                  borderRadius: 0,
+                  cursor: broadcastText.trim() ? 'pointer' : 'default',
+                }}
+              >
+                Broadcast
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      {broadcastMsg && <BroadcastOverlay message={broadcastMsg} />}
+      <KanbanPanel
+        isOpen={isKanbanOpen}
+        onClose={() => setIsKanbanOpen(false)}
+        tasks={jcGetAllTasks()}
+        memberNames={jcGetMemberNames()}
+      />
     </div>
   );
 }

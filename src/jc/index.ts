@@ -6,6 +6,7 @@ import type * as vscode from 'vscode';
 import { readConfig } from '../configPersistence.js';
 import type { AgentState } from '../types.js';
 import { AbsenceTracker } from './absence-tracker.js';
+import { ActivitySummarizer } from './activity-summarizer.js';
 import {
   assignMapping,
   getAllMappings,
@@ -34,6 +35,9 @@ let absenceTracker: AbsenceTracker | null = null;
 /** Task watcher instance */
 let taskWatcher: TaskWatcher | null = null;
 
+/** Activity summarizer instance */
+let activitySummarizer: ActivitySummarizer | null = null;
+
 /** Launch function reference (set by PixelAgentsViewProvider) */
 let launchAgentFn:
   | ((memberId: string, prompt: string, workingDir?: string) => Promise<void>)
@@ -55,6 +59,7 @@ export function initJC(
     jcEnabled = false;
     return false;
   }
+  activitySummarizer = new ActivitySummarizer();
   // Create absence tracker if agents map is provided
   if (agents) {
     absenceTracker = new AbsenceTracker(jcConfig, agents);
@@ -144,6 +149,7 @@ export function onAgentRemoved(agentId: number, webview: vscode.Webview | undefi
 export function onToolStart(
   agentId: number,
   toolName: string,
+  status: string,
   webview: vscode.Webview | undefined,
 ): void {
   if (!jcEnabled) return;
@@ -165,6 +171,18 @@ export function onToolStart(
       jcState: newState,
     });
   }
+
+  if (activitySummarizer) {
+    const summary = activitySummarizer.addEvent(agentId, toolName, status);
+    if (summary) {
+      webview?.postMessage({
+        type: 'jcActivitySummary',
+        agentId,
+        memberId,
+        summary,
+      });
+    }
+  }
 }
 
 /**
@@ -182,6 +200,14 @@ export function onAgentIdle(agentId: number, webview: vscode.Webview | undefined
     agentId,
     memberId,
     jcState: 'idle',
+  });
+
+  activitySummarizer?.clearAgent(agentId);
+  webview?.postMessage({
+    type: 'jcActivitySummary',
+    agentId,
+    memberId,
+    summary: null,
   });
 }
 
@@ -233,10 +259,16 @@ export function getJCPresentMembers(): Set<string> {
   return getPresentMembers();
 }
 
+/** Get current activity summary for an agent */
+export function getActivitySummary(agentId: number): string | null {
+  return activitySummarizer?.getSummary(agentId) ?? null;
+}
+
 /** Clean up JC resources */
 export function disposeJC(): void {
   absenceTracker?.dispose();
   absenceTracker = null;
   taskWatcher?.dispose();
   taskWatcher = null;
+  activitySummarizer = null;
 }
