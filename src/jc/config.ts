@@ -7,20 +7,31 @@ import type { JCConfig } from './types.js';
 
 let cachedConfig: JCConfig | null = null;
 
-/** Load jc-config.json from workspace root */
-export function loadJCConfig(workspaceRoot: string): JCConfig | null {
+/** Resolve jc-config.json path: workspace root first, then extension path fallback */
+function resolveConfigPath(workspaceRoot: string, extensionPath?: string): string | null {
+  const candidate = path.join(workspaceRoot, 'jc-config.json');
+  if (fs.existsSync(candidate)) return candidate;
+  if (extensionPath) {
+    const fallback = path.join(extensionPath, 'jc-config.json');
+    if (fs.existsSync(fallback)) return fallback;
+  }
+  return null;
+}
+
+/** Load jc-config.json from workspace root, falling back to extension path */
+export function loadJCConfig(workspaceRoot: string, extensionPath?: string): JCConfig | null {
   if (cachedConfig) return cachedConfig;
 
-  const configPath = path.join(workspaceRoot, 'jc-config.json');
+  const configPath = resolveConfigPath(workspaceRoot, extensionPath);
+  if (!configPath) {
+    console.log('[JC] jc-config.json not found in workspace or extension path');
+    return null;
+  }
   try {
-    if (!fs.existsSync(configPath)) {
-      console.log('[JC] jc-config.json not found at', configPath);
-      return null;
-    }
     const raw = fs.readFileSync(configPath, 'utf-8');
     cachedConfig = JSON.parse(raw) as JCConfig;
     console.log(
-      `[JC] Config loaded: ${cachedConfig.members.length} members, ${cachedConfig.exec.length} exec`,
+      `[JC] Config loaded from ${configPath}: ${cachedConfig.members.length} members, ${cachedConfig.exec.length} exec`,
     );
     return cachedConfig;
   } catch (err) {
@@ -34,7 +45,7 @@ export function clearConfigCache(): void {
   cachedConfig = null;
 }
 
-/** Check if JC mode is enabled (jc-config.json exists) */
-export function isJCEnabled(workspaceRoot: string): boolean {
-  return fs.existsSync(path.join(workspaceRoot, 'jc-config.json'));
+/** Check if JC mode is enabled (jc-config.json exists in workspace or extension path) */
+export function isJCEnabled(workspaceRoot: string, extensionPath?: string): boolean {
+  return resolveConfigPath(workspaceRoot, extensionPath) !== null;
 }

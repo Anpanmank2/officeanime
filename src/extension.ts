@@ -11,7 +11,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Initialize Just Curious Virtual Office (no-op if jc-config.json not present)
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
-  initJC(workspaceRoot, provider.agents);
+  initJC(workspaceRoot, provider.agents, context.extensionPath);
   providerInstance = provider;
 
   // Set up the launch function for the task orchestrator

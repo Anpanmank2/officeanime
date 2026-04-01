@@ -40,13 +40,17 @@ let launchAgentFn:
   | null = null;
 
 /** Initialize JC system. Call once from extension.ts activate(). */
-export function initJC(workspaceRoot: string, agents?: Map<number, AgentState>): boolean {
-  jcEnabled = isJCEnabled(workspaceRoot);
+export function initJC(
+  workspaceRoot: string,
+  agents?: Map<number, AgentState>,
+  extensionPath?: string,
+): boolean {
+  jcEnabled = isJCEnabled(workspaceRoot, extensionPath);
   if (!jcEnabled) {
     console.log('[JC] JC mode disabled (no jc-config.json)');
     return false;
   }
-  jcConfig = loadJCConfig(workspaceRoot);
+  jcConfig = loadJCConfig(workspaceRoot, extensionPath);
   if (!jcConfig) {
     jcEnabled = false;
     return false;
