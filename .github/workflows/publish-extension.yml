@@ -22,10 +22,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -49,7 +49,6 @@ jobs:
         with:
           pat: ${{ secrets.VSCE_PAT }}
           registryUrl: https://marketplace.visualstudio.com
-          skipDuplicate: true
           dryRun: ${{ inputs.dry_run == 'true' }}
 
       - name: Publish to Open VSX
@@ -58,7 +57,6 @@ jobs:
           pat: ${{ secrets.OPEN_VSX_TOKEN }}
           registryUrl: https://open-vsx.org
           extensionFile: ${{ steps.publish-vscode.outputs.vsixPath }}
-          skipDuplicate: true
           dryRun: ${{ inputs.dry_run == 'true' }}
 
       - name: Upload VSIX to Release

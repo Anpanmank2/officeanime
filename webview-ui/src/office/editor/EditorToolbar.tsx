@@ -12,6 +12,7 @@ import { getCachedSprite } from '../sprites/spriteCache.js';
 import type { FloorColor, TileType as TileTypeVal } from '../types.js';
 import { EditTool } from '../types.js';
 import { getWallSetCount, getWallSetPreviewSprite } from '../wallTiles.js';
+import { getWallSetCount, getWallSetPreviewSprite } from '../wallTiles.js';
 
 const btnStyle: React.CSSProperties = {
   padding: '3px 8px',

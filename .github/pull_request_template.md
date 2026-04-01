@@ -8,7 +8,7 @@
 - [ ] Refactor / code cleanup
 - [ ] Documentation
 - [ ] CI / build
-- [ ] Other: ...
+- [ ] Other: ___
 
 ## Related issues
 <!-- Link related issues: Closes #123, Fixes #456 -->
@@ -17,7 +17,9 @@
 <!-- Required for UI changes. Delete this section if not applicable. -->
 
 ## Test plan
-<!-- Add your own test steps -->
-- [ ] Rebased on latest `main`
+<!-- Check what applies, add your own test steps -->
+- [ ] PR targets `main` branch
+- [ ] `npm run build` passes locally
 - [ ] Tested in Extension Development Host (F5)
-- [ ] ...
+- [ ] No inline constants (all in `src/constants.ts` or `webview-ui/src/constants.ts`)
+- [ ] UI follows pixel art style (sharp corners, solid borders, pixel font)
