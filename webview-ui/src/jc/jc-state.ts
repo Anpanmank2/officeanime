@@ -16,169 +16,145 @@ const memberRuntimes = new Map<string, JCMemberRuntime>();
 const agentToMember = new Map<number, string>();
 
 /** Entrance tile (spawn/despawn point) */
-export const JC_ENTRANCE = { col: 18, row: 3 };
+export const JC_ENTRANCE = { col: 12, row: 2 };
 
 /** Poker Table seats — meeting gathering point in break zone */
 export const POKER_TABLE_SEATS = [
-  { col: 3, row: 3 },
-  { col: 4, row: 3 },
-  { col: 3, row: 4 },
-  { col: 4, row: 4 },
+  { col: 11, row: 3 },
+  { col: 12, row: 3 },
+  { col: 11, row: 4 },
+  { col: 12, row: 4 },
 ];
 
-/** Break zone target positions by breakBehavior type (cols 1-8, rows 2-6) */
+/** Break zone target positions by breakBehavior type */
 const BREAK_TARGETS: Record<string, { col: number; row: number }> = {
-  coffee: { col: 6, row: 4 }, // Coffee table area
-  sofa: { col: 3, row: 5 }, // Sofa area
-  arcade: { col: 7, row: 3 }, // Arcade/bookshelf area
-  bookshelf: { col: 5, row: 3 }, // Bookshelf area
-  meeting: { col: 3, row: 3 }, // Poker table
+  coffee: { col: 21, row: 4 },
+  sofa: { col: 19, row: 3 },
+  arcade: { col: 24, row: 3 },
+  bookshelf: { col: 20, row: 3 },
+  meeting: { col: 11, row: 3 },
 };
 
 /**
- * Desk positions — must match CUSHIONED_BENCH uid+col+row in default-layout-2.json
+ * Desk positions — must match CUSHIONED_BENCH uid+col+row in default-layout-3.json
  * and the extension-side desk-registry.ts.
  */
 const DESK_POSITIONS: Record<
   string,
   { col: number; row: number; facingDir: number; nameplate: string; nameplateEn: string }
 > = {
-  // Engineering — Dev Wing (cols 1-7, rows 9-14)
-  'dev-desk-01': { col: 2, row: 10, facingDir: 3, nameplate: '田中 健太', nameplateEn: 'K.Tanaka' },
-  'dev-desk-02': { col: 5, row: 10, facingDir: 3, nameplate: '佐藤 涼', nameplateEn: 'R.Sato' },
+  // Engineering — Dev Zone (cols 1-11, rows 7-13)
+  'dev-desk-01': { col: 4, row: 9, facingDir: 3, nameplate: '田中 健太', nameplateEn: 'K.Tanaka' },
+  'dev-desk-02': { col: 1, row: 9, facingDir: 3, nameplate: '佐藤 涼', nameplateEn: 'R.Sato' },
   'dev-desk-03': {
-    col: 2,
-    row: 12,
+    col: 7,
+    row: 9,
     facingDir: 3,
     nameplate: '中村 陽菜',
     nameplateEn: 'H.Nakamura',
   },
   'dev-desk-04': {
-    col: 5,
+    col: 2,
     row: 12,
     facingDir: 3,
     nameplate: '山本 真帆',
     nameplateEn: 'M.Yamamoto',
   },
-  'dev-desk-05': { col: 2, row: 14, facingDir: 3, nameplate: '藤井 蓮', nameplateEn: 'R.Fujii' },
-  'dev-desk-06': {
-    col: 5,
-    row: 14,
-    facingDir: 3,
-    nameplate: '黒田 翔太',
-    nameplateEn: 'S.Kuroda',
-  },
-  // Marketing Wing (cols 18-24, rows 9-14)
-  'mkt-desk-01': {
-    col: 18,
-    row: 10,
-    facingDir: 3,
-    nameplate: '黒田 涼',
-    nameplateEn: 'R.Kuroda',
-  },
+  'dev-desk-05': { col: 5, row: 12, facingDir: 3, nameplate: '藤井 蓮', nameplateEn: 'R.Fujii' },
+  'dev-desk-06': { col: 8, row: 12, facingDir: 3, nameplate: '黒田 翔太', nameplateEn: 'S.Kuroda' },
+  // Marketing Zone (cols 13-24, rows 7-13)
+  'mkt-desk-01': { col: 14, row: 9, facingDir: 3, nameplate: '黒田 涼', nameplateEn: 'R.Kuroda' },
   'mkt-desk-02': {
-    col: 20,
-    row: 10,
+    col: 17,
+    row: 9,
     facingDir: 3,
     nameplate: '清水 夏希',
     nameplateEn: 'N.Shimizu',
   },
   'mkt-desk-03': {
-    col: 22,
-    row: 10,
+    col: 20,
+    row: 9,
     facingDir: 3,
     nameplate: 'トマス・ベガ',
     nameplateEn: 'T.Vega',
   },
   'mkt-desk-04': {
-    col: 24,
-    row: 10,
+    col: 23,
+    row: 9,
     facingDir: 3,
     nameplate: 'サーシャ・ブレナン',
     nameplateEn: 'S.Brennan',
   },
   'mkt-desk-05': {
-    col: 18,
+    col: 14,
     row: 12,
     facingDir: 3,
     nameplate: '足立 賢治',
     nameplateEn: 'K.Adachi',
   },
   'mkt-desk-06': {
-    col: 20,
+    col: 17,
     row: 12,
     facingDir: 3,
     nameplate: '高橋 里奈',
     nameplateEn: 'R.Takahashi',
   },
   'mkt-desk-07': {
-    col: 22,
+    col: 20,
     row: 12,
     facingDir: 3,
     nameplate: '谷口 芽依',
     nameplateEn: 'M.Taniguchi',
   },
   'mkt-desk-08': {
-    col: 24,
+    col: 23,
     row: 12,
     facingDir: 3,
     nameplate: 'ジェイク・フローレス＝太田',
     nameplateEn: 'J.Flores-Ota',
   },
-  'mkt-desk-09': {
-    col: 19,
-    row: 14,
-    facingDir: 3,
-    nameplate: '北川 花',
-    nameplateEn: 'H.Kitagawa',
-  },
-  'mkt-desk-10': { col: 21, row: 14, facingDir: 3, nameplate: '森 大地', nameplateEn: 'D.Mori' },
-  'mkt-desk-11': {
-    col: 23,
-    row: 14,
-    facingDir: 3,
-    nameplate: 'レナ・パク',
-    nameplateEn: 'L.Park',
-  },
-  // Research Lab (full width cols 1-24, rows 15-19)
-  'res-desk-01': { col: 4, row: 17, facingDir: 3, nameplate: 'Owner', nameplateEn: 'Owner' },
+  'mkt-desk-09': { col: 16, row: 9, facingDir: 0, nameplate: '北川 花', nameplateEn: 'H.Kitagawa' },
+  'mkt-desk-10': { col: 19, row: 9, facingDir: 0, nameplate: '森 大地', nameplateEn: 'D.Mori' },
+  'mkt-desk-11': { col: 22, row: 9, facingDir: 0, nameplate: 'レナ・パク', nameplateEn: 'L.Park' },
+  // Research Lab (cols 1-11, rows 15-21)
+  'res-desk-01': { col: 1, row: 17, facingDir: 3, nameplate: 'Owner', nameplateEn: 'Owner' },
   'res-desk-02': {
-    col: 8,
+    col: 4,
     row: 17,
     facingDir: 3,
     nameplate: 'Sora Miyake',
     nameplateEn: 'S.Miyake',
   },
   'res-desk-03': {
-    col: 12,
+    col: 7,
     row: 17,
     facingDir: 3,
     nameplate: 'Marina Ríos-Delgado',
     nameplateEn: 'M.Rios',
   },
   'res-desk-04': {
-    col: 16,
-    row: 19,
+    col: 2,
+    row: 20,
     facingDir: 3,
     nameplate: 'Kai Nakamura-Chen',
     nameplateEn: 'K.Nakamura',
   },
   'res-desk-05': {
-    col: 20,
-    row: 19,
+    col: 5,
+    row: 20,
     facingDir: 3,
     nameplate: 'Dr. Priya Okonkwo-Singh',
     nameplateEn: 'P.Okonkwo',
   },
-  'res-desk-06': { col: 24, row: 19, facingDir: 3, nameplate: '空席', nameplateEn: 'Vacant' },
+  'res-desk-06': { col: 8, row: 20, facingDir: 3, nameplate: '空席', nameplateEn: 'Vacant' },
 };
 
-/** Exec positions — icon-only (no character), shown in Exec Center (cols 10-16, rows 7-8) */
+/** Exec positions — icon-only (no character), shown in Exec Area (cols 2-5, rows 3) */
 const EXEC_POSITIONS: Array<{ id: string; col: number; row: number; label: string }> = [
-  { id: 'exec-01', col: 10, row: 7, label: 'Owner/COO' },
-  { id: 'exec-02', col: 12, row: 7, label: 'CEO' },
-  { id: 'exec-03', col: 14, row: 7, label: '秘書' },
-  { id: 'exec-04', col: 16, row: 7, label: 'PM' },
+  { id: 'exec-01', col: 2, row: 3, label: 'Owner/COO' },
+  { id: 'exec-02', col: 3, row: 3, label: 'CEO' },
+  { id: 'exec-03', col: 4, row: 3, label: '秘書' },
+  { id: 'exec-04', col: 5, row: 3, label: 'PM' },
 ];
 
 /** Initialize from config message */

@@ -62,25 +62,23 @@ const LIAISON_PARTICLE_SIZE = 3;
 
 // ── Zone labels ──────────────────────────────────────────────────
 const ZONE_LABELS: Array<{ text: string; col: number; row: number; zone: string }> = [
-  { text: 'EXEC CENTER', col: 11, row: 6, zone: 'exec' },
-  { text: 'DEV ZONE', col: 3, row: 9, zone: 'dev' },
-  { text: 'MARKETING', col: 20, row: 9, zone: 'marketing' },
-  { text: 'RESEARCH LAB', col: 11, row: 15, zone: 'research' },
-  { text: 'MTG ROOM', col: 3, row: 20, zone: 'ops' },
+  { text: 'EXEC AREA', col: 3, row: 2, zone: 'exec' },
+  { text: 'DEV ZONE', col: 4, row: 7, zone: 'dev' },
+  { text: 'MARKETING', col: 17, row: 7, zone: 'marketing' },
+  { text: 'RESEARCH LAB', col: 4, row: 15, zone: 'research' },
+  { text: 'MTG ROOM', col: 17, row: 15, zone: 'ops' },
 ];
 
 // ── Glass walls ──────────────────────────────────────────────────
 const GLASS_WALLS: Array<{ col: number; row: number; width: number; height: number }> = [
-  // Exec north glass (row 5, cols 8-18)
-  { col: 8, row: 5, width: 11, height: 1 },
-  // Exec south glass (row 8, cols 8-18)
-  { col: 8, row: 8, width: 11, height: 1 },
-  // Dev wing east glass (col 8, rows 9-14)
-  { col: 8, row: 9, width: 1, height: 6 },
-  // Marketing wing west glass (col 17, rows 9-14)
-  { col: 17, row: 9, width: 1, height: 6 },
-  // Research north glass (row 14, full width)
+  // Horizontal separator between top zones and work zones (row 6)
+  { col: 1, row: 6, width: 24, height: 1 },
+  // Vertical separator between Dev and Marketing (col 12, rows 7-13)
+  { col: 12, row: 7, width: 1, height: 7 },
+  // Horizontal separator between work zones and lower zones (row 14)
   { col: 1, row: 14, width: 24, height: 1 },
+  // Vertical separator between Research and MTG (col 12, rows 15-21)
+  { col: 12, row: 15, width: 1, height: 7 },
 ];
 
 // ── Glass wall renderer ──────────────────────────────────────────
