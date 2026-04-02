@@ -8,19 +8,19 @@ import { jcGetActivitySummary, jcGetMemberInfo, jcGetMemberTaskStatus } from './
 import type { InstructionMode } from './jc-types.js';
 
 const STATE_DOT_COLORS: Record<string, string> = {
-  coding: '#4caf50',
-  thinking: '#ff9800',
-  reading: '#2196f3',
-  reviewing: '#00bcd4',
-  error: '#f44336',
-  idle: '#9e9e9e',
-  break: '#ff5722',
-  meeting: '#9c27b0',
-  arriving: '#66bb6a',
-  leaving: '#bdbdbd',
-  presenting: '#ab47bc',
-  handoff: '#7e57c2',
-  absent: '#616161',
+  coding: '#39ff14',
+  thinking: '#ffbf00',
+  reading: '#00b4ff',
+  reviewing: '#00f0ff',
+  error: '#ff3d3d',
+  idle: '#666688',
+  break: '#ff6b9d',
+  meeting: '#b388ff',
+  arriving: '#39ff14',
+  leaving: '#888888',
+  presenting: '#bf5fff',
+  handoff: '#b388ff',
+  absent: '#333344',
 };
 
 const STATE_LABELS: Record<string, string> = {
@@ -40,9 +40,9 @@ const STATE_LABELS: Record<string, string> = {
 };
 
 const DEPT_COLORS: Record<string, string> = {
-  engineering: '#5a8cff',
-  marketing: '#ff6b8a',
-  research: '#8cdd6a',
+  engineering: '#00b4ff',
+  marketing: '#ff4d8d',
+  research: '#00e676',
 };
 
 const DEPT_LABELS: Record<string, string> = {
@@ -157,15 +157,16 @@ export function JCMemberInfoPanel({
     >
       <div
         style={{
-          background: 'var(--pixel-bg)',
+          background: 'rgba(8, 10, 25, 0.94)',
           color: '#fff',
-          border: `2px solid ${accentColor}`,
+          border: `2px solid ${accentColor}88`,
           borderRadius: 0,
           padding: 0,
           whiteSpace: 'nowrap',
-          boxShadow: 'var(--pixel-shadow)',
+          boxShadow: `0 0 10px ${accentColor}22, 2px 2px 0px #0a0a14`,
           minWidth: 160,
           maxWidth: 280,
+          borderTop: `1px solid ${accentColor}aa`,
         }}
       >
         {/* Header bar */}
@@ -174,8 +175,8 @@ export function JCMemberInfoPanel({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            background: `${accentColor}33`,
-            borderBottom: `1px solid ${accentColor}55`,
+            background: `${accentColor}18`,
+            borderBottom: `1px solid ${accentColor}33`,
             padding: '3px 6px',
             cursor: 'pointer',
           }}

@@ -29,28 +29,32 @@ const panelStyle: React.CSSProperties = {
   zIndex: 'var(--pixel-controls-z)',
   display: 'flex',
   alignItems: 'center',
-  gap: 4,
-  background: 'var(--pixel-bg)',
-  border: '2px solid var(--pixel-border)',
+  gap: 5,
+  background: 'rgba(8, 10, 25, 0.92)',
+  border: '2px solid rgba(0, 180, 255, 0.25)',
   borderRadius: 0,
-  padding: '4px 6px',
-  boxShadow: 'var(--pixel-shadow)',
+  padding: '5px 7px',
+  boxShadow: '0 0 12px rgba(0, 180, 255, 0.08), 2px 2px 0px #0a0a14',
+  borderTop: '1px solid rgba(0, 240, 255, 0.3)',
 };
 
 const btnBase: React.CSSProperties = {
   padding: '5px 10px',
   fontSize: '24px',
-  color: 'var(--pixel-text)',
-  background: 'var(--pixel-btn-bg)',
-  border: '2px solid transparent',
+  color: 'rgba(200, 210, 240, 0.85)',
+  background: 'rgba(255, 255, 255, 0.06)',
+  border: '2px solid rgba(100, 140, 255, 0.15)',
   borderRadius: 0,
   cursor: 'pointer',
+  transition: 'none',
+  letterSpacing: '0.5px',
 };
 
 const btnActive: React.CSSProperties = {
   ...btnBase,
-  background: 'var(--pixel-active-bg)',
-  border: '2px solid var(--pixel-accent)',
+  background: 'rgba(0, 180, 255, 0.2)',
+  border: '2px solid rgba(0, 240, 255, 0.5)',
+  color: '#00f0ff',
 };
 
 export function BottomToolbar({
@@ -165,10 +169,10 @@ export function BottomToolbar({
             padding: '5px 12px',
             background:
               hovered === 'agent' || isFolderPickerOpen || isBypassMenuOpen
-                ? 'var(--pixel-agent-hover-bg)'
-                : 'var(--pixel-agent-bg)',
-            border: '2px solid var(--pixel-agent-border)',
-            color: 'var(--pixel-agent-text)',
+                ? 'rgba(57, 255, 20, 0.25)'
+                : 'rgba(57, 255, 20, 0.1)',
+            border: '2px solid rgba(57, 255, 20, 0.5)',
+            color: '#80ff60',
           }}
         >
           + Agent
@@ -343,12 +347,13 @@ export function BottomToolbar({
           onMouseLeave={() => setHovered(null)}
           style={
             isBroadcastOpen
-              ? { ...btnActive, border: '2px solid #ffd700' }
+              ? { ...btnActive, border: '2px solid #ffd740', color: '#ffd740' }
               : {
                   ...btnBase,
                   background:
-                    hovered === 'broadcast' ? 'var(--pixel-btn-hover-bg)' : btnBase.background,
-                  color: '#ffd700',
+                    hovered === 'broadcast' ? 'rgba(255, 215, 64, 0.15)' : btnBase.background,
+                  color: '#ffd740',
+                  border: '2px solid rgba(255, 215, 64, 0.3)',
                 }
           }
           title="Broadcast to all agents"
@@ -363,7 +368,7 @@ export function BottomToolbar({
               right: 0,
               marginBottom: 4,
               background: 'var(--pixel-bg)',
-              border: '2px solid #ffd700',
+              border: '2px solid rgba(255, 215, 64, 0.5)',
               borderRadius: 0,
               boxShadow: 'var(--pixel-shadow)',
               minWidth: 240,
@@ -373,8 +378,8 @@ export function BottomToolbar({
             <div
               style={{
                 padding: '4px 6px',
-                borderBottom: '1px solid #ffd70055',
-                color: '#ffd700',
+                borderBottom: '1px solid rgba(255, 215, 64, 0.3)',
+                color: '#ffd740',
                 fontSize: '16px',
                 letterSpacing: '1px',
               }}

@@ -51,6 +51,42 @@
   --pixel-overlay-z: 41;
   --pixel-overlay-selected-z: 42;
   --pixel-controls-z: 50;
+
+  /* Neon startup theme */
+  --neon-cyan: #00f0ff;
+  --neon-magenta: #ff00e5;
+  --neon-green: #39ff14;
+  --neon-amber: #ffbf00;
+  --neon-purple: #bf5fff;
+  --neon-pink: #ff6b9d;
+
+  /* Department neon accents */
+  --dept-eng: #00b4ff;
+  --dept-eng-glow: rgba(0, 180, 255, 0.35);
+  --dept-mkt: #ff4d8d;
+  --dept-mkt-glow: rgba(255, 77, 141, 0.35);
+  --dept-res: #00e676;
+  --dept-res-glow: rgba(0, 230, 118, 0.35);
+  --dept-exec: #ffd740;
+  --dept-exec-glow: rgba(255, 215, 64, 0.35);
+  --dept-ops: #b388ff;
+  --dept-ops-glow: rgba(179, 136, 255, 0.35);
+
+  /* State neon colors */
+  --state-coding: #39ff14;
+  --state-thinking: #ffbf00;
+  --state-reading: #00b4ff;
+  --state-reviewing: #00f0ff;
+  --state-error: #ff3d3d;
+  --state-idle: #666688;
+  --state-break: #ff6b9d;
+  --state-meeting: #b388ff;
+  --state-presenting: #bf5fff;
+
+  /* Glass panel */
+  --glass-bg: rgba(20, 20, 40, 0.75);
+  --glass-border: rgba(100, 140, 255, 0.25);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
 }
 
 html,

@@ -33,9 +33,9 @@ const menuItemBase: React.CSSProperties = {
 const checkboxStyle = (checked: boolean): React.CSSProperties => ({
   width: 14,
   height: 14,
-  border: '2px solid rgba(255, 255, 255, 0.5)',
+  border: `2px solid ${checked ? 'rgba(0, 240, 255, 0.6)' : 'rgba(100, 140, 255, 0.3)'}`,
   borderRadius: 0,
-  background: checked ? 'rgba(90, 140, 255, 0.8)' : 'transparent',
+  background: checked ? 'rgba(0, 180, 255, 0.35)' : 'transparent',
   flexShrink: 0,
   display: 'flex',
   alignItems: 'center',
@@ -93,12 +93,13 @@ export function SettingsModal({
           left: '50%',
           transform: 'translate(-50%, -50%)',
           zIndex: 50,
-          background: 'var(--pixel-bg)',
-          border: '2px solid var(--pixel-border)',
+          background: 'rgba(8, 10, 25, 0.96)',
+          border: '2px solid rgba(0, 180, 255, 0.25)',
           borderRadius: 0,
           padding: '4px',
-          boxShadow: 'var(--pixel-shadow)',
+          boxShadow: '0 0 16px rgba(0, 180, 255, 0.08), 2px 2px 0px #0a0a14',
           minWidth: 200,
+          borderTop: '1px solid rgba(0, 240, 255, 0.3)',
         }}
       >
         {/* Header with title and X button */}
@@ -108,7 +109,7 @@ export function SettingsModal({
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '4px 10px',
-            borderBottom: '1px solid var(--pixel-border)',
+            borderBottom: '1px solid rgba(0, 180, 255, 0.2)',
             marginBottom: '4px',
           }}
         >

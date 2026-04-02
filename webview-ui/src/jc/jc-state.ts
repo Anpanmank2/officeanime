@@ -547,6 +547,87 @@ export function jcGetMemberNames(): Map<string, string> {
   return names;
 }
 
+// ── Dashboard helpers ─────────────────────────────────────────
+
+/** State → neon color mapping for canvas rendering */
+const STATE_NEON_COLORS: Record<string, string> = {
+  coding: '#39ff14',
+  thinking: '#ffbf00',
+  reading: '#00b4ff',
+  reviewing: '#00f0ff',
+  error: '#ff3d3d',
+  idle: '#666688',
+  break: '#ff6b9d',
+  meeting: '#b388ff',
+  arriving: '#39ff14',
+  leaving: '#888888',
+  presenting: '#bf5fff',
+  handoff: '#b388ff',
+  absent: '#333344',
+};
+
+/** Department → neon color mapping */
+const DEPT_NEON_COLORS: Record<string, string> = {
+  engineering: '#00b4ff',
+  marketing: '#ff4d8d',
+  research: '#00e676',
+};
+
+/** Get neon color for a JC state */
+export function jcGetStateColor(state: JCState): string {
+  return STATE_NEON_COLORS[state] ?? '#666688';
+}
+
+/** Get neon color for a department */
+export function jcGetDeptColor(dept: string): string {
+  return DEPT_NEON_COLORS[dept] ?? '#888888';
+}
+
+/** Dashboard member info for HUD rendering */
+export interface DashboardMember {
+  memberId: string;
+  name: string;
+  nameEn: string;
+  role: string;
+  department: string;
+  zone: string;
+  state: JCState;
+  isPresent: boolean;
+  stateColor: string;
+  deptColor: string;
+  deskCol: number;
+  deskRow: number;
+  activitySummary: string | null;
+}
+
+/** Get all members as dashboard entries for the Team HUD */
+export function jcGetDashboardMembers(): DashboardMember[] {
+  const members: DashboardMember[] = [];
+  for (const [deskId, pos] of Object.entries(DESK_POSITIONS)) {
+    if (!jcConfig) continue;
+    const member = jcConfig.members.find((m) => m.deskId === deskId);
+    if (!member) continue;
+    const runtime = memberRuntimes.get(member.id);
+    const state = runtime?.jcState ?? 'absent';
+    members.push({
+      memberId: member.id,
+      name: member.name,
+      nameEn: member.nameEn ?? member.name,
+      role: member.role,
+      department: member.department,
+      zone: member.zone,
+      state,
+      isPresent: runtime?.isPresent ?? false,
+      stateColor: STATE_NEON_COLORS[state] ?? '#666688',
+      deptColor: DEPT_NEON_COLORS[member.department] ?? '#888888',
+      deskCol: pos.col,
+      deskRow: pos.row,
+      activitySummary: memberActivitySummaries.get(member.id) ?? null,
+    });
+  }
+  return members;
+}
+
 // ── Helpers ────────────────────────────────────────────────────
 
 function stateToBubble(state: JCState): JCBubbleType {

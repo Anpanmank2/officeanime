@@ -1,11 +1,15 @@
 // ── Just Curious Virtual Office — Webview Entry Point ────────────
 
 export { renderJCBubble, renderJCOverlay } from './jc-overlay.js';
+export type { DashboardMember } from './jc-state.js';
 export {
   jcActivitySummaryUpdate,
   jcGetActivitySummary,
   jcGetAllTasks,
+  jcGetDashboardMembers,
+  jcGetDeptColor,
   jcGetMemberNames,
+  jcGetStateColor,
 } from './jc-state.js';
 export {
   JC_ENTRANCE,
