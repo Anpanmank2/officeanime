@@ -62,12 +62,66 @@ const LIAISON_PARTICLE_SIZE = 3;
 
 // ── Zone labels ──────────────────────────────────────────────────
 const ZONE_LABELS: Array<{ text: string; col: number; row: number; zone: string }> = [
-  { text: 'EXEC AREA', col: 1, row: 2, zone: 'exec' },
-  { text: 'DEV ZONE', col: 1, row: 7, zone: 'dev' },
-  { text: 'MARKETING', col: 13, row: 7, zone: 'marketing' },
-  { text: 'RESEARCH LAB', col: 1, row: 15, zone: 'research' },
-  { text: 'MTG ROOM', col: 13, row: 15, zone: 'ops' },
+  { text: 'EXEC CENTER', col: 11, row: 6, zone: 'exec' },
+  { text: 'DEV ZONE', col: 3, row: 9, zone: 'dev' },
+  { text: 'MARKETING', col: 20, row: 9, zone: 'marketing' },
+  { text: 'RESEARCH LAB', col: 11, row: 15, zone: 'research' },
+  { text: 'MTG ROOM', col: 3, row: 20, zone: 'ops' },
 ];
+
+// ── Glass walls ──────────────────────────────────────────────────
+const GLASS_WALLS: Array<{ col: number; row: number; width: number; height: number }> = [
+  // Exec north glass (row 5, cols 8-18)
+  { col: 8, row: 5, width: 11, height: 1 },
+  // Exec south glass (row 8, cols 8-18)
+  { col: 8, row: 8, width: 11, height: 1 },
+  // Dev wing east glass (col 8, rows 9-14)
+  { col: 8, row: 9, width: 1, height: 6 },
+  // Marketing wing west glass (col 17, rows 9-14)
+  { col: 17, row: 9, width: 1, height: 6 },
+  // Research north glass (row 14, full width)
+  { col: 1, row: 14, width: 24, height: 1 },
+];
+
+// ── Glass wall renderer ──────────────────────────────────────────
+
+function renderGlassWalls(
+  ctx: CanvasRenderingContext2D,
+  offsetX: number,
+  offsetY: number,
+  s: number,
+  zoom: number,
+): void {
+  ctx.save();
+
+  for (const wall of GLASS_WALLS) {
+    const x = offsetX + wall.col * s;
+    const y = offsetY + wall.row * s;
+    const w = wall.width * s;
+    const h = wall.height * s;
+
+    // Glass panel fill (frosted cyan-white, semi-transparent)
+    ctx.fillStyle = 'rgba(180, 220, 255, 0.15)';
+    ctx.fillRect(x, y, w, h);
+
+    // Glass border (subtle light blue edge)
+    ctx.strokeStyle = 'rgba(150, 200, 255, 0.35)';
+    ctx.lineWidth = Math.max(1, zoom * 0.5);
+    ctx.strokeRect(x, y, w, h);
+
+    // Reflection highlight (thin white line at top or left edge)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    if (wall.height === 1) {
+      // Horizontal glass — highlight at top
+      ctx.fillRect(x, y, w, Math.max(1, zoom * 0.3));
+    } else {
+      // Vertical glass — highlight at left
+      ctx.fillRect(x, y, Math.max(1, zoom * 0.3), h);
+    }
+  }
+
+  ctx.restore();
+}
 
 // ── Main render function ─────────────────────────────────────────
 
@@ -89,7 +143,10 @@ export function renderJCOverlay(
 
   const s = TILE_SIZE * zoom;
 
-  // 1. Department signs (wall-mounted plaques, lowest layer)
+  // 0. Glass walls (startup aesthetic, lowest layer)
+  renderGlassWalls(ctx, offsetX, offsetY, s, zoom);
+
+  // 1. Department signs (wall-mounted plaques)
   renderDepartmentSigns(ctx, offsetX, offsetY, s, zoom);
 
   // 2. Absence indicators (dim dots on empty desks)
