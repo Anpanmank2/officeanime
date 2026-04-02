@@ -63,14 +63,51 @@ async function main() {
       esbuildProblemMatcherPlugin,
     ],
   });
+
+  // Standalone launcher (no VS Code dependency)
+  const standaloneCtx = await esbuild.context({
+    entryPoints: ['src/jc/standalone-launcher.ts'],
+    bundle: true,
+    format: 'cjs',
+    minify: production,
+    sourcemap: !production,
+    sourcesContent: false,
+    platform: 'node',
+    outfile: 'dist/standalone.js',
+    external: ['bufferutil', 'utf-8-validate'],
+    banner: { js: '#!/usr/bin/env node' },
+    logLevel: 'silent',
+    plugins: [esbuildProblemMatcherPlugin],
+  });
+
   if (watch) {
     await ctx.watch();
+    await standaloneCtx.watch();
   } else {
     await ctx.rebuild();
     await ctx.dispose();
+    await standaloneCtx.rebuild();
+    await standaloneCtx.dispose();
     // Copy assets after build
     copyAssets();
+    // Copy PWA files to dist/webview
+    copyPwaFiles();
   }
+}
+
+/**
+ * Copy PWA files (manifest.json, sw.js) to dist/webview
+ */
+function copyPwaFiles() {
+  const publicDir = path.join(__dirname, 'webview-ui', 'public');
+  const dstDir = path.join(__dirname, 'dist', 'webview');
+  for (const file of ['manifest.json', 'sw.js']) {
+    const src = path.join(publicDir, file);
+    if (fs.existsSync(src)) {
+      fs.cpSync(src, path.join(dstDir, file));
+    }
+  }
+  console.log('✓ Copied PWA files → dist/webview/');
 }
 
 main().catch((e) => {
