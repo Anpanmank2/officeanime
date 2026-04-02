@@ -700,8 +700,12 @@ export function jcGetIdleMembers(): string[] {
 
 function stateToBubble(state: JCState): JCBubbleType {
   switch (state) {
+    case 'coding':
+      return 'coding';
     case 'thinking':
       return 'thinking';
+    case 'reading':
+      return 'reading';
     case 'reviewing':
       return 'reviewing';
     case 'error':
@@ -714,6 +718,8 @@ function stateToBubble(state: JCState): JCBubbleType {
       return 'meeting';
     case 'break':
       return 'coffee';
+    case 'idle':
+      return 'idle';
     default:
       return null;
   }

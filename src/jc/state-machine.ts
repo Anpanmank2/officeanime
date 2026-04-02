@@ -104,10 +104,24 @@ export function toolToJCState(toolName: string): JCState {
 /** Determine JC bubble type for visual overlay */
 export function stateToOverlayBubble(
   state: JCState,
-): 'thinking' | 'reviewing' | 'error' | 'presenting' | 'meeting' | 'coffee' | null {
+):
+  | 'coding'
+  | 'thinking'
+  | 'reading'
+  | 'reviewing'
+  | 'error'
+  | 'presenting'
+  | 'meeting'
+  | 'coffee'
+  | 'idle'
+  | null {
   switch (state) {
+    case JCState.CODING:
+      return 'coding';
     case JCState.THINKING:
       return 'thinking';
+    case JCState.READING:
+      return 'reading';
     case JCState.REVIEWING:
       return 'reviewing';
     case JCState.ERROR:
@@ -118,6 +132,8 @@ export function stateToOverlayBubble(
       return 'meeting';
     case JCState.BREAK:
       return 'coffee';
+    case JCState.IDLE:
+      return 'idle';
     default:
       return null;
   }

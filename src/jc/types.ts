@@ -160,12 +160,15 @@ export interface TasksFile {
 
 /** Bubble overlay type for JC state visualization */
 export type JCBubbleType =
+  | 'coding' // ⚙️
   | 'thinking' // 💭
-  | 'reviewing' // ✓
+  | 'reading' // 🔍
+  | 'reviewing' // 👀
   | 'error' // ❌
   | 'presenting' // 📊
   | 'meeting' // 🤝
   | 'coffee' // ☕
+  | 'idle' // ⏳
   | null;
 
 // ── Office Event Queue ──────────────────────────────────────────

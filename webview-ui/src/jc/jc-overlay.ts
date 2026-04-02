@@ -40,14 +40,17 @@ const EXEC_LABEL_FALLBACK_FONT = '7px monospace';
 
 const STATS_FALLBACK_FONT = '8px monospace';
 
-// Bubble emoji sprites
+// Bubble emoji sprites — status icons above characters
 const BUBBLE_EMOJIS: Record<string, string> = {
+  coding: '⚙️',
   thinking: '💭',
-  reviewing: '✓',
+  reading: '🔍',
+  reviewing: '👀',
   error: '❌',
   presenting: '📊',
   meeting: '🤝',
   coffee: '☕',
+  idle: '⏳',
 };
 
 // ── Neon Department Colors ───────────────────────────────────────
@@ -89,6 +92,56 @@ const GLASS_WALLS: Array<{ col: number; row: number; width: number; height: numb
 // ── Liaison beam effect ──────────────────────────────────────────
 const LIAISON_LINE_WIDTH = 2;
 const LIAISON_PARTICLE_SIZE = 3;
+
+// ── Zone background tints ───────────────────────────────────────
+
+const ZONE_AREAS: Array<{
+  zone: string;
+  col: number;
+  row: number;
+  width: number;
+  height: number;
+}> = [
+  { zone: 'exec', col: 1, row: 2, width: 10, height: 4 },
+  { zone: 'dev', col: 1, row: 7, width: 11, height: 7 },
+  { zone: 'marketing', col: 13, row: 7, width: 12, height: 7 },
+  { zone: 'research', col: 1, row: 15, width: 11, height: 7 },
+  { zone: 'ops', col: 13, row: 15, width: 12, height: 7 },
+];
+
+function renderZoneBackgrounds(
+  ctx: CanvasRenderingContext2D,
+  offsetX: number,
+  offsetY: number,
+  s: number,
+): void {
+  ctx.save();
+  const deptStats = jcGetDeptStats();
+
+  for (const area of ZONE_AREAS) {
+    const neon = DEPT_NEON[area.zone];
+    if (!neon) continue;
+
+    const x = offsetX + area.col * s;
+    const y = offsetY + area.row * s;
+    const w = area.width * s;
+    const h = area.height * s;
+
+    // Check if any members are active in this zone
+    const deptKey =
+      area.zone === 'dev' ? 'engineering' : area.zone === 'ops' ? 'engineering' : area.zone;
+    const stats = deptStats[deptKey];
+    const hasActive = stats ? stats.present > 0 : false;
+
+    // Subtle zone tint — brighter when members are active
+    ctx.fillStyle = neon.glow;
+    ctx.globalAlpha = hasActive ? 0.08 : 0.03;
+    ctx.fillRect(x, y, w, h);
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.restore();
+}
 
 // ── Glass wall renderer (neon-enhanced) ──────────────────────────
 
@@ -167,7 +220,10 @@ export function renderJCOverlay(
 
   const s = TILE_SIZE * zoom;
 
-  // 0. Neon glass walls (lowest layer)
+  // 0a. Zone background tints (lowest layer)
+  renderZoneBackgrounds(ctx, offsetX, offsetY, s);
+
+  // 0b. Neon glass walls
   renderGlassWalls(ctx, offsetX, offsetY, s, zoom);
 
   // 1. Active desk glow rings (behind nameplates)
@@ -660,21 +716,23 @@ function renderLiaisonBeams(
     ctx.globalAlpha = alpha * 0.6;
     ctx.stroke();
 
-    // Moving particle along the beam
+    // Moving envelope icon along the beam
     const px = x1 + (x2 - x1) * progress;
     const py = y1 + (y2 - y1) * progress;
+
+    // Envelope glow
     ctx.beginPath();
-    ctx.arc(px, py, LIAISON_PARTICLE_SIZE * zoom, 0, Math.PI * 2);
-    ctx.fillStyle = '#ffffff';
-    ctx.globalAlpha = alpha;
+    ctx.arc(px, py, LIAISON_PARTICLE_SIZE * zoom * 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = beamColor;
+    ctx.globalAlpha = alpha * 0.25;
     ctx.fill();
 
-    // Particle glow
-    ctx.beginPath();
-    ctx.arc(px, py, LIAISON_PARTICLE_SIZE * zoom * 2, 0, Math.PI * 2);
-    ctx.fillStyle = beamColor;
-    ctx.globalAlpha = alpha * 0.3;
-    ctx.fill();
+    // Envelope emoji
+    ctx.globalAlpha = alpha;
+    ctx.font = `${Math.max(8, 10 * zoom)}px serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('✉️', px, py);
   }
 
   ctx.restore();
@@ -697,29 +755,44 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
   const topMargin = 4;
   const padding = 6;
   const dotRadius = 3;
+  const statusDotR = 4;
 
-  // Build department lines
-  const deptLines: Array<{ label: string; present: number; total: number; color: string }> = [];
-  for (const [dept, count] of Object.entries(deptCounts)) {
-    if (count.total > 0) {
-      const deptLabel =
-        dept === 'engineering'
-          ? 'ENG'
-          : dept === 'marketing'
-            ? 'MKT'
-            : dept === 'exec'
-              ? 'EXEC'
-              : 'RES';
-      deptLines.push({
-        label: deptLabel,
-        present: count.present,
-        total: count.total,
-        color: jcGetDeptColor(dept),
-      });
-    }
+  // Build department lines with status indicators
+  const deptOrder = ['exec', 'engineering', 'marketing', 'research'];
+  const deptLabels: Record<string, string> = {
+    exec: 'EXEC',
+    engineering: 'ENG',
+    marketing: 'MKT',
+    research: 'RES',
+  };
+  const deptLines: Array<{
+    label: string;
+    present: number;
+    total: number;
+    color: string;
+    hasWorking: boolean;
+  }> = [];
+  for (const dept of deptOrder) {
+    const count = deptCounts[dept];
+    if (!count || count.total === 0) continue;
+    const working = members.filter(
+      (m) =>
+        m.department === dept &&
+        m.isPresent &&
+        m.state !== 'idle' &&
+        m.state !== 'arriving' &&
+        m.state !== 'leaving',
+    );
+    deptLines.push({
+      label: deptLabels[dept] ?? dept.toUpperCase(),
+      present: count.present,
+      total: count.total,
+      color: jcGetDeptColor(dept),
+      hasWorking: working.length > 0,
+    });
   }
 
-  // Active members (present & working)
+  // Active members (present & working) with activity info
   const activeMembers = members.filter(
     (m) => m.isPresent && m.state !== 'idle' && m.state !== 'arriving' && m.state !== 'leaving',
   );
@@ -729,15 +802,17 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
   const headerMetrics = ctx.measureText(headerText);
   let maxWidth = headerMetrics.width + 20;
 
-  // Active member rows need more width
   for (const m of activeMembers) {
-    const rowText = `${m.nameEn} ${m.state}`;
-    const rowW = ctx.measureText(rowText).width + dotRadius * 2 + 12;
+    // Name + state + optional activity
+    const activity = m.activitySummary ? ` ${m.activitySummary.slice(0, 12)}` : '';
+    const rowText = `${m.nameEn}${activity}`;
+    const rowW = ctx.measureText(rowText).width + dotRadius * 2 + statusDotR * 2 + 16;
     if (rowW > maxWidth) maxWidth = rowW;
   }
 
   for (const line of deptLines) {
-    const lineWidth = ctx.measureText(`${line.label} ${line.present}/${line.total}`).width + 8;
+    const lineWidth =
+      ctx.measureText(`${line.label} ${line.present}/${line.total}`).width + statusDotR * 2 + 12;
     if (lineWidth > maxWidth) maxWidth = lineWidth;
   }
 
@@ -747,7 +822,7 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
     lineHeight + // header
     deptLines.length * lineHeight + // dept rows
     separatorLines * 8 + // separator
-    (showActiveList ? activeMembers.length * lineHeight : 0) + // active member rows
+    (showActiveList ? activeMembers.length * lineHeight : 0) +
     padding * 2;
 
   const boxWidth = maxWidth + padding * 2;
@@ -776,25 +851,30 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
   ctx.fillText(headerText, textX, textY);
   textY += lineHeight;
 
-  // Department lines with colored dots
+  // Department lines with status indicators (🟢/⚪/🔴)
   for (const line of deptLines) {
-    // Department color dot
+    const lineText = `${line.label} ${line.present}/${line.total}`;
+    const lineW = ctx.measureText(lineText).width;
+
+    // Status dot: 🟢 working, ⚪ present but idle, 🔴 no one
+    const statusX = textX - lineW - statusDotR * 2 - 6;
+    const statusY = textY + 5;
     ctx.beginPath();
-    ctx.arc(
-      textX - ctx.measureText(`${line.label} ${line.present}/${line.total}`).width - 8,
-      textY + 5,
-      dotRadius,
-      0,
-      Math.PI * 2,
-    );
-    ctx.fillStyle = line.color;
-    ctx.globalAlpha = line.present > 0 ? 0.9 : 0.3;
+    ctx.arc(statusX, statusY, statusDotR, 0, Math.PI * 2);
+    if (line.hasWorking) {
+      ctx.fillStyle = '#39ff14'; // green — active
+    } else if (line.present > 0) {
+      ctx.fillStyle = '#888899'; // gray — idle
+    } else {
+      ctx.fillStyle = '#ff3d3d'; // red — absent
+    }
+    ctx.globalAlpha = 0.9;
     ctx.fill();
     ctx.globalAlpha = 1;
 
     // Text
     ctx.fillStyle = line.present > 0 ? line.color : `${line.color}66`;
-    ctx.fillText(`${line.label} ${line.present}/${line.total}`, textX, textY);
+    ctx.fillText(lineText, textX, textY);
     textY += lineHeight;
   }
 
@@ -807,16 +887,22 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
 
     for (const m of activeMembers) {
       // State dot
-      const stateText = `${m.nameEn}`;
-      const stateW = ctx.measureText(stateText).width;
       ctx.beginPath();
-      ctx.arc(textX - stateW - 8, textY + 5, dotRadius - 0.5, 0, Math.PI * 2);
+      const nameLabel = m.nameEn.length > 10 ? m.nameEn.slice(0, 9) + '.' : m.nameEn;
+      const activity = m.activitySummary ? ` ${m.activitySummary.slice(0, 12)}` : '';
+      const fullText = `${nameLabel}${activity}`;
+      const fullW = ctx.measureText(fullText).width;
+      ctx.arc(textX - fullW - 8, textY + 5, dotRadius - 0.5, 0, Math.PI * 2);
       ctx.fillStyle = m.stateColor;
       ctx.fill();
 
-      // Name
+      // Name (bright) + activity (dimmer)
       ctx.fillStyle = '#ccccdd';
-      ctx.fillText(stateText, textX, textY);
+      ctx.fillText(nameLabel, textX - ctx.measureText(activity).width, textY);
+      if (activity) {
+        ctx.fillStyle = '#777790';
+        ctx.fillText(activity, textX, textY);
+      }
       textY += lineHeight;
     }
   }

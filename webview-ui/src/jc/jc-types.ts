@@ -71,12 +71,15 @@ export interface JCMemberRuntime {
 
 /** Bubble overlay types */
 export type JCBubbleType =
+  | 'coding'
   | 'thinking'
+  | 'reading'
   | 'reviewing'
   | 'error'
   | 'presenting'
   | 'meeting'
   | 'coffee'
+  | 'idle'
   | null;
 
 /** Desk nameplate render info */
