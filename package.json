@@ -80,7 +80,7 @@
   },
   "devDependencies": {
     "@types/ws": "^8.5.0",
-    "@anthropic-ai/sdk": "^0.80.0",
+    "@anthropic-ai/sdk": "^0.82.0",
     "@playwright/test": "^1.58.2",
     "@types/node": "25.x",
     "@types/pngjs": "^6.0.5",
