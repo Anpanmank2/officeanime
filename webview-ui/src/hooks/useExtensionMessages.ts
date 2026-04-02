@@ -139,6 +139,15 @@ export function useExtensionMessages(
       folderName?: string;
     }> = [];
 
+    // Buffer JC member arrivals until layout is loaded (seats must exist first)
+    let pendingJCArrivals: Array<{
+      agentId: number;
+      memberId: string;
+      deskId: string;
+      hueShift: number;
+      palette?: number;
+    }> = [];
+
     const handler = (e: MessageEvent) => {
       const msg = e.data;
       const os = getOfficeState();
@@ -163,6 +172,40 @@ export function useExtensionMessages(
           os.addAgent(p.id, p.palette, p.hueShift, p.seatId, true, p.folderName);
         }
         pendingAgents = [];
+        // Process buffered JC member arrivals
+        for (const a of pendingJCArrivals) {
+          jcMemberArriving(a.memberId);
+          const existing = os.characters.get(a.agentId);
+          if (existing) {
+            if (existing.seatId) {
+              const oldSeat = os.seats.get(existing.seatId);
+              if (oldSeat) oldSeat.assigned = false;
+            }
+            if (a.deskId && os.seats.has(a.deskId)) {
+              const seat = os.seats.get(a.deskId)!;
+              if (!seat.assigned) {
+                seat.assigned = true;
+                existing.seatId = a.deskId;
+              }
+            }
+            existing.tileCol = JC_ENTRANCE.col;
+            existing.tileRow = JC_ENTRANCE.row;
+            existing.x = JC_ENTRANCE.col * TILE_SIZE + TILE_SIZE / 2;
+            existing.y = JC_ENTRANCE.row * TILE_SIZE + TILE_SIZE / 2;
+            os.sendToSeat(a.agentId);
+          } else {
+            os.addAgent(a.agentId, a.palette, a.hueShift, a.deskId, true);
+            const ch = os.characters.get(a.agentId);
+            if (ch) {
+              ch.tileCol = JC_ENTRANCE.col;
+              ch.tileRow = JC_ENTRANCE.row;
+              ch.x = JC_ENTRANCE.col * TILE_SIZE + TILE_SIZE / 2;
+              ch.y = JC_ENTRANCE.row * TILE_SIZE + TILE_SIZE / 2;
+              os.sendToSeat(a.agentId);
+            }
+          }
+        }
+        pendingJCArrivals = [];
         layoutReadyRef.current = true;
         setLayoutReady(true);
         if (msg.wasReset) {
@@ -477,6 +520,12 @@ export function useExtensionMessages(
         const hueShift = (msg.hueShift as number) ?? 0;
         const palette = msg.palette as number | undefined;
         const seatUid = deskId; // seat UID in layout matches deskId
+
+        // Buffer if layout not ready yet (seats don't exist)
+        if (!layoutReadyRef.current) {
+          pendingJCArrivals.push({ agentId, memberId, deskId, hueShift, palette });
+          return;
+        }
 
         jcMemberArriving(memberId);
 
