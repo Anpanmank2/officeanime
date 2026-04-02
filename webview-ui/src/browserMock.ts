@@ -186,10 +186,32 @@ async function decodeFurnitureFromPng(
  * Fetches all pre-decoded assets from the Vite dev server and stores them
  * for dispatchMockMessages().
  */
+/** JC config loaded during init for permanent resident dispatch */
+let jcConfigData: {
+  members?: Array<{
+    id: string;
+    role: string;
+    hueShift: number;
+    palette?: number;
+    deskId: string;
+  }>;
+} | null = null;
+
 export async function initBrowserMock(): Promise<void> {
   console.log('[BrowserMock] Loading assets...');
 
   const base = import.meta.env.BASE_URL; // '/' in dev, '/sub/' with a subpath, './' in production
+
+  // Load JC config for permanent resident spawning
+  try {
+    const configRes = await fetch(`${base}jc-config.json`);
+    if (configRes.ok) {
+      jcConfigData = (await configRes.json()) as typeof jcConfigData;
+      console.log('[BrowserMock] JC config loaded');
+    }
+  } catch {
+    // JC config not available — skip permanent residents
+  }
 
   const [assetIndex, catalog] = await Promise.all([
     fetch(`${base}assets/asset-index.json`).then((r) => r.json()) as Promise<AssetIndex>,
@@ -270,6 +292,25 @@ export function dispatchMockMessages(): void {
     extensionVersion: '1.2.0',
     lastSeenVersion: '1.1',
   });
+
+  // Spawn permanent residents synchronously (same context as layoutLoaded)
+  if (jcConfigData?.members) {
+    dispatch({ type: 'jcConfigLoaded', config: jcConfigData });
+    const permanentRoles = ['CEO', 'Secretary', 'PM / Director'];
+    const residents = jcConfigData.members.filter((m) => permanentRoles.includes(m.role));
+    residents.forEach((member, idx) => {
+      dispatch({
+        type: 'jcMemberArriving',
+        agentId: -100 - idx,
+        memberId: member.id,
+        deskId: member.deskId,
+        seatUid: member.deskId,
+        hueShift: member.hueShift,
+        palette: member.palette ?? 0,
+      });
+    });
+    console.log(`[BrowserMock] ${residents.length} permanent residents dispatched`);
+  }
 
   console.log('[BrowserMock] Messages dispatched');
 }

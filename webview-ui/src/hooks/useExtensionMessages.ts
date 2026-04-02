@@ -172,7 +172,7 @@ export function useExtensionMessages(
           os.addAgent(p.id, p.palette, p.hueShift, p.seatId, true, p.folderName);
         }
         pendingAgents = [];
-        // Process buffered JC member arrivals
+        // Process buffered JC member arrivals — place directly at desk
         for (const a of pendingJCArrivals) {
           jcMemberArriving(a.memberId);
           const existing = os.characters.get(a.agentId);
@@ -186,23 +186,15 @@ export function useExtensionMessages(
               if (!seat.assigned) {
                 seat.assigned = true;
                 existing.seatId = a.deskId;
+                existing.tileCol = seat.seatCol;
+                existing.tileRow = seat.seatRow;
+                existing.x = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
+                existing.y = seat.seatRow * TILE_SIZE + TILE_SIZE / 2;
+                existing.dir = seat.facingDir;
               }
             }
-            existing.tileCol = JC_ENTRANCE.col;
-            existing.tileRow = JC_ENTRANCE.row;
-            existing.x = JC_ENTRANCE.col * TILE_SIZE + TILE_SIZE / 2;
-            existing.y = JC_ENTRANCE.row * TILE_SIZE + TILE_SIZE / 2;
-            os.sendToSeat(a.agentId);
           } else {
             os.addAgent(a.agentId, a.palette, a.hueShift, a.deskId, true);
-            const ch = os.characters.get(a.agentId);
-            if (ch) {
-              ch.tileCol = JC_ENTRANCE.col;
-              ch.tileRow = JC_ENTRANCE.row;
-              ch.x = JC_ENTRANCE.col * TILE_SIZE + TILE_SIZE / 2;
-              ch.y = JC_ENTRANCE.row * TILE_SIZE + TILE_SIZE / 2;
-              os.sendToSeat(a.agentId);
-            }
           }
         }
         pendingJCArrivals = [];
@@ -543,28 +535,18 @@ export function useExtensionMessages(
             if (!seat.assigned) {
               seat.assigned = true;
               existing.seatId = seatUid;
+              // Snap to seat position
+              existing.tileCol = seat.seatCol;
+              existing.tileRow = seat.seatRow;
+              existing.x = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
+              existing.y = seat.seatRow * TILE_SIZE + TILE_SIZE / 2;
+              existing.dir = seat.facingDir;
             }
           }
-          // Move to entrance and walk to seat
-          existing.tileCol = JC_ENTRANCE.col;
-          existing.tileRow = JC_ENTRANCE.row;
-          existing.x = JC_ENTRANCE.col * TILE_SIZE + TILE_SIZE / 2;
-          existing.y = JC_ENTRANCE.row * TILE_SIZE + TILE_SIZE / 2;
-          os.sendToSeat(agentId);
           saveAgentSeats(os);
         } else {
-          // Create new character at the preferred seat
+          // Create character directly at the preferred seat (no entrance walk)
           os.addAgent(agentId, palette, hueShift, seatUid, true);
-          const ch = os.characters.get(agentId);
-          if (ch) {
-            // Override position to entrance — character will walk to desk
-            ch.tileCol = JC_ENTRANCE.col;
-            ch.tileRow = JC_ENTRANCE.row;
-            ch.x = JC_ENTRANCE.col * TILE_SIZE + TILE_SIZE / 2;
-            ch.y = JC_ENTRANCE.row * TILE_SIZE + TILE_SIZE / 2;
-            // Trigger walk to assigned seat
-            os.sendToSeat(agentId);
-          }
         }
       } else if (msg.type === 'jcMemberLeaving') {
         const agentId = msg.agentId as number;

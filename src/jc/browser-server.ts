@@ -42,15 +42,18 @@ export function startBrowserServer(
 
       if (urlPath === '/') urlPath = '/index.html';
 
-      // Try webview root first, then assets fallback
+      // Try webview root first, then assets fallback, then extension root
       let filePath = path.join(webviewRoot, urlPath);
       if (!fs.existsSync(filePath)) {
-        // Try dist/assets/ fallback for asset files
         filePath = path.join(assetsRoot, urlPath.replace(/^\/assets\//, '/'));
         if (!fs.existsSync(filePath)) {
-          res.writeHead(404);
-          res.end('Not found');
-          return;
+          // Fallback: serve from extension root (for jc-config.json etc.)
+          filePath = path.join(extensionPath, urlPath);
+          if (!fs.existsSync(filePath)) {
+            res.writeHead(404);
+            res.end('Not found');
+            return;
+          }
         }
       }
 
