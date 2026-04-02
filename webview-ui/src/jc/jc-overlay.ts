@@ -22,7 +22,7 @@ import {
   jcGetStats,
   jcIsActive,
 } from './jc-state.js';
-import type { JCBubbleType } from './jc-types.js';
+import type { JCBubbleType, JCState } from './jc-types.js';
 
 // ── Constants ────────────────────────────────────────────────────
 const NAMEPLATE_FONT = '7px "Press Start 2P", monospace';
@@ -51,6 +51,10 @@ const BUBBLE_EMOJIS: Record<string, string> = {
   meeting: '🤝',
   coffee: '☕',
   idle: '⏳',
+  // Break behavior variants
+  sofa: '💤',
+  arcade: '🎮',
+  bookshelf: '📚',
 };
 
 // ── Neon Department Colors ───────────────────────────────────────
@@ -1146,7 +1150,9 @@ export function renderJCBubble(
   const bgSize = 12 * zoom;
 
   // Neon-tinted bubble background
-  const bubbleColor = jcGetStateColor(bubbleType === 'coffee' ? 'break' : bubbleType);
+  const breakTypes = new Set(['coffee', 'sofa', 'arcade', 'bookshelf']);
+  const stateForColor = breakTypes.has(bubbleType ?? '') ? 'break' : (bubbleType as string);
+  const bubbleColor = jcGetStateColor(stateForColor as JCState);
   ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
   ctx.beginPath();
   ctx.arc(bx, by, bgSize / 2, 0, Math.PI * 2);

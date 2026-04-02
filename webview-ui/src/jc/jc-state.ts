@@ -219,7 +219,7 @@ export function jcMemberStateChange(memberId: string, newState: JCState): void {
   const runtime = memberRuntimes.get(memberId);
   if (runtime) {
     runtime.jcState = newState;
-    runtime.bubbleType = stateToBubble(newState);
+    runtime.bubbleType = stateToBubble(newState, runtime.config.breakBehavior);
   }
 }
 
@@ -698,7 +698,7 @@ export function jcGetIdleMembers(): string[] {
 
 // ── Helpers ────────────────────────────────────────────────────
 
-function stateToBubble(state: JCState): JCBubbleType {
+function stateToBubble(state: JCState, breakBehavior?: string): JCBubbleType {
   switch (state) {
     case 'coding':
       return 'coding';
@@ -717,6 +717,11 @@ function stateToBubble(state: JCState): JCBubbleType {
     case 'handoff':
       return 'meeting';
     case 'break':
+      // Use member's break behavior for visual variety
+      if (breakBehavior === 'sofa') return 'sofa';
+      if (breakBehavior === 'arcade') return 'arcade';
+      if (breakBehavior === 'bookshelf') return 'bookshelf';
+      if (breakBehavior === 'meeting') return 'meeting';
       return 'coffee';
     case 'idle':
       return 'idle';

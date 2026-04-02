@@ -79,6 +79,9 @@ export type JCBubbleType =
   | 'presenting'
   | 'meeting'
   | 'coffee'
+  | 'sofa'
+  | 'arcade'
+  | 'bookshelf'
   | 'idle'
   | null;
 

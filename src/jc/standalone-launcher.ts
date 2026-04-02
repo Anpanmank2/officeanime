@@ -7,7 +7,9 @@ import * as path from 'path';
 
 import { startBrowserServer } from './browser-server.js';
 import { createCommandDispatcher } from './command-dispatcher.js';
+import { EventWatcher } from './event-watcher.js';
 import { createMessageBridge } from './message-bridge.js';
+import type { JCConfig } from './types.js';
 
 const DEFAULT_PORT = 8432;
 
@@ -157,6 +159,17 @@ async function main(): Promise<void> {
     // Forward other commands to dispatcher
     dispatcher.dispatch(data, respond);
   });
+
+  // Start event queue watcher (jc-events.json)
+  let eventWatcher: EventWatcher | null = null;
+  if (jcConfig) {
+    const workspaceRoot = process.cwd();
+    eventWatcher = new EventWatcher(jcConfig as JCConfig, workspaceRoot);
+    // Create a pseudo-webview that broadcasts to all browser clients
+    const pseudoWebview = { postMessage: (msg: unknown) => server.broadcast(msg) } as any;
+    eventWatcher.start(pseudoWebview);
+    console.log(`[JC] Event watcher started (watching ${workspaceRoot}/jc-events.json)`);
+  }
 
   console.log(`[JC] Standalone Office Anime server running`);
   console.log(`[JC] Open http://localhost:${port} in your browser`);
