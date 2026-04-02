@@ -1,5 +1,6 @@
 // ── Just Curious Virtual Office — Webview State Manager ─────────
 
+import { DEPT_COLORS, IDLE_TIMEOUT_MS, PERMANENT_ROLES, STATE_COLORS } from './jc-constants.js';
 import type {
   AbsenceInfo,
   JCBubbleType,
@@ -19,12 +20,12 @@ const agentToMember = new Map<number, string>();
 /** Entrance tile (spawn/despawn point) */
 export const JC_ENTRANCE = { col: 12, row: 2 };
 
-/** Poker Table seats — meeting gathering point in break zone */
+/** Poker Table seats — meeting gathering point in Poker Room */
 export const POKER_TABLE_SEATS = [
-  { col: 11, row: 3 },
-  { col: 12, row: 3 },
-  { col: 11, row: 4 },
-  { col: 12, row: 4 },
+  { col: 16, row: 17 },
+  { col: 18, row: 17 },
+  { col: 17, row: 16 },
+  { col: 17, row: 18 },
 ];
 
 /** Break zone target positions by breakBehavior type */
@@ -33,130 +34,51 @@ const BREAK_TARGETS: Record<string, { col: number; row: number }> = {
   sofa: { col: 19, row: 3 },
   arcade: { col: 24, row: 3 },
   bookshelf: { col: 20, row: 3 },
-  meeting: { col: 11, row: 3 },
+  meeting: { col: 17, row: 17 },
 };
 
 /**
  * Desk positions — must match CUSHIONED_BENCH uid+col+row in default-layout-3.json
  * and the extension-side desk-registry.ts.
+ * Nameplate text is derived from jc-config.json at runtime via jcGetNameplates().
  */
-const DESK_POSITIONS: Record<
-  string,
-  { col: number; row: number; facingDir: number; nameplate: string; nameplateEn: string }
-> = {
-  // Engineering — Dev Zone (cols 1-11, rows 7-13)
-  'dev-desk-01': { col: 4, row: 9, facingDir: 3, nameplate: '田中 健太', nameplateEn: 'K.Tanaka' },
-  'dev-desk-02': { col: 1, row: 9, facingDir: 3, nameplate: '佐藤 涼', nameplateEn: 'R.Sato' },
-  'dev-desk-03': {
-    col: 7,
-    row: 9,
-    facingDir: 3,
-    nameplate: '中村 陽菜',
-    nameplateEn: 'H.Nakamura',
-  },
-  'dev-desk-04': {
-    col: 2,
-    row: 12,
-    facingDir: 3,
-    nameplate: '山本 真帆',
-    nameplateEn: 'M.Yamamoto',
-  },
-  'dev-desk-05': { col: 5, row: 12, facingDir: 3, nameplate: '藤井 蓮', nameplateEn: 'R.Fujii' },
-  'dev-desk-06': { col: 8, row: 12, facingDir: 3, nameplate: '黒田 翔太', nameplateEn: 'S.Kuroda' },
-  // Marketing Zone (cols 13-24, rows 7-13)
-  'mkt-desk-01': { col: 14, row: 9, facingDir: 3, nameplate: '黒田 涼', nameplateEn: 'R.Kuroda' },
-  'mkt-desk-02': {
-    col: 17,
-    row: 9,
-    facingDir: 3,
-    nameplate: '清水 夏希',
-    nameplateEn: 'N.Shimizu',
-  },
-  'mkt-desk-03': {
-    col: 20,
-    row: 9,
-    facingDir: 3,
-    nameplate: 'トマス・ベガ',
-    nameplateEn: 'T.Vega',
-  },
-  'mkt-desk-04': {
-    col: 23,
-    row: 9,
-    facingDir: 3,
-    nameplate: 'サーシャ・ブレナン',
-    nameplateEn: 'S.Brennan',
-  },
-  'mkt-desk-05': {
-    col: 14,
-    row: 12,
-    facingDir: 3,
-    nameplate: '足立 賢治',
-    nameplateEn: 'K.Adachi',
-  },
-  'mkt-desk-06': {
-    col: 17,
-    row: 12,
-    facingDir: 3,
-    nameplate: '高橋 里奈',
-    nameplateEn: 'R.Takahashi',
-  },
-  'mkt-desk-07': {
-    col: 20,
-    row: 12,
-    facingDir: 3,
-    nameplate: '谷口 芽依',
-    nameplateEn: 'M.Taniguchi',
-  },
-  'mkt-desk-08': {
-    col: 23,
-    row: 12,
-    facingDir: 3,
-    nameplate: 'ジェイク・フローレス＝太田',
-    nameplateEn: 'J.Flores-Ota',
-  },
-  'mkt-desk-09': { col: 16, row: 9, facingDir: 0, nameplate: '北川 花', nameplateEn: 'H.Kitagawa' },
-  'mkt-desk-10': { col: 19, row: 9, facingDir: 0, nameplate: '森 大地', nameplateEn: 'D.Mori' },
-  'mkt-desk-11': { col: 22, row: 9, facingDir: 0, nameplate: 'レナ・パク', nameplateEn: 'L.Park' },
-  // Research Lab (cols 1-11, rows 15-21)
-  'res-desk-01': { col: 1, row: 17, facingDir: 3, nameplate: 'Owner', nameplateEn: 'Owner' },
-  'res-desk-02': {
-    col: 4,
-    row: 17,
-    facingDir: 3,
-    nameplate: 'Sora Miyake',
-    nameplateEn: 'S.Miyake',
-  },
-  'res-desk-03': {
-    col: 7,
-    row: 17,
-    facingDir: 3,
-    nameplate: 'Marina Ríos-Delgado',
-    nameplateEn: 'M.Rios',
-  },
-  'res-desk-04': {
-    col: 2,
-    row: 20,
-    facingDir: 3,
-    nameplate: 'Kai Nakamura-Chen',
-    nameplateEn: 'K.Nakamura',
-  },
-  'res-desk-05': {
-    col: 5,
-    row: 20,
-    facingDir: 3,
-    nameplate: 'Dr. Priya Okonkwo-Singh',
-    nameplateEn: 'P.Okonkwo',
-  },
-  'res-desk-06': { col: 8, row: 20, facingDir: 3, nameplate: '空席', nameplateEn: 'Vacant' },
-  // Executive — Exec Area (permanent residents)
-  'exec-desk-ceo': { col: 3, row: 4, facingDir: 3, nameplate: '亀井', nameplateEn: 'Kamei' },
-  'exec-desk-sec': {
-    col: 5,
-    row: 4,
-    facingDir: 3,
-    nameplate: '秘書',
-    nameplateEn: 'Secretary',
-  },
+const DESK_POSITIONS: Record<string, { col: number; row: number; facingDir: number }> = {
+  // ── Engineering — Dev Zone (cols 1-11, rows 7-13) ──
+  // "テックオタクの洞窟" — クラスタ配置
+  'dev-desk-01': { col: 5, row: 9, facingDir: 2 }, // Kenta (TL) — ペアプロ、Ryo.Sに向かう（左向き）
+  'dev-desk-02': { col: 2, row: 9, facingDir: 1 }, // Ryo.S (BE) — Kentaに向かう（右向き）
+  'dev-desk-03': { col: 8, row: 9, facingDir: 0 }, // Hina (FE) — 壁向き集中席（北向き）
+  'dev-desk-04': { col: 2, row: 12, facingDir: 3 }, // Maho (PM) — チーム俯瞰（南向き）
+  'dev-desk-05': { col: 6, row: 12, facingDir: 3 }, // Ren (Designer) — 横並びペア（南向き）
+  'dev-desk-06': { col: 8, row: 12, facingDir: 3 }, // Shota (Game) — Renと画面共有（南向き）
+
+  // ── Marketing — Creative Village (cols 13-24, rows 7-13) ──
+  // "カラフルなカオス" — Strategy島 + Execution列
+  'mkt-desk-01': { col: 14, row: 9, facingDir: 3 }, // Ryo.K (Dir) — 角のL字、全体を見渡す（南向き）
+  'mkt-desk-02': { col: 17, row: 9, facingDir: 1 }, // Natsuki — Strategy島（右向き→Tomásに向かう）
+  'mkt-desk-03': { col: 19, row: 9, facingDir: 2 }, // Tomás — Strategy島（左向き→Natsukiに向かう）
+  'mkt-desk-04': { col: 21, row: 9, facingDir: 1 }, // Sasha — Strategy島（右向き→Kenjiに向かう）
+  'mkt-desk-05': { col: 23, row: 9, facingDir: 2 }, // Kenji — Strategy島（左向き→Sashaに向かう）
+  'mkt-desk-06': { col: 14, row: 12, facingDir: 3 }, // Rina (Ops) — 情報ハブ（南向き）
+  'mkt-desk-07': { col: 16, row: 12, facingDir: 3 }, // Mei — Execution列（南向き）
+  'mkt-desk-08': { col: 18, row: 12, facingDir: 3 }, // Jake — Execution列（南向き）
+  'mkt-desk-09': { col: 20, row: 12, facingDir: 3 }, // Hana — Execution列（南向き）
+  'mkt-desk-10': { col: 22, row: 12, facingDir: 3 }, // Daichi — Execution列（南向き）
+  'mkt-desk-11': { col: 24, row: 12, facingDir: 3 }, // Lena — Execution列（南向き）
+
+  // ── Research Lab — 学者の書斎 (cols 1-11, rows 15-21) ──
+  // ゼミ配置: 本棚を背にした上座 + 向かい合わせペア + 独立席
+  'res-desk-01': { col: 3, row: 17, facingDir: 3 }, // Lead (Owner) — 本棚背、最奥の上座（南向き）
+  'res-desk-02': { col: 7, row: 17, facingDir: 3 }, // Sora — Leadの隣、シニア研究員（南向き）
+  'res-desk-03': { col: 2, row: 20, facingDir: 1 }, // Marina — 向かい合わせペア（右向き→Kaiへ）
+  'res-desk-04': { col: 5, row: 20, facingDir: 2 }, // Kai — 向かい合わせペア（左向き→Marinaへ）
+  'res-desk-05': { col: 8, row: 20, facingDir: 2 }, // Priya — 独立席、壁向き（西向き）
+  'res-desk-06': { col: 10, row: 20, facingDir: 3 }, // Vacant — 空席（南向き）
+
+  // ── Executive — Exec Area (permanent residents) ──
+  // "静かな威圧感" — ミニマルで品格のある空間
+  'exec-desk-ceo': { col: 3, row: 4, facingDir: 3 }, // CEO Kamei
+  'exec-desk-sec': { col: 5, row: 4, facingDir: 3 }, // Secretary
 };
 
 /** Exec positions — icon-only (no character), shown in Exec Area */
@@ -249,20 +171,22 @@ export function jcGetDeskPosition(deskId: string): { col: number; row: number } 
   return pos ? { col: pos.col, row: pos.row } : undefined;
 }
 
-/** Get all nameplates for rendering */
+/** Get all nameplates for rendering (names derived from config) */
 export function jcGetNameplates(): NameplateInfo[] {
   const nameplates: NameplateInfo[] = [];
   for (const [deskId, pos] of Object.entries(DESK_POSITIONS)) {
     let isPresent = false;
+    let text = deskId; // fallback when config not loaded
     if (jcConfig) {
       const member = jcConfig.members.find((m) => m.deskId === deskId);
       if (member) {
+        text = member.nameEn ?? member.name;
         const runtime = memberRuntimes.get(member.id);
         isPresent = runtime?.isPresent ?? false;
       }
     }
     nameplates.push({
-      text: pos.nameplateEn,
+      text,
       col: pos.col,
       row: pos.row,
       isPresent,
@@ -557,39 +481,16 @@ export function jcGetMemberNames(): Map<string, string> {
 
 // ── Dashboard helpers ─────────────────────────────────────────
 
-/** State → neon color mapping for canvas rendering */
-const STATE_NEON_COLORS: Record<string, string> = {
-  coding: '#39ff14',
-  thinking: '#ffbf00',
-  reading: '#00b4ff',
-  reviewing: '#00f0ff',
-  error: '#ff3d3d',
-  idle: '#666688',
-  break: '#ff6b9d',
-  meeting: '#b388ff',
-  arriving: '#39ff14',
-  leaving: '#888888',
-  presenting: '#bf5fff',
-  handoff: '#b388ff',
-  absent: '#333344',
-};
-
-/** Department → neon color mapping */
-const DEPT_NEON_COLORS: Record<string, string> = {
-  engineering: '#00b4ff',
-  marketing: '#ff4d8d',
-  research: '#00e676',
-  exec: '#ffd740',
-};
+// State and department colors imported from jc-constants.ts
 
 /** Get neon color for a JC state */
 export function jcGetStateColor(state: JCState): string {
-  return STATE_NEON_COLORS[state] ?? '#666688';
+  return STATE_COLORS[state] ?? '#666688';
 }
 
 /** Get neon color for a department */
 export function jcGetDeptColor(dept: string): string {
-  return DEPT_NEON_COLORS[dept] ?? '#888888';
+  return DEPT_COLORS[dept] ?? '#888888';
 }
 
 /** Dashboard member info for HUD rendering */
@@ -611,11 +512,11 @@ export interface DashboardMember {
 
 /** Get all members as dashboard entries for the Team HUD */
 export function jcGetDashboardMembers(): DashboardMember[] {
+  if (!jcConfig) return [];
   const members: DashboardMember[] = [];
-  for (const [deskId, pos] of Object.entries(DESK_POSITIONS)) {
-    if (!jcConfig) continue;
-    const member = jcConfig.members.find((m) => m.deskId === deskId);
-    if (!member) continue;
+  for (const member of jcConfig.members) {
+    const pos = DESK_POSITIONS[member.deskId];
+    if (!pos) continue;
     const runtime = memberRuntimes.get(member.id);
     const state = runtime?.jcState ?? 'absent';
     members.push({
@@ -627,8 +528,8 @@ export function jcGetDashboardMembers(): DashboardMember[] {
       zone: member.zone,
       state,
       isPresent: runtime?.isPresent ?? false,
-      stateColor: STATE_NEON_COLORS[state] ?? '#666688',
-      deptColor: DEPT_NEON_COLORS[member.department] ?? '#888888',
+      stateColor: STATE_COLORS[state] ?? '#666688',
+      deptColor: DEPT_COLORS[member.department] ?? '#888888',
       deskCol: pos.col,
       deskRow: pos.row,
       activitySummary: memberActivitySummaries.get(member.id) ?? null,
@@ -662,7 +563,7 @@ export function jcGetSpeechBubbles(): SpeechBubble[] {
 
 // ── Permanent Resident Tracking ─────────────────────────────────
 
-const PERMANENT_ROLES = new Set(['CEO', 'Secretary', 'PM / Director']);
+// PERMANENT_ROLES imported from jc-constants.ts
 
 /** Check if a member is a permanent resident (never departs) */
 export function jcIsPermanentResident(memberId: string): boolean {
@@ -673,7 +574,7 @@ export function jcIsPermanentResident(memberId: string): boolean {
 
 // ── Idle Timeout Tracking ───────────────────────────────────────
 
-const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+// IDLE_TIMEOUT_MS imported from jc-constants.ts
 const memberLastActivity = new Map<string, number>();
 
 /** Record activity for a member (resets idle timer) */

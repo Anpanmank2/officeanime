@@ -7,6 +7,13 @@
 import type { Character } from '../office/types.js';
 import { CharacterState, TILE_SIZE } from '../office/types.js';
 import {
+  BUBBLE_EMOJIS,
+  DEPT_LABELS,
+  DEPT_NEON,
+  SPEECH_BUBBLE_COLORS,
+  TASK_STATUS_COLORS,
+} from './jc-constants.js';
+import {
   jcGetActiveLiaisons,
   jcGetActivitySummary,
   jcGetDashboardMembers,
@@ -24,7 +31,7 @@ import {
 } from './jc-state.js';
 import type { JCBubbleType, JCState } from './jc-types.js';
 
-// ── Constants ────────────────────────────────────────────────────
+// ── Rendering Constants (overlay-specific) ───────────────────────
 const NAMEPLATE_FONT = '7px "Press Start 2P", monospace';
 const NAMEPLATE_FALLBACK_FONT = '8px monospace';
 const NAMEPLATE_PADDING_X = 3;
@@ -40,49 +47,13 @@ const EXEC_LABEL_FALLBACK_FONT = '7px monospace';
 
 const STATS_FALLBACK_FONT = '8px monospace';
 
-// Bubble emoji sprites — status icons above characters
-const BUBBLE_EMOJIS: Record<string, string> = {
-  coding: '⚙️',
-  thinking: '💭',
-  reading: '🔍',
-  reviewing: '👀',
-  error: '❌',
-  presenting: '📊',
-  meeting: '🤝',
-  coffee: '☕',
-  idle: '⏳',
-  // Break behavior variants
-  sofa: '💤',
-  arcade: '🎮',
-  bookshelf: '📚',
-};
-
-// ── Neon Department Colors ───────────────────────────────────────
-const DEPT_NEON: Record<string, { primary: string; glow: string; fill: string; text: string }> = {
-  dev: { primary: '#00b4ff', glow: 'rgba(0, 180, 255, 0.4)', fill: '#0a1a30', text: '#80d4ff' },
-  marketing: {
-    primary: '#ff4d8d',
-    glow: 'rgba(255, 77, 141, 0.4)',
-    fill: '#300a1a',
-    text: '#ff99bf',
-  },
-  research: {
-    primary: '#00e676',
-    glow: 'rgba(0, 230, 118, 0.4)',
-    fill: '#0a2a15',
-    text: '#80f0b0',
-  },
-  ops: { primary: '#b388ff', glow: 'rgba(179, 136, 255, 0.4)', fill: '#1a0a30', text: '#d4b8ff' },
-  exec: { primary: '#ffd740', glow: 'rgba(255, 215, 64, 0.4)', fill: '#2a2008', text: '#ffe680' },
-};
-
 // ── Zone labels ──────────────────────────────────────────────────
 const ZONE_LABELS: Array<{ text: string; col: number; row: number; zone: string }> = [
   { text: 'EXEC AREA', col: 3, row: 2, zone: 'exec' },
   { text: 'DEV ZONE', col: 4, row: 7, zone: 'dev' },
   { text: 'MARKETING', col: 17, row: 7, zone: 'marketing' },
   { text: 'RESEARCH LAB', col: 4, row: 15, zone: 'research' },
-  { text: 'MTG ROOM', col: 17, row: 15, zone: 'ops' },
+  { text: 'POKER ROOM', col: 17, row: 15, zone: 'ops' },
 ];
 
 // ── Glass walls ──────────────────────────────────────────────────
@@ -556,10 +527,7 @@ function renderHoverNameplate(
 
 // ── Task indicators ──────────────────────────────────────────────
 
-const TASK_PENDING_COLOR = '#ffbf00';
-const TASK_RUNNING_COLOR = '#39ff14';
-const TASK_DONE_COLOR = '#00b4ff';
-const TASK_ERROR_COLOR = '#ff3d3d';
+// Task status colors imported from jc-constants.ts
 
 function renderTaskIndicators(
   ctx: CanvasRenderingContext2D,
@@ -584,7 +552,7 @@ function renderTaskIndicators(
     if (task.status === 'pending') {
       ctx.beginPath();
       ctx.arc(cx, cy, iconSize / 2, 0, Math.PI * 2);
-      ctx.fillStyle = TASK_PENDING_COLOR;
+      ctx.fillStyle = TASK_STATUS_COLORS.pending;
       ctx.globalAlpha = 0.8;
       ctx.fill();
       ctx.beginPath();
@@ -600,12 +568,12 @@ function renderTaskIndicators(
       const pulse = (Math.sin(Date.now() / 300) + 1) / 2;
       ctx.beginPath();
       ctx.arc(cx, cy, (iconSize / 2) * (0.8 + 0.2 * pulse), 0, Math.PI * 2);
-      ctx.fillStyle = TASK_RUNNING_COLOR;
+      ctx.fillStyle = TASK_STATUS_COLORS.running;
       ctx.globalAlpha = 0.6 + 0.4 * pulse;
       ctx.fill();
       ctx.globalAlpha = 1;
     } else if (task.status === 'done') {
-      ctx.fillStyle = TASK_DONE_COLOR;
+      ctx.fillStyle = TASK_STATUS_COLORS.done;
       ctx.globalAlpha = 0.9;
       ctx.beginPath();
       ctx.arc(cx, cy, iconSize / 2, 0, Math.PI * 2);
@@ -620,7 +588,7 @@ function renderTaskIndicators(
       ctx.stroke();
       ctx.globalAlpha = 1;
     } else if (task.status === 'error') {
-      ctx.fillStyle = TASK_ERROR_COLOR;
+      ctx.fillStyle = TASK_STATUS_COLORS.error;
       ctx.globalAlpha = 0.9;
       ctx.beginPath();
       ctx.arc(cx, cy, iconSize / 2, 0, Math.PI * 2);
@@ -763,12 +731,6 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
 
   // Build department lines with status indicators
   const deptOrder = ['exec', 'engineering', 'marketing', 'research'];
-  const deptLabels: Record<string, string> = {
-    exec: 'EXEC',
-    engineering: 'ENG',
-    marketing: 'MKT',
-    research: 'RES',
-  };
   const deptLines: Array<{
     label: string;
     present: number;
@@ -788,7 +750,7 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
         m.state !== 'leaving',
     );
     deptLines.push({
-      label: deptLabels[dept] ?? dept.toUpperCase(),
+      label: DEPT_LABELS[dept] ?? dept.toUpperCase(),
       present: count.present,
       total: count.total,
       color: jcGetDeptColor(dept),
@@ -1008,13 +970,7 @@ function renderActivityBubbles(
 
 // ── Speech Bubbles (cross-department chat) ──────────────────────
 
-/** Department border colors for speech bubbles */
-const SPEECH_DEPT_COLORS: Record<string, string> = {
-  engineering: '#4A90D9',
-  marketing: '#50C878',
-  research: '#9B59B6',
-  exec: '#FFD700',
-};
+// Speech bubble department colors imported from jc-constants.ts as SPEECH_BUBBLE_COLORS
 
 function renderSpeechBubbles(
   ctx: CanvasRenderingContext2D,
@@ -1081,7 +1037,7 @@ function renderSpeechBubbles(
     const bgW = textW + PADDING_X * 2;
     const bgH = textH + PADDING_Y * 2;
 
-    const deptColor = SPEECH_DEPT_COLORS[bubble.department] ?? '#888888';
+    const deptColor = SPEECH_BUBBLE_COLORS[bubble.department] ?? '#888888';
 
     // Shadow
     ctx.fillStyle = 'rgba(0,0,0,0.5)';
