@@ -195,6 +195,33 @@ export function useExtensionMessages(
             }
           } else {
             os.addAgent(a.agentId, a.palette, a.hueShift, a.deskId, true);
+            const ch2 = os.characters.get(a.agentId);
+            if (ch2 && ch2.seatId) {
+              const s2 = os.seats.get(ch2.seatId);
+              if (s2) {
+                let sf = false;
+                for (let d2 = 2; d2 <= 4 && !sf; d2++) {
+                  for (let dr2 = -d2; dr2 <= d2 && !sf; dr2++) {
+                    for (let dc2 = -d2; dc2 <= d2 && !sf; dc2++) {
+                      if (Math.abs(dr2) + Math.abs(dc2) !== d2) continue;
+                      const nc2 = s2.seatCol + dc2;
+                      const nr2 = s2.seatRow + dr2;
+                      if (nr2 < 0 || nr2 >= os.tileMap.length) continue;
+                      if (nc2 < 0 || nc2 >= (os.tileMap[0]?.length ?? 0)) continue;
+                      const t2 = os.tileMap[nr2]?.[nc2];
+                      if (t2 === undefined || t2 === 0 || t2 === 255) continue;
+                      if (os.blockedTiles.has(`${nc2},${nr2}`)) continue;
+                      ch2.tileCol = nc2;
+                      ch2.tileRow = nr2;
+                      ch2.x = nc2 * TILE_SIZE + TILE_SIZE / 2;
+                      ch2.y = nr2 * TILE_SIZE + TILE_SIZE / 2;
+                      sf = true;
+                    }
+                  }
+                }
+                os.sendToSeat(a.agentId);
+              }
+            }
           }
         }
         pendingJCArrivals = [];
@@ -545,8 +572,36 @@ export function useExtensionMessages(
           }
           saveAgentSeats(os);
         } else {
-          // Create character directly at the preferred seat (no entrance walk)
+          // Create character at preferred seat, then walk from nearby tile
           os.addAgent(agentId, palette, hueShift, seatUid, true);
+          const ch = os.characters.get(agentId);
+          if (ch && ch.seatId) {
+            const seat = os.seats.get(ch.seatId);
+            if (seat) {
+              // Find walkable tile 2-4 Manhattan distance from seat
+              let spawnFound = false;
+              for (let dist = 2; dist <= 4 && !spawnFound; dist++) {
+                for (let dr = -dist; dr <= dist && !spawnFound; dr++) {
+                  for (let dc = -dist; dc <= dist && !spawnFound; dc++) {
+                    if (Math.abs(dr) + Math.abs(dc) !== dist) continue;
+                    const nc = seat.seatCol + dc;
+                    const nr = seat.seatRow + dr;
+                    if (nr < 0 || nr >= os.tileMap.length) continue;
+                    if (nc < 0 || nc >= (os.tileMap[0]?.length ?? 0)) continue;
+                    const t = os.tileMap[nr]?.[nc];
+                    if (t === undefined || t === 0 || t === 255) continue;
+                    if (os.blockedTiles.has(`${nc},${nr}`)) continue;
+                    ch.tileCol = nc;
+                    ch.tileRow = nr;
+                    ch.x = nc * TILE_SIZE + TILE_SIZE / 2;
+                    ch.y = nr * TILE_SIZE + TILE_SIZE / 2;
+                    spawnFound = true;
+                  }
+                }
+              }
+              os.sendToSeat(agentId);
+            }
+          }
         }
       } else if (msg.type === 'jcMemberLeaving') {
         const agentId = msg.agentId as number;
