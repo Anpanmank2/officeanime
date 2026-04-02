@@ -12,10 +12,13 @@ import type {
   JCConfig,
   OfficeEvent,
   OfficeEventsFile,
+  ReviewCompletedEvent,
+  ReviewRequestedEvent,
   SpeechBubble,
   TaskAssignedEvent,
   TaskCompletedEvent,
   TaskReceivedEvent,
+  WorkStartedEvent,
 } from './types.js';
 
 const EVENT_FILE_NAME = 'jc-events.json';
@@ -138,6 +141,15 @@ export class EventWatcher {
       case 'cross_dept_message':
         this.handleCrossDeptMessage(event as CrossDeptMessageEvent);
         break;
+      case 'work_started':
+        this.handleWorkStarted(event as WorkStartedEvent);
+        break;
+      case 'review_requested':
+        this.handleReviewRequested(event as ReviewRequestedEvent);
+        break;
+      case 'review_completed':
+        this.handleReviewCompleted(event as ReviewCompletedEvent);
+        break;
       case 'task_completed':
         this.handleTaskCompleted(event as TaskCompletedEvent);
         break;
@@ -232,6 +244,74 @@ export class EventWatcher {
       fromMemberId: event.from,
       toMemberId: event.to,
     });
+  }
+
+  private handleWorkStarted(event: WorkStartedEvent): void {
+    const member = this.config.members.find((m) => m.id === event.agent);
+    if (member) {
+      this.webview!.postMessage({
+        type: 'jcMemberStateChange',
+        agentId: -200 - Math.floor(Math.random() * 1000),
+        memberId: event.agent,
+        jcState: 'coding',
+      });
+      const bubble: SpeechBubble = {
+        id: `work-${event.agent}-${Date.now()}`,
+        memberId: event.agent,
+        text: event.task.slice(0, 20) + '...',
+        department: member.department,
+        timestamp: Date.now(),
+        duration: 3000,
+      };
+      this.webview!.postMessage({ type: 'jcSpeechBubble', bubble });
+    }
+  }
+
+  private handleReviewRequested(event: ReviewRequestedEvent): void {
+    this.webview!.postMessage({
+      type: 'jcMemberStateChange',
+      agentId: -200 - Math.floor(Math.random() * 1000),
+      memberId: event.to,
+      jcState: 'reviewing',
+    });
+    const from = this.config.members.find((m) => m.id === event.from);
+    if (from) {
+      const bubble: SpeechBubble = {
+        id: `review-req-${Date.now()}`,
+        memberId: event.from,
+        text: 'レビューお願いします',
+        department: from.department,
+        timestamp: Date.now(),
+        duration: 3000,
+      };
+      this.webview!.postMessage({ type: 'jcSpeechBubble', bubble });
+    }
+    this.webview!.postMessage({
+      type: 'jcLiaison',
+      fromMemberId: event.from,
+      toMemberId: event.to,
+    });
+  }
+
+  private handleReviewCompleted(event: ReviewCompletedEvent): void {
+    this.webview!.postMessage({
+      type: 'jcMemberStateChange',
+      agentId: -200 - Math.floor(Math.random() * 1000),
+      memberId: event.to,
+      jcState: 'coding',
+    });
+    const reviewer = this.config.members.find((m) => m.id === event.from);
+    if (reviewer) {
+      const bubble: SpeechBubble = {
+        id: `review-done-${Date.now()}`,
+        memberId: event.from,
+        text: event.approved ? 'LGTM! 👍' : '修正お願いします 📝',
+        department: reviewer.department,
+        timestamp: Date.now(),
+        duration: 3000,
+      };
+      this.webview!.postMessage({ type: 'jcSpeechBubble', bubble });
+    }
   }
 
   private handleTaskCompleted(event: TaskCompletedEvent): void {
