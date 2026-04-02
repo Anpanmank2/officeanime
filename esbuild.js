@@ -75,7 +75,6 @@ async function main() {
     platform: 'node',
     outfile: 'dist/standalone.js',
     external: ['bufferutil', 'utf-8-validate'],
-    banner: { js: '#!/usr/bin/env node' },
     logLevel: 'silent',
     plugins: [esbuildProblemMatcherPlugin],
   });
