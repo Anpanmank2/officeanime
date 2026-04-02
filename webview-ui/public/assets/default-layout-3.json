@@ -4543,169 +4543,199 @@
       "row": 0
     },
     {
-      "uid": "fur-049",
+      "uid": "tbl-049",
+      "type": "SMALL_TABLE_FRONT",
+      "col": 3,
+      "row": 2
+    },
+    {
+      "uid": "exec-desk-ceo",
+      "type": "CUSHIONED_BENCH",
+      "col": 3,
+      "row": 4
+    },
+    {
+      "uid": "pc-050",
+      "type": "PC_FRONT_OFF",
+      "col": 3,
+      "row": 2
+    },
+    {
+      "uid": "tbl-051",
+      "type": "SMALL_TABLE_FRONT",
+      "col": 5,
+      "row": 2
+    },
+    {
+      "uid": "exec-desk-sec",
+      "type": "CUSHIONED_BENCH",
+      "col": 5,
+      "row": 4
+    },
+    {
+      "uid": "pc-052",
+      "type": "PC_FRONT_OFF",
+      "col": 5,
+      "row": 2
+    },
+    {
+      "uid": "fur-053",
       "type": "LARGE_PAINTING",
       "col": 2,
       "row": 0
     },
     {
-      "uid": "fur-050",
+      "uid": "fur-054",
       "type": "CLOCK",
-      "col": 5,
+      "col": 6,
       "row": 0
     },
     {
-      "uid": "fur-051",
+      "uid": "fur-055",
       "type": "PLANT",
       "col": 1,
       "row": 2
     },
     {
-      "uid": "fur-052",
-      "type": "PLANT_2",
-      "col": 6,
-      "row": 4
-    },
-    {
-      "uid": "fur-053",
+      "uid": "fur-056",
       "type": "SOFA_FRONT",
       "col": 19,
       "row": 2
     },
     {
-      "uid": "fur-054",
+      "uid": "fur-057",
       "type": "SOFA_FRONT",
       "col": 22,
       "row": 2
     },
     {
-      "uid": "fur-055",
+      "uid": "fur-058",
       "type": "COFFEE_TABLE",
       "col": 20,
       "row": 4
     },
     {
-      "uid": "fur-056",
+      "uid": "fur-059",
       "type": "COFFEE",
       "col": 20,
       "row": 4
     },
     {
-      "uid": "fur-057",
+      "uid": "fur-060",
       "type": "COFFEE",
       "col": 21,
       "row": 4
     },
     {
-      "uid": "fur-058",
+      "uid": "fur-061",
       "type": "PLANT",
       "col": 18,
       "row": 2
     },
     {
-      "uid": "fur-059",
+      "uid": "fur-062",
       "type": "CACTUS",
       "col": 24,
       "row": 2
     },
     {
-      "uid": "fur-060",
+      "uid": "fur-063",
       "type": "DOUBLE_BOOKSHELF",
       "col": 20,
       "row": 0
     },
     {
-      "uid": "fur-061",
+      "uid": "fur-064",
       "type": "WHITEBOARD",
       "col": 14,
       "row": 13
     },
     {
-      "uid": "fur-062",
+      "uid": "fur-065",
       "type": "WHITEBOARD",
       "col": 18,
       "row": 13
     },
     {
-      "uid": "fur-063",
+      "uid": "fur-066",
       "type": "SOFA_FRONT",
       "col": 15,
       "row": 19
     },
     {
-      "uid": "fur-064",
+      "uid": "fur-067",
       "type": "SOFA_FRONT",
       "col": 19,
       "row": 19
     },
     {
-      "uid": "fur-065",
+      "uid": "fur-068",
       "type": "COFFEE_TABLE",
       "col": 17,
       "row": 17
     },
     {
-      "uid": "fur-066",
+      "uid": "fur-069",
       "type": "PLANT",
       "col": 22,
       "row": 15
     },
     {
-      "uid": "fur-067",
+      "uid": "fur-070",
       "type": "BIN",
       "col": 24,
       "row": 20
     },
     {
-      "uid": "fur-068",
+      "uid": "fur-071",
       "type": "DOUBLE_BOOKSHELF",
       "col": 10,
       "row": 5
     },
     {
-      "uid": "fur-069",
+      "uid": "fur-072",
       "type": "BOOKSHELF",
       "col": 1,
       "row": 5
     },
     {
-      "uid": "fur-070",
+      "uid": "fur-073",
       "type": "HANGING_PLANT",
       "col": 6,
       "row": 5
     },
     {
-      "uid": "fur-071",
+      "uid": "fur-074",
       "type": "LARGE_PAINTING",
       "col": 13,
       "row": 5
     },
     {
-      "uid": "fur-072",
+      "uid": "fur-075",
       "type": "SMALL_PAINTING",
       "col": 21,
       "row": 5
     },
     {
-      "uid": "fur-073",
+      "uid": "fur-076",
       "type": "WHITEBOARD",
       "col": 1,
       "row": 13
     },
     {
-      "uid": "fur-074",
+      "uid": "fur-077",
       "type": "HANGING_PLANT",
       "col": 10,
       "row": 13
     },
     {
-      "uid": "fur-075",
+      "uid": "fur-078",
       "type": "SMALL_PAINTING_2",
       "col": 22,
       "row": 13
     },
     {
-      "uid": "fur-076",
+      "uid": "fur-079",
       "type": "LARGE_PLANT",
       "col": 8,
       "row": 2

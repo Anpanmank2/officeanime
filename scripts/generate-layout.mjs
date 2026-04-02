@@ -169,11 +169,13 @@ furniture.push({ uid: fuid('fur'), type: 'CUSHIONED_CHAIR_SIDE:left', col: 14, r
 furniture.push({ uid: fuid('fur'), type: 'WHITEBOARD', col: 14, row: 0 });
 
 // ━━━ EXEC AREA (cols 1-6, rows 2-5) ━━━
-// Exec icons rendered programmatically — just add decorations
+// Permanent residents: CEO (col 3) and Secretary (col 5)
+addDeskStation(3, 2, 'exec-desk-ceo'); // CEO Kamei
+addDeskStation(5, 2, 'exec-desk-sec'); // Secretary
+// Decorations
 furniture.push({ uid: fuid('fur'), type: 'LARGE_PAINTING', col: 2, row: 0 }); // wall art
-furniture.push({ uid: fuid('fur'), type: 'CLOCK', col: 5, row: 0 }); // wall clock
+furniture.push({ uid: fuid('fur'), type: 'CLOCK', col: 6, row: 0 }); // wall clock
 furniture.push({ uid: fuid('fur'), type: 'PLANT', col: 1, row: 2 }); // plant
-furniture.push({ uid: fuid('fur'), type: 'PLANT_2', col: 6, row: 4 }); // plant
 
 // ━━━ BREAK ZONE (cols 18-24, rows 2-5) ━━━
 furniture.push({ uid: fuid('fur'), type: 'SOFA_FRONT', col: 19, row: 2 }); // sofa 1

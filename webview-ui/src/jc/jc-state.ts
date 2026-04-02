@@ -149,11 +149,11 @@ const DESK_POSITIONS: Record<
   },
   'res-desk-06': { col: 8, row: 20, facingDir: 3, nameplate: '空席', nameplateEn: 'Vacant' },
   // Executive — Exec Area (permanent residents)
-  'exec-desk-ceo': { col: 3, row: 4, facingDir: 0, nameplate: '亀井', nameplateEn: 'Kamei' },
+  'exec-desk-ceo': { col: 3, row: 4, facingDir: 3, nameplate: '亀井', nameplateEn: 'Kamei' },
   'exec-desk-sec': {
-    col: 4,
+    col: 5,
     row: 4,
-    facingDir: 0,
+    facingDir: 3,
     nameplate: '秘書',
     nameplateEn: 'Secretary',
   },
