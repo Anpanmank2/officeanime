@@ -4,12 +4,17 @@ export { renderJCBubble, renderJCOverlay } from './jc-overlay.js';
 export type { DashboardMember } from './jc-state.js';
 export {
   jcActivitySummaryUpdate,
+  jcAddSpeechBubble,
   jcGetActivitySummary,
   jcGetAllTasks,
   jcGetDashboardMembers,
   jcGetDeptColor,
+  jcGetIdleMembers,
   jcGetMemberNames,
+  jcGetSpeechBubbles,
   jcGetStateColor,
+  jcIsPermanentResident,
+  jcRecordActivity,
 } from './jc-state.js';
 export {
   JC_ENTRANCE,
@@ -47,6 +52,7 @@ export type {
   JCMemberRuntime,
   JCState,
   NameplateInfo,
+  SpeechBubble,
   TaskDefinition,
   TaskStatus,
 } from './jc-types.js';

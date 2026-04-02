@@ -17,6 +17,7 @@ import {
   jcGetMemberForAgent,
   jcGetMemberRuntime,
   jcGetNameplates,
+  jcGetSpeechBubbles,
   jcGetStateColor,
   jcGetStats,
   jcIsActive,
@@ -202,7 +203,12 @@ export function renderJCOverlay(
     renderActivityBubbles(ctx, characters, offsetX, offsetY, zoom);
   }
 
-  // 10. Team HUD (top-right)
+  // 10. Cross-department speech bubbles (text chat)
+  if (characters) {
+    renderSpeechBubbles(ctx, characters, offsetX, offsetY, zoom);
+  }
+
+  // 11. Team HUD (top-right)
   renderTeamHUD(ctx, canvasWidth);
 }
 
@@ -696,7 +702,14 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
   const deptLines: Array<{ label: string; present: number; total: number; color: string }> = [];
   for (const [dept, count] of Object.entries(deptCounts)) {
     if (count.total > 0) {
-      const deptLabel = dept === 'engineering' ? 'ENG' : dept === 'marketing' ? 'MKT' : 'RES';
+      const deptLabel =
+        dept === 'engineering'
+          ? 'ENG'
+          : dept === 'marketing'
+            ? 'MKT'
+            : dept === 'exec'
+              ? 'EXEC'
+              : 'RES';
       deptLines.push({
         label: deptLabel,
         present: count.present,
@@ -900,6 +913,126 @@ function renderActivityBubbles(
     ctx.fillText(summary, screenX, screenY);
   }
 
+  ctx.restore();
+}
+
+// ── Speech Bubbles (cross-department chat) ──────────────────────
+
+/** Department border colors for speech bubbles */
+const SPEECH_DEPT_COLORS: Record<string, string> = {
+  engineering: '#4A90D9',
+  marketing: '#50C878',
+  research: '#9B59B6',
+  exec: '#FFD700',
+};
+
+function renderSpeechBubbles(
+  ctx: CanvasRenderingContext2D,
+  characters: Character[],
+  offsetX: number,
+  offsetY: number,
+  zoom: number,
+): void {
+  const bubbles = jcGetSpeechBubbles();
+  if (bubbles.length === 0) return;
+
+  const FONT = zoom >= 3 ? '6px "Press Start 2P", monospace' : '7px monospace';
+  const MAX_TEXT_WIDTH = 80 * zoom;
+  const PADDING_X = 4 * zoom;
+  const PADDING_Y = 3 * zoom;
+  const OFFSET_Y = -36 * zoom;
+  const TAIL_SIZE = 3 * zoom;
+  const BORDER_WIDTH = Math.max(1.5, zoom * 0.6);
+
+  ctx.save();
+  ctx.font = FONT;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+
+  for (const bubble of bubbles) {
+    // Find the character for this member
+    let charX: number | null = null;
+    let charY: number | null = null;
+    for (const ch of characters) {
+      if (ch.isSubagent) continue;
+      const memberId = jcGetMemberForAgent(ch.id);
+      if (memberId === bubble.memberId) {
+        const sittingOff = ch.state === CharacterState.TYPE ? -4 : 0;
+        charX = offsetX + ch.x * zoom;
+        charY = offsetY + (ch.y + sittingOff) * zoom;
+        break;
+      }
+    }
+    if (charX === null || charY === null) continue;
+
+    // Fade out in last 500ms
+    const elapsed = Date.now() - bubble.timestamp;
+    const remaining = bubble.duration - elapsed;
+    const alpha = remaining < 500 ? remaining / 500 : 1;
+    if (alpha <= 0) continue;
+
+    ctx.globalAlpha = alpha;
+
+    // Truncate text to fit
+    let text = bubble.text;
+    const metrics = ctx.measureText(text);
+    if (metrics.width > MAX_TEXT_WIDTH) {
+      while (ctx.measureText(text + '…').width > MAX_TEXT_WIDTH && text.length > 0) {
+        text = text.slice(0, -1);
+      }
+      text += '…';
+    }
+
+    const textW = ctx.measureText(text).width;
+    const textH = zoom >= 3 ? 6 : 7;
+
+    const bgX = charX - textW / 2 - PADDING_X;
+    const bgY = charY + OFFSET_Y - textH - PADDING_Y;
+    const bgW = textW + PADDING_X * 2;
+    const bgH = textH + PADDING_Y * 2;
+
+    const deptColor = SPEECH_DEPT_COLORS[bubble.department] ?? '#888888';
+
+    // Shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(bgX + 1, bgY + 1, bgW, bgH);
+
+    // Background — dark with dept tint
+    ctx.fillStyle = 'rgba(15, 18, 35, 0.93)';
+    ctx.fillRect(bgX, bgY, bgW, bgH);
+
+    // Department-colored border (pixel art dotted style)
+    ctx.strokeStyle = deptColor;
+    ctx.lineWidth = BORDER_WIDTH;
+    ctx.strokeRect(bgX, bgY, bgW, bgH);
+
+    // Left accent bar (department color)
+    const accentW = Math.max(2, Math.round(zoom * 0.6));
+    ctx.fillStyle = deptColor;
+    ctx.fillRect(bgX, bgY, accentW, bgH);
+
+    // Tail pointing down to character
+    ctx.fillStyle = 'rgba(15, 18, 35, 0.93)';
+    ctx.beginPath();
+    ctx.moveTo(charX - TAIL_SIZE, bgY + bgH);
+    ctx.lineTo(charX, bgY + bgH + TAIL_SIZE);
+    ctx.lineTo(charX + TAIL_SIZE, bgY + bgH);
+    ctx.fill();
+    // Tail border
+    ctx.strokeStyle = deptColor;
+    ctx.lineWidth = Math.max(1, zoom * 0.4);
+    ctx.beginPath();
+    ctx.moveTo(charX - TAIL_SIZE, bgY + bgH);
+    ctx.lineTo(charX, bgY + bgH + TAIL_SIZE);
+    ctx.lineTo(charX + TAIL_SIZE, bgY + bgH);
+    ctx.stroke();
+
+    // Text
+    ctx.fillStyle = '#e0e0f0';
+    ctx.fillText(text, charX, charY + OFFSET_Y);
+  }
+
+  ctx.globalAlpha = 1;
   ctx.restore();
 }
 

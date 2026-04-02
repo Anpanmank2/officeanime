@@ -7,6 +7,7 @@ import type {
   JCMemberRuntime,
   JCState,
   NameplateInfo,
+  SpeechBubble,
   TaskDefinition,
 } from './jc-types.js';
 
@@ -147,13 +148,20 @@ const DESK_POSITIONS: Record<
     nameplateEn: 'P.Okonkwo',
   },
   'res-desk-06': { col: 8, row: 20, facingDir: 3, nameplate: '空席', nameplateEn: 'Vacant' },
+  // Executive — Exec Area (permanent residents)
+  'exec-desk-ceo': { col: 3, row: 4, facingDir: 0, nameplate: '亀井', nameplateEn: 'Kamei' },
+  'exec-desk-sec': {
+    col: 4,
+    row: 4,
+    facingDir: 0,
+    nameplate: '秘書',
+    nameplateEn: 'Secretary',
+  },
 };
 
-/** Exec positions — icon-only (no character), shown in Exec Area (cols 2-5, rows 3) */
+/** Exec positions — icon-only (no character), shown in Exec Area */
 const EXEC_POSITIONS: Array<{ id: string; col: number; row: number; label: string }> = [
   { id: 'exec-01', col: 2, row: 3, label: 'Owner/COO' },
-  { id: 'exec-02', col: 3, row: 3, label: 'CEO' },
-  { id: 'exec-03', col: 4, row: 3, label: '秘書' },
   { id: 'exec-04', col: 5, row: 3, label: 'PM' },
 ];
 
@@ -571,6 +579,7 @@ const DEPT_NEON_COLORS: Record<string, string> = {
   engineering: '#00b4ff',
   marketing: '#ff4d8d',
   research: '#00e676',
+  exec: '#ffd740',
 };
 
 /** Get neon color for a JC state */
@@ -628,6 +637,65 @@ export function jcGetDashboardMembers(): DashboardMember[] {
   return members;
 }
 
+// ── Speech Bubble Queue ──────────────────────────────────────────
+
+const speechBubbles: SpeechBubble[] = [];
+
+/** Add a speech bubble for a member */
+export function jcAddSpeechBubble(bubble: SpeechBubble): void {
+  // Remove existing bubble for this member (only one at a time)
+  const idx = speechBubbles.findIndex((b) => b.memberId === bubble.memberId);
+  if (idx >= 0) speechBubbles.splice(idx, 1);
+  speechBubbles.push(bubble);
+}
+
+/** Get active speech bubbles (pruning expired ones) */
+export function jcGetSpeechBubbles(): SpeechBubble[] {
+  const now = Date.now();
+  for (let i = speechBubbles.length - 1; i >= 0; i--) {
+    if (now - speechBubbles[i].timestamp > speechBubbles[i].duration) {
+      speechBubbles.splice(i, 1);
+    }
+  }
+  return speechBubbles;
+}
+
+// ── Permanent Resident Tracking ─────────────────────────────────
+
+const PERMANENT_ROLES = new Set(['CEO', 'Secretary', 'PM / Director']);
+
+/** Check if a member is a permanent resident (never departs) */
+export function jcIsPermanentResident(memberId: string): boolean {
+  if (!jcConfig) return false;
+  const member = jcConfig.members.find((m) => m.id === memberId);
+  return member ? PERMANENT_ROLES.has(member.role) : false;
+}
+
+// ── Idle Timeout Tracking ───────────────────────────────────────
+
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const memberLastActivity = new Map<string, number>();
+
+/** Record activity for a member (resets idle timer) */
+export function jcRecordActivity(memberId: string): void {
+  memberLastActivity.set(memberId, Date.now());
+}
+
+/** Get member IDs that have been idle past the timeout (excludes permanent residents) */
+export function jcGetIdleMembers(): string[] {
+  const now = Date.now();
+  const idle: string[] = [];
+  for (const [memberId, lastActivity] of memberLastActivity) {
+    if (now - lastActivity > IDLE_TIMEOUT_MS && !jcIsPermanentResident(memberId)) {
+      const runtime = memberRuntimes.get(memberId);
+      if (runtime?.isPresent && runtime.jcState !== 'leaving') {
+        idle.push(memberId);
+      }
+    }
+  }
+  return idle;
+}
+
 // ── Helpers ────────────────────────────────────────────────────
 
 function stateToBubble(state: JCState): JCBubbleType {
@@ -651,8 +719,9 @@ function stateToBubble(state: JCState): JCBubbleType {
   }
 }
 
-function deskIdToZone(deskId: string): 'dev' | 'marketing' | 'research' {
+function deskIdToZone(deskId: string): 'dev' | 'marketing' | 'research' | 'exec' {
   if (deskId.startsWith('dev-')) return 'dev';
   if (deskId.startsWith('mkt-')) return 'marketing';
+  if (deskId.startsWith('exec-')) return 'exec';
   return 'research';
 }

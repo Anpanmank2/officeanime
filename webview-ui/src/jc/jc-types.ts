@@ -139,3 +139,27 @@ export const CommandType = {
 
 /** Instruction mode */
 export type InstructionMode = 'instant' | 'directive';
+
+/** Speech bubble for cross-department communication visualization */
+export interface SpeechBubble {
+  id: string;
+  memberId: string;
+  text: string;
+  department: string;
+  timestamp: number; // Date.now()
+  duration: number; // ms (default 3000)
+}
+
+/** Office event types for file-based event queue */
+export const OfficeEventType = {
+  OFFICE_OPEN: 'office_open',
+  TASK_RECEIVED: 'task_received',
+  TASK_ASSIGNED: 'task_assigned',
+  WORK_STARTED: 'work_started',
+  CROSS_DEPT_MESSAGE: 'cross_dept_message',
+  REVIEW_REQUESTED: 'review_requested',
+  REVIEW_COMPLETED: 'review_completed',
+  TASK_COMPLETED: 'task_completed',
+  AGENT_LEAVE: 'agent_leave',
+} as const;
+export type OfficeEventType = (typeof OfficeEventType)[keyof typeof OfficeEventType];

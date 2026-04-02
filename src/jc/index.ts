@@ -18,6 +18,7 @@ import {
 } from './agent-mapper.js';
 import { isJCEnabled, loadJCConfig } from './config.js';
 import { getDeskByMemberId } from './desk-registry.js';
+import { EventWatcher } from './event-watcher.js';
 import { toolToJCState } from './state-machine.js';
 import { TaskWatcher } from './task-watcher.js';
 import type { JCConfig, JCState, TaskDefinition } from './types.js';
@@ -28,6 +29,15 @@ let jcEnabled = false;
 
 /** Per-member JC state tracking */
 const memberStates = new Map<string, JCState>();
+
+/** Per-member last activity timestamp (for idle timeout) */
+const memberLastActivity = new Map<string, number>();
+
+/** Idle timeout: 5 minutes */
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+
+/** Idle check timer */
+let idleCheckTimer: ReturnType<typeof setInterval> | null = null;
 
 /** Members mapped but not yet arrived (waiting for first tool use) */
 const pendingArrivals = new Set<string>();
@@ -43,6 +53,12 @@ let absenceTracker: AbsenceTracker | null = null;
 
 /** Task watcher instance */
 let taskWatcher: TaskWatcher | null = null;
+
+/** Event watcher instance */
+let eventWatcher: EventWatcher | null = null;
+
+/** Workspace root for event file */
+let workspaceRootPath: string | null = null;
 
 /** Activity summarizer instance */
 let activitySummarizer: ActivitySummarizer | null = null;
@@ -68,6 +84,7 @@ export function initJC(
     jcEnabled = false;
     return false;
   }
+  workspaceRootPath = workspaceRoot;
   activitySummarizer = new ActivitySummarizer();
   // Create absence tracker if agents map is provided
   if (agents) {
@@ -185,6 +202,7 @@ export function onToolStart(
   }
 
   absenceTracker?.onToolStart(agentId, toolName, toolName);
+  memberLastActivity.set(memberId, Date.now());
 
   const newState = toolToJCState(toolName);
   const currentState = memberStates.get(memberId);
@@ -264,7 +282,7 @@ export function getTaskWatcher(): TaskWatcher | null {
 /** Get member IDs that should always be present in the office */
 export function getPermanentResidents(): string[] {
   if (!jcConfig) return [];
-  const permanentRoles = ['CEO', 'PM / Director'];
+  const permanentRoles = ['CEO', 'Secretary', 'PM / Director'];
   return jcConfig.members.filter((m) => permanentRoles.includes(m.role)).map((m) => m.id);
 }
 
@@ -306,6 +324,16 @@ export function sendJCConfig(webview: vscode.Webview): void {
     );
   }
   taskWatcher?.start(webview);
+
+  // Start event watcher for file-based office events
+  if (!eventWatcher && jcConfig && workspaceRootPath) {
+    eventWatcher = new EventWatcher(jcConfig, workspaceRootPath);
+  }
+  eventWatcher?.start(webview);
+
+  // Start idle timeout checker (every 30s)
+  if (idleCheckTimer) clearInterval(idleCheckTimer);
+  idleCheckTimer = setInterval(() => checkIdleMembers(webview), 30000);
 }
 
 /** Get the set of currently present member IDs */
@@ -318,11 +346,56 @@ export function getActivitySummary(agentId: number): string | null {
   return activitySummarizer?.getSummary(agentId) ?? null;
 }
 
+/** Get the event watcher instance (for programmatic event emission) */
+export function getEventWatcher(): EventWatcher | null {
+  return eventWatcher;
+}
+
+/** Check for idle members and trigger departures */
+function checkIdleMembers(webview: vscode.Webview): void {
+  if (!jcConfig) return;
+  const now = Date.now();
+  const permanentIds = new Set(getPermanentResidents());
+
+  for (const [memberId, lastActivity] of memberLastActivity) {
+    if (permanentIds.has(memberId)) continue; // Never depart permanent residents
+    if (now - lastActivity < IDLE_TIMEOUT_MS) continue;
+
+    const state = memberStates.get(memberId);
+    if (state && state !== 'absent' && state !== 'leaving') {
+      console.log(`[JC] Idle timeout for ${memberId} — triggering departure`);
+      memberStates.set(memberId, 'leaving');
+      const agentId = getAgentForMember(memberId);
+      webview.postMessage({
+        type: 'jcMemberLeaving',
+        agentId: agentId ?? -300 - Math.floor(Math.random() * 1000),
+        memberId,
+      });
+      memberLastActivity.delete(memberId);
+    }
+  }
+}
+
+/** Get agent ID for a member (reverse lookup) */
+function getAgentForMember(memberId: string): number | null {
+  const mappings = getAllMappings();
+  for (const [agentIdStr, mId] of Object.entries(mappings)) {
+    if (mId === memberId) return Number(agentIdStr);
+  }
+  return null;
+}
+
 /** Clean up JC resources */
 export function disposeJC(): void {
   absenceTracker?.dispose();
   absenceTracker = null;
   taskWatcher?.dispose();
   taskWatcher = null;
+  eventWatcher?.dispose();
+  eventWatcher = null;
   activitySummarizer = null;
+  if (idleCheckTimer) {
+    clearInterval(idleCheckTimer);
+    idleCheckTimer = null;
+  }
 }

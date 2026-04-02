@@ -323,6 +323,34 @@
       "deskId": "res-desk-06",
       "accentColor": "#999999",
       "breakBehavior": "sofa"
+    },
+    {
+      "id": "exec-ceo",
+      "name": "亀井",
+      "nameEn": "Kamei",
+      "role": "CEO",
+      "department": "exec",
+      "layer": "L1",
+      "zone": "exec",
+      "hueShift": 30,
+      "palette": 0,
+      "deskId": "exec-desk-ceo",
+      "accentColor": "#FFD700",
+      "breakBehavior": "meeting"
+    },
+    {
+      "id": "exec-sec",
+      "name": "秘書",
+      "nameEn": "Secretary",
+      "role": "Secretary",
+      "department": "exec",
+      "layer": "L2",
+      "zone": "exec",
+      "hueShift": 300,
+      "palette": 2,
+      "deskId": "exec-desk-sec",
+      "accentColor": "#FFD700",
+      "breakBehavior": "coffee"
     }
   ],
   "exec": [

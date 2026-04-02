@@ -274,6 +274,31 @@ export const DESK_REGISTRY: DeskEntry[] = [
     nameplate: '空席',
     nameplateEn: 'Vacant',
   },
+
+  // ═══════════════════════════════════════════════════
+  // Executive — Exec Area (cols 2-5, rows 2-5)
+  // Permanent residents: CEO and Secretary
+  // ═══════════════════════════════════════════════════
+  {
+    deskId: 'exec-desk-ceo',
+    memberId: 'exec-ceo',
+    zone: 'exec',
+    seatCol: 3,
+    seatRow: 4,
+    facingDir: DOWN,
+    nameplate: '亀井',
+    nameplateEn: 'Kamei',
+  },
+  {
+    deskId: 'exec-desk-sec',
+    memberId: 'exec-sec',
+    zone: 'exec',
+    seatCol: 4,
+    seatRow: 4,
+    facingDir: DOWN,
+    nameplate: '秘書',
+    nameplateEn: 'Secretary',
+  },
 ];
 
 /** Entrance tile position (spawn/despawn point) — top center of poker area */
@@ -290,8 +315,6 @@ export const POKER_TABLE_SEATS = [
 /** Exec display positions (icon-only, no character) — left section rows 2-5 */
 export const EXEC_POSITIONS = [
   { id: 'exec-01', col: 2, row: 3, label: 'Owner/COO' },
-  { id: 'exec-02', col: 3, row: 3, label: 'CEO' },
-  { id: 'exec-03', col: 4, row: 3, label: '秘書' },
   { id: 'exec-04', col: 5, row: 3, label: 'PM' },
 ];
 

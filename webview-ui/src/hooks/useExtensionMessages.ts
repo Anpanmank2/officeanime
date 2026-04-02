@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { AbsenceInfo, JCState, TaskDefinition } from '../jc/index.js';
+import type { AbsenceInfo, JCState, SpeechBubble, TaskDefinition } from '../jc/index.js';
 import {
   JC_ENTRANCE,
   jcAbsenceBulkSync,
   jcAbsenceUpdate,
   jcActivitySummaryUpdate,
+  jcAddSpeechBubble,
   jcGetBreakTarget,
   jcGetPokerSeat,
   jcLoadConfig,
@@ -13,6 +14,7 @@ import {
   jcMemberDeparted,
   jcMemberLeaving,
   jcMemberStateChange,
+  jcRecordActivity,
   jcTasksBulkSync,
   jcTaskUpdate,
   jcTriggerLiaison,
@@ -537,6 +539,7 @@ export function useExtensionMessages(
         const agentId = msg.agentId as number;
         const jcState = msg.jcState as JCState;
         jcMemberStateChange(msg.memberId, jcState);
+        jcRecordActivity(msg.memberId as string);
 
         // Sync character animation with JC state
         const ch = os.characters.get(agentId);
@@ -604,6 +607,8 @@ export function useExtensionMessages(
           type: string;
         };
         jcActivitySummaryUpdate(memberId, summary);
+      } else if (msg.type === 'jcSpeechBubble') {
+        jcAddSpeechBubble(msg.bubble as SpeechBubble);
       }
     };
     window.addEventListener('message', handler);

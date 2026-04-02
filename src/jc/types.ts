@@ -112,7 +112,9 @@ export type JCMessageToWebview =
   | { type: 'jcAbsenceUpdate'; payload: AbsenceInfo }
   | { type: 'jcAbsenceBulkSync'; payload: AbsenceInfo[] }
   | { type: 'jcTaskUpdate'; task: TaskDefinition }
-  | { type: 'jcTasksBulkSync'; tasks: TaskDefinition[] };
+  | { type: 'jcTasksBulkSync'; tasks: TaskDefinition[] }
+  | { type: 'jcSpeechBubble'; bubble: SpeechBubble }
+  | { type: 'jcOfficeEvent'; event: OfficeEvent };
 
 export type JCMessageToExtension =
   | { type: 'jcRequestMapping'; agentId: number }
@@ -165,6 +167,122 @@ export type JCBubbleType =
   | 'meeting' // 🤝
   | 'coffee' // ☕
   | null;
+
+// ── Office Event Queue ──────────────────────────────────────────
+
+/** Event types for the file-based event queue (Claude Code → Office UI) */
+export const OfficeEventType = {
+  OFFICE_OPEN: 'office_open',
+  TASK_RECEIVED: 'task_received',
+  TASK_ASSIGNED: 'task_assigned',
+  WORK_STARTED: 'work_started',
+  CROSS_DEPT_MESSAGE: 'cross_dept_message',
+  REVIEW_REQUESTED: 'review_requested',
+  REVIEW_COMPLETED: 'review_completed',
+  TASK_COMPLETED: 'task_completed',
+  AGENT_LEAVE: 'agent_leave',
+} as const;
+export type OfficeEventType = (typeof OfficeEventType)[keyof typeof OfficeEventType];
+
+/** Base office event */
+export interface OfficeEventBase {
+  event: OfficeEventType;
+  timestamp: string; // ISO 8601
+}
+
+/** Task received by CEO */
+export interface TaskReceivedEvent extends OfficeEventBase {
+  event: 'task_received';
+  task: string;
+  from: string; // 'user' or member ID
+}
+
+/** Task assigned to member(s) */
+export interface TaskAssignedEvent extends OfficeEventBase {
+  event: 'task_assigned';
+  from: string; // assigner member ID
+  to: string[]; // assignee member IDs
+  task: string;
+  department: string;
+}
+
+/** Work started by a member */
+export interface WorkStartedEvent extends OfficeEventBase {
+  event: 'work_started';
+  agent: string; // member ID
+  task: string;
+  department: string;
+}
+
+/** Cross-department message */
+export interface CrossDeptMessageEvent extends OfficeEventBase {
+  event: 'cross_dept_message';
+  from: string; // member ID
+  to: string; // member ID
+  message: string;
+  from_dept: string;
+  to_dept: string;
+}
+
+/** Review requested */
+export interface ReviewRequestedEvent extends OfficeEventBase {
+  event: 'review_requested';
+  from: string;
+  to: string;
+  task: string;
+}
+
+/** Review completed */
+export interface ReviewCompletedEvent extends OfficeEventBase {
+  event: 'review_completed';
+  from: string;
+  to: string;
+  approved: boolean;
+}
+
+/** Task completed */
+export interface TaskCompletedEvent extends OfficeEventBase {
+  event: 'task_completed';
+  agent: string;
+  task: string;
+  department: string;
+}
+
+/** Agent leave */
+export interface AgentLeaveEvent extends OfficeEventBase {
+  event: 'agent_leave';
+  agent: string;
+  reason: 'idle_timeout' | 'task_done' | 'manual';
+}
+
+/** Union of all office events */
+export type OfficeEvent =
+  | TaskReceivedEvent
+  | TaskAssignedEvent
+  | WorkStartedEvent
+  | CrossDeptMessageEvent
+  | ReviewRequestedEvent
+  | ReviewCompletedEvent
+  | TaskCompletedEvent
+  | AgentLeaveEvent;
+
+/** Office events file schema */
+export interface OfficeEventsFile {
+  version: 1;
+  events: OfficeEvent[];
+}
+
+// ── Speech Bubbles ──────────────────────────────────────────────
+
+/** Speech bubble for cross-department communication visualization */
+export interface SpeechBubble {
+  id: string;
+  memberId: string;
+  text: string;
+  department: string;
+  timestamp: number; // Date.now()
+  duration: number; // ms (default 3000)
+}
 
 /** Absence tracking info for JC members without active agents */
 export interface AbsenceInfo {
