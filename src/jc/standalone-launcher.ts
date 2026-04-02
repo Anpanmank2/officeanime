@@ -11,13 +11,65 @@ import { createMessageBridge } from './message-bridge.js';
 
 const DEFAULT_PORT = 8432;
 
+// ── Shared state (accessible from both watcher and webviewReady handler) ──
+interface JCMemberEntry {
+  id: string;
+  hueShift: number;
+  palette?: number;
+  deskId: string;
+}
+
+const activeAgents = new Map<number, { sessionId: string; file: string; memberId?: string }>();
+const assignedMembers = new Set<string>();
+const agentMemberMap: Record<number, string> = {};
+let jcMembers: JCMemberEntry[] = [];
+let jcConfig: unknown = null;
+
+/** Build messages to send when a browser client connects or signals ready */
+function buildClientInitMessages(respond: (msg: unknown) => void): void {
+  // 1. Config + settings
+  if (jcConfig) {
+    respond({ type: 'jcConfigLoaded', config: jcConfig });
+    respond({
+      type: 'settingsLoaded',
+      soundEnabled: false,
+      extensionVersion: '1.2.0',
+      lastSeenVersion: '1.2',
+    });
+  }
+
+  // 2. All current agents + their JC member arrivals
+  for (const [agentId, agent] of activeAgents) {
+    respond({ type: 'agentCreated', id: agentId });
+
+    if (agent.memberId) {
+      const member = jcMembers.find((m) => m.id === agent.memberId);
+      if (member) {
+        respond({
+          type: 'jcMemberArriving',
+          agentId,
+          memberId: member.id,
+          deskId: member.deskId,
+          seatUid: member.deskId,
+          hueShift: member.hueShift,
+          palette: member.palette ?? 0,
+        });
+      }
+    }
+  }
+
+  // 3. Mapping update (all at once)
+  if (Object.keys(agentMemberMap).length > 0) {
+    respond({ type: 'jcMappingUpdate', mappings: { ...agentMemberMap } });
+  }
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const portArg = args.find((a) => a.startsWith('--port='));
   const port = portArg ? parseInt(portArg.split('=')[1], 10) : DEFAULT_PORT;
   const shouldOpen = args.includes('--open');
 
-  // Resolve asset path (dist/ should be in the package root)
   const extensionPath = path.resolve(__dirname, '..');
 
   // Verify dist/webview exists
@@ -28,13 +80,9 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  // Track active agents (declared before dispatcher so getAgentIds closure works)
-  const activeAgents = new Map<number, { sessionId: string; file: string }>();
-
-  // Create command dispatcher (read-only mode — no terminal control)
+  // Create command dispatcher (read-only mode)
   const dispatcher = createCommandDispatcher();
   dispatcher.setContext({
-    // No sendToTerminal — browser can view but not send instructions
     getAgentIds: () => [...activeAgents.keys()],
   });
 
@@ -43,8 +91,7 @@ async function main(): Promise<void> {
     onBrowserCommand: (data, respond) => dispatcher.dispatch(data, respond),
   });
 
-  // Load JC config (try extension root, then cwd)
-  let jcConfig: unknown = null;
+  // Load JC config
   for (const dir of [extensionPath, process.cwd()]) {
     const configPath = path.join(dir, 'jc-config.json');
     if (fs.existsSync(configPath)) {
@@ -58,49 +105,34 @@ async function main(): Promise<void> {
     }
   }
 
-  // Start browser server
-  const initMessages = jcConfig
-    ? [
-        { type: 'jcConfigLoaded', config: jcConfig },
-        {
-          type: 'settingsLoaded',
-          soundEnabled: false,
-          extensionVersion: '1.2.0',
-          lastSeenVersion: '1.2',
-        },
-      ]
-    : [];
-
-  const server = await startBrowserServer(extensionPath, port, (data, respond) => {
-    const msg = data as { type?: string };
-    // When browser signals ready, send JC config (WS replay fires before React mounts)
-    if (msg.type === 'webviewReady') {
-      for (const m of initMessages) {
-        respond(m);
-      }
-      return;
-    }
-    bridge.handleWsMessage(null as any, JSON.stringify(data));
-    void respond;
-  });
-
-  // Seed replay buffer with JC config so new browser connections get it
+  // Extract JC members for auto-mapping
   if (jcConfig) {
-    const initMessages = [
-      { type: 'jcConfigLoaded', config: jcConfig },
-      {
-        type: 'settingsLoaded',
-        soundEnabled: false,
-        extensionVersion: '1.2.0',
-        lastSeenVersion: '1.2',
-      },
-    ];
-    bridge.seedReplayBuffer(initMessages);
-    // Also send to already-connected clients
-    for (const msg of initMessages) {
-      server.broadcast(msg);
+    const cfg = jcConfig as {
+      members?: Array<{ id: string; hueShift: number; palette?: number; deskId: string }>;
+    };
+    if (cfg.members) {
+      jcMembers = cfg.members.map((m) => ({
+        id: m.id,
+        hueShift: m.hueShift,
+        palette: m.palette,
+        deskId: m.deskId,
+      }));
     }
   }
+
+  // Start browser server
+  const server = await startBrowserServer(extensionPath, port, (data, respond) => {
+    const msg = data as { type?: string };
+
+    // When browser signals ready, send ALL current state
+    if (msg.type === 'webviewReady') {
+      buildClientInitMessages(respond);
+      return;
+    }
+
+    // Forward other commands to dispatcher
+    dispatcher.dispatch(data, respond);
+  });
 
   console.log(`[JC] Standalone Office Anime server running`);
   console.log(`[JC] Open http://localhost:${port} in your browser`);
@@ -110,7 +142,7 @@ async function main(): Promise<void> {
   // Watch Claude Code project directories
   const claudeDir = path.join(os.homedir(), '.claude', 'projects');
   if (fs.existsSync(claudeDir)) {
-    watchClaudeProjects(claudeDir, server.broadcast, bridge, activeAgents);
+    startWatcher(claudeDir, server.broadcast);
   } else {
     console.log(`[JC] Claude projects directory not found: ${claudeDir}`);
     console.log(`[JC] Will show empty office. Start Claude Code to see agents.`);
@@ -129,7 +161,7 @@ async function main(): Promise<void> {
     exec(cmd);
   }
 
-  // Handle graceful shutdown
+  // Graceful shutdown
   const shutdown = () => {
     console.log('\n[JC] Shutting down...');
     server.close();
@@ -139,17 +171,11 @@ async function main(): Promise<void> {
   process.on('SIGTERM', shutdown);
 }
 
-type AgentMap = Map<number, { sessionId: string; file: string }>;
+// ── JSONL Watcher ────────────────────────────────────────────────
 
-function watchClaudeProjects(
-  claudeDir: string,
-  broadcast: (data: unknown) => void,
-  _bridge: ReturnType<typeof createMessageBridge>,
-  activeAgents: AgentMap,
-): void {
-  let nextAgentId = 1;
+let nextAgentId = 1;
 
-  // Scan for existing JSONL files
+function startWatcher(claudeDir: string, broadcast: (data: unknown) => void): void {
   const scanProjects = (): void => {
     try {
       const projects = fs.readdirSync(claudeDir);
@@ -163,24 +189,42 @@ function watchClaudeProjects(
           const filePath = path.join(projectDir, file);
           const sessionId = file.replace('.jsonl', '');
 
-          // Check if already tracked
+          // Skip already tracked
           const isTracked = [...activeAgents.values()].some((a) => a.file === filePath);
           if (isTracked) continue;
 
-          // Check if recently modified (within last 5 minutes)
+          // Only recent files (5 min)
           const fstat = fs.statSync(filePath);
-          const age = Date.now() - fstat.mtimeMs;
-          if (age > 5 * 60 * 1000) continue;
+          if (Date.now() - fstat.mtimeMs > 5 * 60 * 1000) continue;
 
           const agentId = nextAgentId++;
-          activeAgents.set(agentId, { sessionId, file: filePath });
+          const member = jcMembers.find((m) => !assignedMembers.has(m.id));
 
-          broadcast({
-            type: 'agentCreated',
-            agent: { id: agentId, name: `Agent ${agentId}`, sessionId },
-          });
+          activeAgents.set(agentId, { sessionId, file: filePath, memberId: member?.id });
 
-          console.log(`[JC] Detected agent: ${sessionId} (id=${agentId})`);
+          // Broadcast to already-connected clients (for agents detected after browser opens)
+          broadcast({ type: 'agentCreated', id: agentId });
+
+          if (member) {
+            assignedMembers.add(member.id);
+            agentMemberMap[agentId] = member.id;
+
+            broadcast({
+              type: 'jcMemberArriving',
+              agentId,
+              memberId: member.id,
+              deskId: member.deskId,
+              seatUid: member.deskId,
+              hueShift: member.hueShift,
+              palette: member.palette ?? 0,
+            });
+
+            broadcast({ type: 'jcMappingUpdate', mappings: { ...agentMemberMap } });
+
+            console.log(`[JC] Agent ${agentId} → ${member.id} (desk: ${member.deskId})`);
+          } else {
+            console.log(`[JC] Agent ${agentId} detected (no JC member available)`);
+          }
         }
       }
     } catch {
@@ -188,10 +232,7 @@ function watchClaudeProjects(
     }
   };
 
-  // Initial scan
   scanProjects();
-
-  // Re-scan periodically
   setInterval(scanProjects, 5000);
 }
 
