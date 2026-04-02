@@ -480,17 +480,42 @@ export function useExtensionMessages(
 
         jcMemberArriving(memberId);
 
-        // Create character at the preferred seat with palette + hueShift
-        os.addAgent(agentId, palette, hueShift, seatUid, true);
-        const ch = os.characters.get(agentId);
-        if (ch) {
-          // Override position to entrance — character will walk to desk
-          ch.tileCol = JC_ENTRANCE.col;
-          ch.tileRow = JC_ENTRANCE.row;
-          ch.x = JC_ENTRANCE.col * TILE_SIZE + TILE_SIZE / 2;
-          ch.y = JC_ENTRANCE.row * TILE_SIZE + TILE_SIZE / 2;
-          // Trigger walk to assigned seat
+        // If character already exists (from agentCreated), reassign to correct seat
+        const existing = os.characters.get(agentId);
+        if (existing) {
+          // Free old seat
+          if (existing.seatId) {
+            const oldSeat = os.seats.get(existing.seatId);
+            if (oldSeat) oldSeat.assigned = false;
+          }
+          // Assign preferred seat
+          if (seatUid && os.seats.has(seatUid)) {
+            const seat = os.seats.get(seatUid)!;
+            if (!seat.assigned) {
+              seat.assigned = true;
+              existing.seatId = seatUid;
+            }
+          }
+          // Move to entrance and walk to seat
+          existing.tileCol = JC_ENTRANCE.col;
+          existing.tileRow = JC_ENTRANCE.row;
+          existing.x = JC_ENTRANCE.col * TILE_SIZE + TILE_SIZE / 2;
+          existing.y = JC_ENTRANCE.row * TILE_SIZE + TILE_SIZE / 2;
           os.sendToSeat(agentId);
+          saveAgentSeats(os);
+        } else {
+          // Create new character at the preferred seat
+          os.addAgent(agentId, palette, hueShift, seatUid, true);
+          const ch = os.characters.get(agentId);
+          if (ch) {
+            // Override position to entrance — character will walk to desk
+            ch.tileCol = JC_ENTRANCE.col;
+            ch.tileRow = JC_ENTRANCE.row;
+            ch.x = JC_ENTRANCE.col * TILE_SIZE + TILE_SIZE / 2;
+            ch.y = JC_ENTRANCE.row * TILE_SIZE + TILE_SIZE / 2;
+            // Trigger walk to assigned seat
+            os.sendToSeat(agentId);
+          }
         }
       } else if (msg.type === 'jcMemberLeaving') {
         const agentId = msg.agentId as number;
