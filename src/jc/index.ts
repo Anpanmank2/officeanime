@@ -29,6 +29,15 @@ let jcEnabled = false;
 /** Per-member JC state tracking */
 const memberStates = new Map<string, JCState>();
 
+/** Members mapped but not yet arrived (waiting for first tool use) */
+const pendingArrivals = new Set<string>();
+
+/** Stored arrival data for pending members */
+const pendingArrivalData = new Map<
+  string,
+  { agentId: number; memberId: string; deskId: string; hueShift: number; palette: number }
+>();
+
 /** Absence tracker instance */
 let absenceTracker: AbsenceTracker | null = null;
 
@@ -101,19 +110,18 @@ export async function onAgentCreated(
 
   if (memberId) {
     assignMapping(agentId, memberId);
-    memberStates.set(memberId, 'arriving');
     absenceTracker?.onAgentCreated(memberId);
 
     const desk = getDeskByMemberId(memberId);
     const member = jcConfig.members.find((m) => m.id === memberId);
 
     if (desk && member) {
-      webview?.postMessage({
-        type: 'jcMemberArriving',
+      // Defer arrival until first tool use
+      pendingArrivals.add(memberId);
+      pendingArrivalData.set(memberId, {
         agentId,
         memberId,
         deskId: desk.deskId,
-        seatUid: desk.deskId, // seat UID in the layout matches deskId
         hueShift: member.hueShift,
         palette: member.palette ?? 0,
       });
@@ -156,6 +164,25 @@ export function onToolStart(
 
   const memberId = getMemberForAgent(agentId);
   if (!memberId) return;
+
+  // On first tool use, trigger deferred arrival
+  if (pendingArrivals.has(memberId)) {
+    const arrival = pendingArrivalData.get(memberId);
+    if (arrival) {
+      memberStates.set(memberId, 'arriving');
+      webview?.postMessage({
+        type: 'jcMemberArriving',
+        agentId: arrival.agentId,
+        memberId: arrival.memberId,
+        deskId: arrival.deskId,
+        seatUid: arrival.deskId,
+        hueShift: arrival.hueShift,
+        palette: arrival.palette,
+      });
+    }
+    pendingArrivals.delete(memberId);
+    pendingArrivalData.delete(memberId);
+  }
 
   absenceTracker?.onToolStart(agentId, toolName, toolName);
 
@@ -234,11 +261,38 @@ export function getTaskWatcher(): TaskWatcher | null {
   return taskWatcher;
 }
 
+/** Get member IDs that should always be present in the office */
+export function getPermanentResidents(): string[] {
+  if (!jcConfig) return [];
+  const permanentRoles = ['CEO', 'PM / Director'];
+  return jcConfig.members.filter((m) => permanentRoles.includes(m.role)).map((m) => m.id);
+}
+
 /** Send JC config to webview on initialization */
 export function sendJCConfig(webview: vscode.Webview): void {
   if (!jcEnabled || !jcConfig) return;
   webview.postMessage({ type: 'jcConfigLoaded', config: jcConfig });
   webview.postMessage({ type: 'jcMappingUpdate', mappings: getAllMappings() });
+
+  // Auto-arrive permanent residents (CEO, PM)
+  const permanentIds = getPermanentResidents();
+  for (const memberId of permanentIds) {
+    const member = jcConfig.members.find((m) => m.id === memberId);
+    const desk = getDeskByMemberId(memberId);
+    if (member && desk) {
+      memberStates.set(memberId, 'idle');
+      webview.postMessage({
+        type: 'jcMemberArriving',
+        agentId: -100 - permanentIds.indexOf(memberId),
+        memberId,
+        deskId: desk.deskId,
+        seatUid: desk.deskId,
+        hueShift: member.hueShift,
+        palette: member.palette ?? 0,
+      });
+    }
+  }
+
   // Start absence tracker polling and send initial sync
   absenceTracker?.start(webview);
   // Start task watcher

@@ -36,6 +36,30 @@ function buildClientInitMessages(respond: (msg: unknown) => void): void {
       extensionVersion: '1.2.0',
       lastSeenVersion: '1.2',
     });
+
+    // Auto-arrive permanent residents (CEO, PM / Director)
+    const permanentRoles = ['CEO', 'PM / Director'];
+    const cfg = jcConfig as {
+      members?: Array<{
+        id: string;
+        role: string;
+        hueShift: number;
+        palette?: number;
+        deskId: string;
+      }>;
+    };
+    const permanentMembers = (cfg.members ?? []).filter((m) => permanentRoles.includes(m.role));
+    permanentMembers.forEach((member, idx) => {
+      respond({
+        type: 'jcMemberArriving',
+        agentId: -100 - idx,
+        memberId: member.id,
+        deskId: member.deskId,
+        seatUid: member.deskId,
+        hueShift: member.hueShift,
+        palette: member.palette ?? 0,
+      });
+    });
   }
 
   // 2. All current agents + their JC member arrivals
