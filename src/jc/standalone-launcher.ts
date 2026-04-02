@@ -43,11 +43,64 @@ async function main(): Promise<void> {
     onBrowserCommand: (data, respond) => dispatcher.dispatch(data, respond),
   });
 
+  // Load JC config (try extension root, then cwd)
+  let jcConfig: unknown = null;
+  for (const dir of [extensionPath, process.cwd()]) {
+    const configPath = path.join(dir, 'jc-config.json');
+    if (fs.existsSync(configPath)) {
+      try {
+        jcConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+        console.log(`[JC] Config loaded from ${configPath}`);
+      } catch {
+        console.warn(`[JC] Failed to parse ${configPath}`);
+      }
+      break;
+    }
+  }
+
   // Start browser server
+  const initMessages = jcConfig
+    ? [
+        { type: 'jcConfigLoaded', config: jcConfig },
+        {
+          type: 'settingsLoaded',
+          soundEnabled: false,
+          extensionVersion: '1.2.0',
+          lastSeenVersion: '1.2',
+        },
+      ]
+    : [];
+
   const server = await startBrowserServer(extensionPath, port, (data, respond) => {
+    const msg = data as { type?: string };
+    // When browser signals ready, send JC config (WS replay fires before React mounts)
+    if (msg.type === 'webviewReady') {
+      for (const m of initMessages) {
+        respond(m);
+      }
+      return;
+    }
     bridge.handleWsMessage(null as any, JSON.stringify(data));
     void respond;
   });
+
+  // Seed replay buffer with JC config so new browser connections get it
+  if (jcConfig) {
+    const initMessages = [
+      { type: 'jcConfigLoaded', config: jcConfig },
+      {
+        type: 'settingsLoaded',
+        soundEnabled: false,
+        extensionVersion: '1.2.0',
+        lastSeenVersion: '1.2',
+      },
+    ];
+    bridge.seedReplayBuffer(initMessages);
+    // Also send to already-connected clients
+    for (const msg of initMessages) {
+      server.broadcast(msg);
+    }
+  }
 
   console.log(`[JC] Standalone Office Anime server running`);
   console.log(`[JC] Open http://localhost:${port} in your browser`);

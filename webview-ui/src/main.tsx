@@ -7,8 +7,9 @@ import App from './App.tsx';
 import { isBrowserRuntime } from './runtime';
 
 async function main() {
-  const hasWsPort = !!(window as unknown as Record<string, unknown>).__PIXEL_AGENTS_WS_PORT__;
-  if (isBrowserRuntime && !hasWsPort) {
+  if (isBrowserRuntime) {
+    // Always load assets via HTTP fetch in browser mode.
+    // WS provides live agent data; browserMock provides static assets (sprites, layout).
     const { initBrowserMock } = await import('./browserMock.js');
     await initBrowserMock();
   }

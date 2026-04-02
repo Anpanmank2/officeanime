@@ -133,8 +133,8 @@ function App() {
   // useExtensionMessages listener has been registered.
   // Skip if WebSocket bridge is active (real extension data will arrive via WS).
   useEffect(() => {
-    const hasWsPort = !!(window as unknown as Record<string, unknown>).__PIXEL_AGENTS_WS_PORT__;
-    if (isBrowserRuntime && !hasWsPort) {
+    if (isBrowserRuntime) {
+      // Dispatch mock asset messages in browser mode (both standalone WS and plain browser).
       void import('./browserMock.js').then(({ dispatchMockMessages }) => dispatchMockMessages());
     }
   }, []);
