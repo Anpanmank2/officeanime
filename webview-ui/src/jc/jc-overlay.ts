@@ -63,13 +63,10 @@ const LIAISON_PARTICLE_SIZE = 3;
 // ── Zone labels ──────────────────────────────────────────────────
 const ZONE_LABELS: Array<{ text: string; col: number; row: number; zone: string }> = [
   { text: 'EXEC AREA', col: 1, row: 2, zone: 'exec' },
-  { text: 'ENTRANCE', col: 10, row: 2, zone: 'entrance' },
-  { text: 'POKER TABLE', col: 10, row: 4, zone: 'poker' },
-  { text: 'BREAK ZONE', col: 18, row: 2, zone: 'break' },
   { text: 'DEV ZONE', col: 1, row: 7, zone: 'dev' },
   { text: 'MARKETING', col: 13, row: 7, zone: 'marketing' },
   { text: 'RESEARCH LAB', col: 1, row: 15, zone: 'research' },
-  { text: 'OPS HUB', col: 13, row: 15, zone: 'ops' },
+  { text: 'MTG ROOM', col: 13, row: 15, zone: 'ops' },
 ];
 
 // ── Main render function ─────────────────────────────────────────
@@ -133,11 +130,8 @@ const DEPT_SIGN_COLORS: Record<string, { frame: string; fill: string; text: stri
   dev: { frame: '#3a6fd8', fill: '#1a3a7a', text: '#a0c4ff' },
   marketing: { frame: '#d83a6f', fill: '#7a1a3a', text: '#ffa0c4' },
   research: { frame: '#3ad87a', fill: '#1a7a3a', text: '#a0ffbc' },
-  ops: { frame: '#8a6ad8', fill: '#3a1a7a', text: '#c4a0ff' },
+  ops: { frame: '#6a5ad8', fill: '#2a1a5a', text: '#b8a0ff' },
   exec: { frame: '#d8b83a', fill: '#7a5a1a', text: '#ffe0a0' },
-  entrance: { frame: '#888888', fill: '#333333', text: '#cccccc' },
-  poker: { frame: '#888888', fill: '#333333', text: '#cccccc' },
-  break: { frame: '#d87a3a', fill: '#7a3a1a', text: '#ffc4a0' },
 };
 
 function renderDepartmentSigns(
@@ -166,36 +160,54 @@ function renderDepartmentSigns(
     const textW = textMetrics.width;
     const textH = zoom >= 3 ? 9 : 10;
 
-    const padX = Math.max(4, 5 * zoom * 0.4);
-    const padY = Math.max(3, 4 * zoom * 0.4);
+    const padX = Math.max(6, 7 * zoom * 0.4);
+    const padY = Math.max(4, 5 * zoom * 0.4);
     const signW = textW + padX * 2;
     const signH = textH + padY * 2;
     const signX = cx - signW / 2;
     const signY = y;
 
-    // Shadow (1px offset, subtle depth)
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-    ctx.fillRect(signX + 1, signY + 1, signW, signH);
+    // Shadow (2px offset, stronger depth)
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(signX + 2, signY + 2, signW, signH);
 
-    // Outer frame (department color, 2px border)
+    // Outer frame (department color)
     ctx.fillStyle = colors.frame;
     ctx.fillRect(signX, signY, signW, signH);
 
-    // Inner fill (2px inset on each side)
-    const borderW = Math.max(1, Math.round(zoom * 0.5));
+    // Inner fill (inset on each side)
+    const borderW = Math.max(2, Math.round(zoom * 0.6));
     ctx.fillStyle = colors.fill;
     ctx.fillRect(signX + borderW, signY + borderW, signW - borderW * 2, signH - borderW * 2);
 
+    // Inner highlight: 1px lighter strip at the very top inside the border
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.fillRect(signX + borderW, signY + borderW, signW - borderW * 2, 1);
+
     // Left accent bar (brighter strip, like a mounting rail)
     ctx.fillStyle = colors.frame;
-    ctx.fillRect(signX + borderW, signY + borderW, borderW + 1, signH - borderW * 2);
+    ctx.fillRect(signX + borderW, signY + borderW, borderW, signH - borderW * 2);
 
-    // Mounting pins (two small dots above sign center)
-    const pinSize = Math.max(1, Math.round(zoom * 0.4));
-    const pinY = signY - pinSize * 2;
-    ctx.fillStyle = colors.frame;
-    ctx.fillRect(cx - signW * 0.25 - pinSize / 2, pinY, pinSize, pinSize * 2);
-    ctx.fillRect(cx + signW * 0.25 - pinSize / 2, pinY, pinSize, pinSize * 2);
+    // Mounting bracket pins (metallic L-shaped brackets above sign)
+    const pinW = Math.max(2, Math.round(zoom * 0.5));
+    const pinH = Math.max(3, Math.round(zoom * 0.7));
+    const pinY = signY - pinH;
+    const bracketColor = '#b0b8c8'; // light metallic silver
+    const bracketShadow = '#505860'; // darker bracket shadow
+
+    // Left bracket
+    const lx = cx - signW * 0.28;
+    ctx.fillStyle = bracketShadow;
+    ctx.fillRect(lx - pinW / 2 + 1, pinY + 1, pinW, pinH);
+    ctx.fillStyle = bracketColor;
+    ctx.fillRect(lx - pinW / 2, pinY, pinW, pinH);
+
+    // Right bracket
+    const rx = cx + signW * 0.28;
+    ctx.fillStyle = bracketShadow;
+    ctx.fillRect(rx - pinW / 2 + 1, pinY + 1, pinW, pinH);
+    ctx.fillStyle = bracketColor;
+    ctx.fillRect(rx - pinW / 2, pinY, pinW, pinH);
 
     // Text (centered)
     ctx.font = signFont;
