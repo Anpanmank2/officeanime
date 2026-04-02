@@ -77,6 +77,8 @@ export function OfficeCanvas({
   // Delete/rotate button bounds (updated each frame by renderer)
   const deleteButtonBoundsRef = useRef<DeleteButtonBounds | null>(null);
   const rotateButtonBoundsRef = useRef<RotateButtonBounds | null>(null);
+  // Hover tile position for JC nameplate hover (imperative ref, no re-renders)
+  const hoverTileRef = useRef<{ col: number; row: number } | null>(null);
   // Right-click erase dragging
   const isEraseDraggingRef = useRef(false);
   // Zoom scroll accumulator for trackpad pinch sensitivity
@@ -282,7 +284,17 @@ export function OfficeCanvas({
         offsetRef.current = { x: offsetX, y: offsetY };
 
         // JC Virtual Office overlay (nameplates, zone labels, exec icons, stats)
-        renderJCOverlay(ctx, offsetX, offsetY, zoom, w, officeState.getCharacters());
+        const ht = hoverTileRef.current;
+        renderJCOverlay(
+          ctx,
+          offsetX,
+          offsetY,
+          zoom,
+          w,
+          officeState.getCharacters(),
+          ht?.col,
+          ht?.row,
+        );
 
         // Store delete/rotate button bounds for hit-testing
         deleteButtonBoundsRef.current = editorRender?.deleteButtonBounds ?? null;
@@ -473,6 +485,7 @@ export function OfficeCanvas({
       const hitId = officeState.getCharacterAt(pos.worldX, pos.worldY);
       const tile = screenToTile(e.clientX, e.clientY);
       officeState.hoveredTile = tile;
+      hoverTileRef.current = tile;
       const canvas = canvasRef.current;
       if (canvas) {
         let cursor = 'default';
@@ -790,6 +803,7 @@ export function OfficeCanvas({
     editorState.ghostRow = -1;
     officeState.hoveredAgentId = null;
     officeState.hoveredTile = null;
+    hoverTileRef.current = null;
   }, [officeState, editorState]);
 
   const handleContextMenu = useCallback(

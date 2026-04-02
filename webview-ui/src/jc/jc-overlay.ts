@@ -22,7 +22,6 @@ import type { JCBubbleType } from './jc-types.js';
 // ── Constants ────────────────────────────────────────────────────
 const NAMEPLATE_FONT = '7px "Press Start 2P", monospace';
 const NAMEPLATE_FALLBACK_FONT = '8px monospace';
-const NAMEPLATE_BG = 'rgba(0, 0, 0, 0.7)';
 const NAMEPLATE_TEXT_COLOR = '#ffffff';
 const NAMEPLATE_PRESENT_COLOR = '#00ff88';
 const NAMEPLATE_ABSENT_COLOR = '#555555';
@@ -32,7 +31,6 @@ const NAMEPLATE_OFFSET_Y = -2; // pixels above the seat tile
 
 const ZONE_LABEL_FONT = '9px "Press Start 2P", monospace';
 const ZONE_LABEL_FALLBACK_FONT = '10px monospace';
-const ZONE_LABEL_COLOR = 'rgba(255, 255, 255, 0.3)';
 
 const EXEC_ICON_SIZE = 12; // pixel size for exec portrait placeholder
 const EXEC_LABEL_FONT = '6px "Press Start 2P", monospace';
@@ -62,18 +60,6 @@ const LIAISON_COLOR_MARKETING = 'rgba(255, 100, 100, 0.4)';
 const LIAISON_LINE_WIDTH = 2;
 const LIAISON_PARTICLE_SIZE = 3;
 
-// Zone color themes
-const ZONE_COLORS: Record<string, string> = {
-  exec: 'rgba(200, 180, 120, 0.35)',
-  entrance: 'rgba(255, 255, 255, 0.25)',
-  poker: 'rgba(255, 255, 255, 0.20)',
-  break: 'rgba(255, 140, 60, 0.30)',
-  dev: 'rgba(90, 140, 255, 0.30)',
-  marketing: 'rgba(255, 107, 138, 0.30)',
-  research: 'rgba(140, 221, 106, 0.30)',
-  ops: 'rgba(180, 140, 255, 0.30)',
-};
-
 // ── Zone labels ──────────────────────────────────────────────────
 const ZONE_LABELS: Array<{ text: string; col: number; row: number; zone: string }> = [
   { text: 'EXEC AREA', col: 1, row: 2, zone: 'exec' },
@@ -99,13 +85,15 @@ export function renderJCOverlay(
   zoom: number,
   canvasWidth: number,
   characters?: Character[],
+  hoverTileCol?: number,
+  hoverTileRow?: number,
 ): void {
   if (!jcIsActive()) return;
 
   const s = TILE_SIZE * zoom;
 
-  // 1. Zone labels (background, lowest layer)
-  renderZoneLabels(ctx, offsetX, offsetY, s, zoom);
+  // 1. Department signs (wall-mounted plaques, lowest layer)
+  renderDepartmentSigns(ctx, offsetX, offsetY, s, zoom);
 
   // 2. Absence indicators (dim dots on empty desks)
   renderAbsenceIndicators(ctx, offsetX, offsetY, s, zoom);
@@ -113,8 +101,10 @@ export function renderJCOverlay(
   // 2.5. Task status indicators on desks
   renderTaskIndicators(ctx, offsetX, offsetY, s, zoom);
 
-  // 3. Name plates (above desks)
-  renderNamePlates(ctx, offsetX, offsetY, s, zoom);
+  // 3. Hover nameplate (shown only when mouse is near a desk)
+  if (hoverTileCol !== undefined && hoverTileRow !== undefined) {
+    renderHoverNameplate(ctx, offsetX, offsetY, s, zoom, hoverTileCol, hoverTileRow);
+  }
 
   // 4. Exec icons
   renderExecIcons(ctx, offsetX, offsetY, s, zoom);
@@ -138,7 +128,19 @@ export function renderJCOverlay(
 
 // ── Sub-renderers ────────────────────────────────────────────────
 
-function renderZoneLabels(
+// Department sign solid colors (matching zone theme but solid for signs)
+const DEPT_SIGN_COLORS: Record<string, { frame: string; fill: string; text: string }> = {
+  dev: { frame: '#3a6fd8', fill: '#1a3a7a', text: '#a0c4ff' },
+  marketing: { frame: '#d83a6f', fill: '#7a1a3a', text: '#ffa0c4' },
+  research: { frame: '#3ad87a', fill: '#1a7a3a', text: '#a0ffbc' },
+  ops: { frame: '#8a6ad8', fill: '#3a1a7a', text: '#c4a0ff' },
+  exec: { frame: '#d8b83a', fill: '#7a5a1a', text: '#ffe0a0' },
+  entrance: { frame: '#888888', fill: '#333333', text: '#cccccc' },
+  poker: { frame: '#888888', fill: '#333333', text: '#cccccc' },
+  break: { frame: '#d87a3a', fill: '#7a3a1a', text: '#ffc4a0' },
+};
+
+function renderDepartmentSigns(
   ctx: CanvasRenderingContext2D,
   offsetX: number,
   offsetY: number,
@@ -146,26 +148,125 @@ function renderZoneLabels(
   zoom: number,
 ): void {
   ctx.save();
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
 
   for (const label of ZONE_LABELS) {
-    const x = offsetX + label.col * s;
+    const cx = offsetX + (label.col + 0.5) * s; // center of sign horizontally
     const y = offsetY + label.row * s;
-    const zoneColor = ZONE_COLORS[label.zone] ?? ZONE_LABEL_COLOR;
 
-    // Draw zone label with department-specific color
-    ctx.font = zoom >= 3 ? ZONE_LABEL_FONT : ZONE_LABEL_FALLBACK_FONT;
-    ctx.fillStyle = zoneColor;
-    ctx.fillText(label.text, x, y);
+    const colors = DEPT_SIGN_COLORS[label.zone] ?? {
+      frame: '#888888',
+      fill: '#333333',
+      text: '#cccccc',
+    };
 
-    // Draw a subtle underline accent for department zones
-    if (label.zone === 'dev' || label.zone === 'marketing' || label.zone === 'research') {
-      const metrics = ctx.measureText(label.text);
-      ctx.fillStyle = zoneColor;
-      ctx.fillRect(x, y + (zoom >= 3 ? 11 : 12), metrics.width, Math.max(1, zoom * 0.5));
-    }
+    // Sign dimensions: scale with zoom but keep readable
+    const signFont = zoom >= 3 ? ZONE_LABEL_FONT : ZONE_LABEL_FALLBACK_FONT;
+    ctx.font = signFont;
+    const textMetrics = ctx.measureText(label.text);
+    const textW = textMetrics.width;
+    const textH = zoom >= 3 ? 9 : 10;
+
+    const padX = Math.max(4, 5 * zoom * 0.4);
+    const padY = Math.max(3, 4 * zoom * 0.4);
+    const signW = textW + padX * 2;
+    const signH = textH + padY * 2;
+    const signX = cx - signW / 2;
+    const signY = y;
+
+    // Shadow (1px offset, subtle depth)
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(signX + 1, signY + 1, signW, signH);
+
+    // Outer frame (department color, 2px border)
+    ctx.fillStyle = colors.frame;
+    ctx.fillRect(signX, signY, signW, signH);
+
+    // Inner fill (2px inset on each side)
+    const borderW = Math.max(1, Math.round(zoom * 0.5));
+    ctx.fillStyle = colors.fill;
+    ctx.fillRect(signX + borderW, signY + borderW, signW - borderW * 2, signH - borderW * 2);
+
+    // Left accent bar (brighter strip, like a mounting rail)
+    ctx.fillStyle = colors.frame;
+    ctx.fillRect(signX + borderW, signY + borderW, borderW + 1, signH - borderW * 2);
+
+    // Mounting pins (two small dots above sign center)
+    const pinSize = Math.max(1, Math.round(zoom * 0.4));
+    const pinY = signY - pinSize * 2;
+    ctx.fillStyle = colors.frame;
+    ctx.fillRect(cx - signW * 0.25 - pinSize / 2, pinY, pinSize, pinSize * 2);
+    ctx.fillRect(cx + signW * 0.25 - pinSize / 2, pinY, pinSize, pinSize * 2);
+
+    // Text (centered)
+    ctx.font = signFont;
+    ctx.fillStyle = colors.text;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label.text, cx, signY + signH / 2);
   }
+
+  ctx.restore();
+}
+
+function renderHoverNameplate(
+  ctx: CanvasRenderingContext2D,
+  offsetX: number,
+  offsetY: number,
+  s: number,
+  zoom: number,
+  hoverCol: number,
+  hoverRow: number,
+): void {
+  const nameplates = jcGetNameplates();
+  // Find nameplate within 1 tile of hover position
+  const np = nameplates.find(
+    (n) => Math.abs(n.col - hoverCol) <= 1 && Math.abs(n.row - hoverRow) <= 1,
+  );
+  if (!np) return;
+
+  ctx.save();
+  ctx.font = zoom >= 3 ? NAMEPLATE_FONT : NAMEPLATE_FALLBACK_FONT;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+
+  const x = offsetX + (np.col + 0.5) * s;
+  const y = offsetY + np.row * s + NAMEPLATE_OFFSET_Y * zoom;
+
+  const text = np.text;
+  const metrics = ctx.measureText(text);
+  const textW = metrics.width;
+  const textH = 8;
+
+  const bgX = x - textW / 2 - NAMEPLATE_PADDING_X;
+  const bgY = y - textH - NAMEPLATE_PADDING_Y;
+  const bgW = textW + NAMEPLATE_PADDING_X * 2;
+  const bgH = textH + NAMEPLATE_PADDING_Y * 2;
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(bgX + 1, bgY + 1, bgW, bgH);
+
+  // Background: dark tooltip style
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(bgX, bgY, bgW, bgH);
+
+  // Border (1px solid)
+  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(bgX, bgY, bgW, bgH);
+
+  // Left accent bar (department color)
+  const zoneColor = NAMEPLATE_ZONE_COLORS[np.zone];
+  if (zoneColor) {
+    const accentW = Math.max(2, Math.round(zoom * 0.5));
+    ctx.fillStyle = np.isPresent ? zoneColor : `${zoneColor}44`;
+    ctx.fillRect(bgX, bgY, accentW, bgH);
+  }
+
+  // Text
+  ctx.fillStyle = np.isPresent ? NAMEPLATE_PRESENT_COLOR : NAMEPLATE_ABSENT_COLOR;
+  ctx.fillText(text, x, y);
+
   ctx.restore();
 }
 
@@ -287,52 +388,6 @@ const NAMEPLATE_ZONE_COLORS: Record<string, string> = {
   marketing: '#ff6b8a',
   research: '#8cdd6a',
 };
-
-function renderNamePlates(
-  ctx: CanvasRenderingContext2D,
-  offsetX: number,
-  offsetY: number,
-  s: number,
-  zoom: number,
-): void {
-  const nameplates = jcGetNameplates();
-  ctx.save();
-  ctx.font = zoom >= 3 ? NAMEPLATE_FONT : NAMEPLATE_FALLBACK_FONT;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-
-  for (const np of nameplates) {
-    const x = offsetX + (np.col + 0.5) * s;
-    const y = offsetY + np.row * s + NAMEPLATE_OFFSET_Y * zoom;
-
-    const text = np.text;
-    const metrics = ctx.measureText(text);
-    const textW = metrics.width;
-    const textH = 8;
-
-    const bgX = x - textW / 2 - NAMEPLATE_PADDING_X;
-    const bgY = y - textH - NAMEPLATE_PADDING_Y;
-    const bgW = textW + NAMEPLATE_PADDING_X * 2;
-    const bgH = textH + NAMEPLATE_PADDING_Y * 2;
-
-    // Background
-    ctx.fillStyle = NAMEPLATE_BG;
-    ctx.fillRect(bgX, bgY, bgW, bgH);
-
-    // Left accent bar (department color)
-    const zoneColor = NAMEPLATE_ZONE_COLORS[np.zone];
-    if (zoneColor) {
-      const accentW = Math.max(1, zoom * 0.5);
-      ctx.fillStyle = np.isPresent ? zoneColor : `${zoneColor}44`;
-      ctx.fillRect(bgX, bgY, accentW, bgH);
-    }
-
-    // Text
-    ctx.fillStyle = np.isPresent ? NAMEPLATE_PRESENT_COLOR : NAMEPLATE_ABSENT_COLOR;
-    ctx.fillText(text, x, y);
-  }
-  ctx.restore();
-}
 
 function renderExecIcons(
   ctx: CanvasRenderingContext2D,
