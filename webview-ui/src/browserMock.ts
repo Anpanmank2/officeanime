@@ -296,7 +296,7 @@ export function dispatchMockMessages(): void {
   // Spawn permanent residents synchronously (same context as layoutLoaded)
   if (jcConfigData?.members) {
     dispatch({ type: 'jcConfigLoaded', config: jcConfigData });
-    const permanentRoles = ['CEO', 'Secretary', 'PM / Director'];
+    const permanentRoles = ['CEO', 'Secretary', 'PM / Director', 'Research Lead (Owner兼務)'];
     const residents = jcConfigData.members.filter((m) => permanentRoles.includes(m.role));
     residents.forEach((member, idx) => {
       dispatch({
