@@ -1,5 +1,19 @@
 // ── Just Curious Virtual Office — Webview Entry Point ────────────
 
+// Shared constants (single source of truth for colors, labels, etc.)
+export {
+  BUBBLE_EMOJIS,
+  DEPT_COLORS,
+  DEPT_LABELS,
+  DEPT_NEON,
+  DEPT_POPUP_COLORS,
+  IDLE_TIMEOUT_MS,
+  PERMANENT_ROLES,
+  SPEECH_BUBBLE_COLORS,
+  STATE_COLORS,
+  STATE_LABELS,
+  TASK_STATUS_COLORS,
+} from './jc-constants.js';
 export { renderJCBubble, renderJCOverlay } from './jc-overlay.js';
 export type { DashboardMember } from './jc-state.js';
 export {

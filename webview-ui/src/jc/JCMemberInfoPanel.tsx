@@ -4,52 +4,9 @@ import { CHARACTER_SITTING_OFFSET_PX } from '../constants.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import { CharacterState, TILE_SIZE } from '../office/types.js';
 import { vscode } from '../vscodeApi.js';
+import { DEPT_COLORS, DEPT_LABELS, STATE_COLORS, STATE_LABELS } from './jc-constants.js';
 import { jcGetActivitySummary, jcGetMemberInfo, jcGetMemberTaskStatus } from './jc-state.js';
 import type { InstructionMode } from './jc-types.js';
-
-const STATE_DOT_COLORS: Record<string, string> = {
-  coding: '#39ff14',
-  thinking: '#ffbf00',
-  reading: '#00b4ff',
-  reviewing: '#00f0ff',
-  error: '#ff3d3d',
-  idle: '#666688',
-  break: '#ff6b9d',
-  meeting: '#b388ff',
-  arriving: '#39ff14',
-  leaving: '#888888',
-  presenting: '#bf5fff',
-  handoff: '#b388ff',
-  absent: '#333344',
-};
-
-const STATE_LABELS: Record<string, string> = {
-  coding: 'Coding',
-  thinking: 'Thinking',
-  reading: 'Reading',
-  reviewing: 'Reviewing',
-  error: 'Error',
-  idle: 'Idle',
-  break: 'On Break',
-  meeting: 'In Meeting',
-  arriving: 'Arriving',
-  leaving: 'Leaving',
-  presenting: 'Presenting',
-  handoff: 'Handoff',
-  absent: 'Absent',
-};
-
-const DEPT_COLORS: Record<string, string> = {
-  engineering: '#00b4ff',
-  marketing: '#ff4d8d',
-  research: '#00e676',
-};
-
-const DEPT_LABELS: Record<string, string> = {
-  engineering: 'ENG',
-  marketing: 'MKT',
-  research: 'RES',
-};
 
 interface JCMemberInfoPanelProps {
   officeState: OfficeState;
@@ -106,7 +63,7 @@ export function JCMemberInfoPanel({
   const screenX = (deviceOffsetX + ch.x * zoom) / dpr;
   const screenY = (deviceOffsetY + (ch.y + sittingOffset + 16) * zoom) / dpr;
 
-  const dotColor = STATE_DOT_COLORS[memberInfo.jcState] ?? '#9e9e9e';
+  const dotColor = STATE_COLORS[memberInfo.jcState] ?? '#9e9e9e';
   const stateLabel = STATE_LABELS[memberInfo.jcState] ?? memberInfo.jcState;
   const deptColor = DEPT_COLORS[memberInfo.config.department] ?? 'var(--pixel-text-dim)';
   const deptLabel = DEPT_LABELS[memberInfo.config.department] ?? memberInfo.config.department;

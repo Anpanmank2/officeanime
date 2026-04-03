@@ -21,23 +21,22 @@ import type { DeskEntry } from './types.js';
 
 // Direction constants matching fork's Direction enum
 const DOWN = 0;
-const _LEFT = 1;
-const _RIGHT = 2;
+const LEFT = 1;
+const RIGHT = 2;
 const UP = 3;
 
 export const DESK_REGISTRY: DeskEntry[] = [
   // ═══════════════════════════════════════════════════
   // Engineering — Dev Zone (cols 1-11, rows 7-13)
-  // Row A: desks at row 7, chairs at row 9
-  // Row B: desks at row 10 (staggered +1 col), chairs at row 12
+  // "テックオタクの洞窟" — クラスタ配置
   // ═══════════════════════════════════════════════════
   {
     deskId: 'dev-desk-01',
     memberId: 'eng-01',
     zone: 'dev',
-    seatCol: 4,
+    seatCol: 5,
     seatRow: 9,
-    facingDir: UP,
+    facingDir: RIGHT,
     nameplate: '田中 健太',
     nameplateEn: 'K.Tanaka',
   },
@@ -45,9 +44,9 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'dev-desk-02',
     memberId: 'eng-02',
     zone: 'dev',
-    seatCol: 1,
+    seatCol: 2,
     seatRow: 9,
-    facingDir: UP,
+    facingDir: LEFT,
     nameplate: '佐藤 涼',
     nameplateEn: 'R.Sato',
   },
@@ -55,9 +54,9 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'dev-desk-03',
     memberId: 'eng-03',
     zone: 'dev',
-    seatCol: 7,
+    seatCol: 8,
     seatRow: 9,
-    facingDir: UP,
+    facingDir: DOWN,
     nameplate: '中村 陽菜',
     nameplateEn: 'H.Nakamura',
   },
@@ -75,7 +74,7 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'dev-desk-05',
     memberId: 'eng-05',
     zone: 'dev',
-    seatCol: 5,
+    seatCol: 6,
     seatRow: 12,
     facingDir: UP,
     nameplate: '藤井 蓮',
@@ -93,10 +92,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
   },
 
   // ═══════════════════════════════════════════════════
-  // Marketing — Marketing Zone (cols 13-24, rows 7-13)
-  // Row A: desks at row 7, chairs at row 9
-  // Row B: desks at row 10, chairs at row 12
-  // + 3 standalone benches at row 9
+  // Marketing — Creative Village (cols 13-24, rows 7-13)
+  // "カラフルなカオス" — Strategy島 + Execution列
   // ═══════════════════════════════════════════════════
   {
     deskId: 'mkt-desk-01',
@@ -114,7 +111,7 @@ export const DESK_REGISTRY: DeskEntry[] = [
     zone: 'marketing',
     seatCol: 17,
     seatRow: 9,
-    facingDir: UP,
+    facingDir: LEFT,
     nameplate: '清水 夏希',
     nameplateEn: 'N.Shimizu',
   },
@@ -122,9 +119,9 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'mkt-desk-03',
     memberId: 'mkt-03',
     zone: 'marketing',
-    seatCol: 20,
+    seatCol: 19,
     seatRow: 9,
-    facingDir: UP,
+    facingDir: RIGHT,
     nameplate: 'トマス・ベガ',
     nameplateEn: 'T.Vega',
   },
@@ -132,9 +129,9 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'mkt-desk-04',
     memberId: 'mkt-04',
     zone: 'marketing',
-    seatCol: 23,
+    seatCol: 21,
     seatRow: 9,
-    facingDir: UP,
+    facingDir: LEFT,
     nameplate: 'サーシャ・ブレナン',
     nameplateEn: 'S.Brennan',
   },
@@ -142,9 +139,9 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'mkt-desk-05',
     memberId: 'mkt-05',
     zone: 'marketing',
-    seatCol: 14,
-    seatRow: 12,
-    facingDir: UP,
+    seatCol: 23,
+    seatRow: 9,
+    facingDir: RIGHT,
     nameplate: '足立 賢治',
     nameplateEn: 'K.Adachi',
   },
@@ -152,7 +149,7 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'mkt-desk-06',
     memberId: 'mkt-06',
     zone: 'marketing',
-    seatCol: 17,
+    seatCol: 14,
     seatRow: 12,
     facingDir: UP,
     nameplate: '高橋 里奈',
@@ -162,7 +159,7 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'mkt-desk-07',
     memberId: 'mkt-07',
     zone: 'marketing',
-    seatCol: 20,
+    seatCol: 16,
     seatRow: 12,
     facingDir: UP,
     nameplate: '谷口 芽依',
@@ -172,7 +169,7 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'mkt-desk-08',
     memberId: 'mkt-08',
     zone: 'marketing',
-    seatCol: 23,
+    seatCol: 18,
     seatRow: 12,
     facingDir: UP,
     nameplate: 'ジェイク・フローレス＝太田',
@@ -182,9 +179,9 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'mkt-desk-09',
     memberId: 'mkt-09',
     zone: 'marketing',
-    seatCol: 16,
-    seatRow: 9,
-    facingDir: DOWN,
+    seatCol: 20,
+    seatRow: 12,
+    facingDir: UP,
     nameplate: '北川 花',
     nameplateEn: 'H.Kitagawa',
   },
@@ -192,9 +189,9 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'mkt-desk-10',
     memberId: 'mkt-10',
     zone: 'marketing',
-    seatCol: 19,
-    seatRow: 9,
-    facingDir: DOWN,
+    seatCol: 22,
+    seatRow: 12,
+    facingDir: UP,
     nameplate: '森 大地',
     nameplateEn: 'D.Mori',
   },
@@ -202,23 +199,22 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'mkt-desk-11',
     memberId: 'mkt-11',
     zone: 'marketing',
-    seatCol: 22,
-    seatRow: 9,
-    facingDir: DOWN,
+    seatCol: 24,
+    seatRow: 12,
+    facingDir: UP,
     nameplate: 'レナ・パク',
     nameplateEn: 'L.Park',
   },
 
   // ═══════════════════════════════════════════════════
   // Research — Research Lab (cols 1-11, rows 15-21)
-  // Row A: desks at row 15, chairs at row 17
-  // Row B: desks at row 18 (staggered), chairs at row 20
+  // "学者の書斎" — ゼミ配置: 本棚背の上座 + ペア + 独立席
   // ═══════════════════════════════════════════════════
   {
     deskId: 'res-desk-01',
     memberId: 'res-01',
     zone: 'research',
-    seatCol: 1,
+    seatCol: 3,
     seatRow: 17,
     facingDir: UP,
     nameplate: 'Owner',
@@ -228,7 +224,7 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'res-desk-02',
     memberId: 'res-02',
     zone: 'research',
-    seatCol: 4,
+    seatCol: 7,
     seatRow: 17,
     facingDir: UP,
     nameplate: 'Sora Miyake',
@@ -238,9 +234,9 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'res-desk-03',
     memberId: 'res-03',
     zone: 'research',
-    seatCol: 7,
-    seatRow: 17,
-    facingDir: UP,
+    seatCol: 2,
+    seatRow: 20,
+    facingDir: LEFT,
     nameplate: 'Marina Ríos-Delgado',
     nameplateEn: 'M.Rios',
   },
@@ -248,9 +244,9 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'res-desk-04',
     memberId: 'res-04',
     zone: 'research',
-    seatCol: 2,
+    seatCol: 5,
     seatRow: 20,
-    facingDir: UP,
+    facingDir: RIGHT,
     nameplate: 'Kai Nakamura-Chen',
     nameplateEn: 'K.Nakamura',
   },
@@ -258,9 +254,9 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'res-desk-05',
     memberId: 'res-05',
     zone: 'research',
-    seatCol: 5,
+    seatCol: 8,
     seatRow: 20,
-    facingDir: UP,
+    facingDir: RIGHT,
     nameplate: 'Dr. Priya Okonkwo-Singh',
     nameplateEn: 'P.Okonkwo',
   },
@@ -268,7 +264,7 @@ export const DESK_REGISTRY: DeskEntry[] = [
     deskId: 'res-desk-06',
     memberId: 'res-06',
     zone: 'research',
-    seatCol: 8,
+    seatCol: 10,
     seatRow: 20,
     facingDir: UP,
     nameplate: '空席',
@@ -277,7 +273,7 @@ export const DESK_REGISTRY: DeskEntry[] = [
 
   // ═══════════════════════════════════════════════════
   // Executive — Exec Area (cols 2-5, rows 2-5)
-  // Permanent residents: CEO and Secretary
+  // "静かな威圧感" — Permanent residents: CEO and Secretary
   // ═══════════════════════════════════════════════════
   {
     deskId: 'exec-desk-ceo',
@@ -304,12 +300,12 @@ export const DESK_REGISTRY: DeskEntry[] = [
 /** Entrance tile position (spawn/despawn point) — top center of poker area */
 export const ENTRANCE_TILE = { col: 12, row: 2 };
 
-/** Poker Table center tiles (meeting point) — coffee table at (11,3) 2×2 */
+/** Poker Table seats — meeting gathering point in Poker Room around (17,17) */
 export const POKER_TABLE_SEATS = [
-  { col: 11, row: 3 },
-  { col: 12, row: 3 },
-  { col: 11, row: 4 },
-  { col: 12, row: 4 },
+  { col: 16, row: 17 },
+  { col: 18, row: 17 },
+  { col: 17, row: 16 },
+  { col: 17, row: 18 },
 ];
 
 /** Exec display positions (icon-only, no character) — left section rows 2-5 */

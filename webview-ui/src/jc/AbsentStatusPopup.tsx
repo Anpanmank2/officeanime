@@ -4,21 +4,8 @@
 
 import { useEffect, useState } from 'react';
 
+import { DEPT_LABELS, DEPT_POPUP_COLORS } from './jc-constants.js';
 import type { AbsenceInfo } from './jc-types.js';
-
-const DEPT_COLORS: Record<string, string> = {
-  engineering: '#5a8cff',
-  marketing: '#ff6b8a',
-  research: '#8cdd6a',
-  exec: '#f0ad4e',
-};
-
-const DEPT_LABELS: Record<string, string> = {
-  engineering: 'ENG',
-  marketing: 'MKT',
-  research: 'RES',
-  exec: 'EXEC',
-};
 
 function formatDuration(ms: number): string {
   if (ms <= 0) return '—';
@@ -60,7 +47,7 @@ export function AbsentStatusPopup({ info, position, onClose, onLaunch }: AbsentS
         })
       : '—';
 
-  const deptColor = DEPT_COLORS[info.department] ?? '#8b949e';
+  const deptColor = DEPT_POPUP_COLORS[info.department] ?? '#8b949e';
   const deptLabel = DEPT_LABELS[info.department] ?? info.department;
   const statusLabel = info.status === 'absent' ? '不在' : 'アイドル';
   const dotColor = info.status === 'absent' ? '#ff4444' : '#f0ad4e';

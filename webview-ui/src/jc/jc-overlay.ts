@@ -140,7 +140,7 @@ function renderGlassWalls(
     const pulse = (Math.sin(now / 2000) + 1) / 2;
 
     // Glass panel fill — dark with subtle blue tint
-    ctx.fillStyle = 'rgba(10, 15, 35, 0.55)';
+    ctx.fillStyle = 'rgba(10, 15, 35, 0.85)';
     ctx.fillRect(x, y, w, h);
 
     // Neon border glow (outer)
