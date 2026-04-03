@@ -282,7 +282,7 @@ export function getTaskWatcher(): TaskWatcher | null {
 /** Get member IDs that should always be present in the office */
 export function getPermanentResidents(): string[] {
   if (!jcConfig) return [];
-  const permanentRoles = ['CEO', 'Secretary', 'PM / Director'];
+  const permanentRoles = ['CEO', 'Secretary', 'PM / Director', 'Research Lead (Owner兼務)'];
   return jcConfig.members.filter((m) => permanentRoles.includes(m.role)).map((m) => m.id);
 }
 
