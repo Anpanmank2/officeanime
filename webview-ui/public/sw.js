@@ -1,5 +1,5 @@
 // ── Service Worker — Office Anime PWA ──────────────────────────
-const CACHE_NAME = 'office-anime-v3';
+const CACHE_NAME = 'office-anime-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
