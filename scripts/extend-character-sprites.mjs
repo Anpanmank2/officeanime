@@ -186,23 +186,21 @@ for (let ci = 0; ci < CHAR_COUNT; ci++) {
   const srcBuf = fs.readFileSync(inPath);
   const src = PNG.sync.read(srcBuf);
 
-  if (src.width !== OLD_WIDTH || src.height !== HEIGHT) {
+  const alreadyExtended = src.width === NEW_WIDTH && src.height === HEIGHT;
+  if (!alreadyExtended && (src.width !== OLD_WIDTH || src.height !== HEIGHT)) {
     console.warn(
-      `char_${ci}.png: unexpected size ${src.width}×${src.height}, expected ${OLD_WIDTH}×${HEIGHT}`,
+      `char_${ci}.png: unexpected size ${src.width}×${src.height}, expected ${OLD_WIDTH}×${HEIGHT} or ${NEW_WIDTH}×${HEIGHT}`,
     );
-    // If already extended, skip
-    if (src.width === NEW_WIDTH) {
-      console.log(`char_${ci}.png: already extended (${NEW_WIDTH}px wide), skipping`);
-      continue;
-    }
+    continue;
   }
 
   // Create new wider PNG
   const dst = new PNG({ width: NEW_WIDTH, height: HEIGHT });
 
-  // Copy existing 112×96 content
+  // Copy existing content (first 112px = original 7 frames)
+  const copyWidth = alreadyExtended ? OLD_WIDTH : Math.min(src.width, OLD_WIDTH);
   for (let y = 0; y < HEIGHT; y++) {
-    for (let x = 0; x < Math.min(src.width, OLD_WIDTH); x++) {
+    for (let x = 0; x < copyWidth; x++) {
       const srcIdx = (y * src.width + x) * 4;
       const dstIdx = (y * NEW_WIDTH + x) * 4;
       dst.data[dstIdx] = src.data[srcIdx];
@@ -212,17 +210,18 @@ for (let ci = 0; ci < CHAR_COUNT; ci++) {
     }
   }
 
-  // Extract standing pose (walk2 = frame index 1, Row 0 = front/down)
-  const standingPose = extractFrame(src, 1, 0);
-
-  // Generate thinking frames (Col 7-9, Row 0 only)
-  const thinkFrames = generateThinkingFrames(standingPose);
-  for (let i = 0; i < 3; i++) {
-    writeFrame(dst, 7 + i, 0, thinkFrames[i]);
+  // Generate thinking frames for all 3 directions (Col 7-9, Rows 0-2)
+  for (let dirRow = 0; dirRow < 3; dirRow++) {
+    const standingPose = extractFrame(src, 1, dirRow); // walk2 for each direction
+    const thinkFrames = generateThinkingFrames(standingPose);
+    for (let i = 0; i < 3; i++) {
+      writeFrame(dst, 7 + i, dirRow, thinkFrames[i]);
+    }
   }
 
-  // Generate error frames (Col 10, Row 0/1/2 = frame 0/1/2)
-  const errorFrames = generateErrorFrames(standingPose);
+  // Generate error frames (Col 10, Row 0/1/2 = frame 0/1/2) — uses down-facing pose
+  const standingPoseDown = extractFrame(src, 1, 0);
+  const errorFrames = generateErrorFrames(standingPoseDown);
   for (let i = 0; i < 3; i++) {
     writeFrame(dst, 10, i, errorFrames[i]);
   }
