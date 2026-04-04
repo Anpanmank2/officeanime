@@ -708,7 +708,9 @@ export function useExtensionMessages(
       } else if (msg.type === 'jcLiaison') {
         const fromMemberId = msg.fromMemberId as string;
         const toMemberId = msg.toMemberId as string;
-        jcTriggerLiaison(fromMemberId, toMemberId);
+        const duration = (msg.duration as number) || 3000;
+        const color = msg.color as string | undefined;
+        jcTriggerLiaison(fromMemberId, toMemberId, duration, color);
       } else if (msg.type === 'jcMappingUpdate') {
         jcUpdateMappings(msg.mappings);
       } else if (msg.type === 'jcAbsenceUpdate') {

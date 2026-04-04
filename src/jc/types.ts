@@ -184,6 +184,11 @@ export const OfficeEventType = {
   REVIEW_COMPLETED: 'review_completed',
   TASK_COMPLETED: 'task_completed',
   AGENT_LEAVE: 'agent_leave',
+  // v1.2: Delegation chain events (/company orchestration)
+  ROLE_ESCALATE: 'role_escalate',
+  DELEGATE: 'delegate',
+  DELEGATION_COMPLETE: 'delegation_complete',
+  PROGRESS_CHECK: 'progress_check',
 } as const;
 export type OfficeEventType = (typeof OfficeEventType)[keyof typeof OfficeEventType];
 
@@ -258,6 +263,44 @@ export interface AgentLeaveEvent extends OfficeEventBase {
   reason: 'idle_timeout' | 'task_done' | 'manual';
 }
 
+// ── v1.2: Delegation chain events ──────────────────────────────
+
+/** Role escalation (e.g. secretary → CEO) */
+export interface RoleEscalateEvent extends OfficeEventBase {
+  event: 'role_escalate';
+  from: string; // member ID (e.g. secretary)
+  to: string; // member ID (e.g. CEO)
+  role: string; // role name for display
+  message: string; // escalation text
+}
+
+/** Delegation from lead/CEO to agent */
+export interface DelegateEvent extends OfficeEventBase {
+  event: 'delegate';
+  from: string; // delegator member ID
+  to: string[]; // delegatee member IDs
+  task: string;
+  department: string;
+  message: string; // delegation text for speech bubble
+}
+
+/** Delegation completion report (agent → lead → CEO) */
+export interface DelegationCompleteEvent extends OfficeEventBase {
+  event: 'delegation_complete';
+  from: string; // completing member ID
+  to: string; // report-to member ID
+  task: string;
+  message: string; // completion text
+}
+
+/** Progress check by secretary */
+export interface ProgressCheckEvent extends OfficeEventBase {
+  event: 'progress_check';
+  from: string; // secretary member ID
+  to: string; // checked member ID
+  message: string;
+}
+
 /** Union of all office events */
 export type OfficeEvent =
   | TaskReceivedEvent
@@ -267,7 +310,11 @@ export type OfficeEvent =
   | ReviewRequestedEvent
   | ReviewCompletedEvent
   | TaskCompletedEvent
-  | AgentLeaveEvent;
+  | AgentLeaveEvent
+  | RoleEscalateEvent
+  | DelegateEvent
+  | DelegationCompleteEvent
+  | ProgressCheckEvent;
 
 /** Office events file schema */
 export interface OfficeEventsFile {

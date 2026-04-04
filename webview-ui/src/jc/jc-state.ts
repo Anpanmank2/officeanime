@@ -305,6 +305,7 @@ const activeLiaisons: Array<{
   toRow: number;
   startTime: number;
   duration: number;
+  color?: string;
 }> = [];
 
 /** Trigger a department liaison visual effect */
@@ -312,6 +313,7 @@ export function jcTriggerLiaison(
   fromMemberId: string,
   toMemberId: string,
   duration: number = 3000,
+  color?: string,
 ): void {
   const fromDesk = DESK_POSITIONS[getMemberDeskId(fromMemberId)];
   const toDesk = DESK_POSITIONS[getMemberDeskId(toMemberId)];
@@ -326,6 +328,7 @@ export function jcTriggerLiaison(
     toRow: toDesk.row,
     startTime: Date.now(),
     duration,
+    color,
   });
 }
 

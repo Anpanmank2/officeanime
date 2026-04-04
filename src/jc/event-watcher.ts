@@ -9,11 +9,15 @@ import type * as vscode from 'vscode';
 import { getDeskByMemberId } from './desk-registry.js';
 import type {
   CrossDeptMessageEvent,
+  DelegateEvent,
+  DelegationCompleteEvent,
   JCConfig,
   OfficeEvent,
   OfficeEventsFile,
+  ProgressCheckEvent,
   ReviewCompletedEvent,
   ReviewRequestedEvent,
+  RoleEscalateEvent,
   SpeechBubble,
   TaskAssignedEvent,
   TaskCompletedEvent,
@@ -155,6 +159,18 @@ export class EventWatcher {
         break;
       case 'agent_leave':
         this.handleAgentLeave(event);
+        break;
+      case 'role_escalate':
+        this.handleRoleEscalate(event as RoleEscalateEvent);
+        break;
+      case 'delegate':
+        this.handleDelegate(event as DelegateEvent);
+        break;
+      case 'delegation_complete':
+        this.handleDelegationComplete(event as DelegationCompleteEvent);
+        break;
+      case 'progress_check':
+        this.handleProgressCheck(event as ProgressCheckEvent);
         break;
       default:
         // Forward raw event to webview
@@ -346,5 +362,177 @@ export class EventWatcher {
       agentId: -200 - Math.floor(Math.random() * 1000),
       memberId,
     });
+  }
+
+  // ── v1.2: Delegation chain event handlers ──────────────────────
+
+  /** Beam color presets for delegation types */
+  private static readonly BEAM_COLORS: Record<string, { color: string; duration: number }> = {
+    secretary_to_ceo: { color: '#ffbf00', duration: 2000 },
+    ceo_to_lead: { color: '#39ff14', duration: 2000 },
+    lead_to_agent: { color: '#00b4ff', duration: 1500 },
+    cross_dept: { color: '#bf5fff', duration: 2000 },
+    report_up: { color: '#00b4ff', duration: 1500 },
+    progress_check: { color: '#666688', duration: 1000 },
+  };
+
+  /** Determine beam type from member roles */
+  private getBeamType(fromId: string, toId: string): { color: string; duration: number } {
+    const from = this.config.members.find((m) => m.id === fromId);
+    const to = this.config.members.find((m) => m.id === toId);
+    if (!from || !to) return { color: '#ffffff', duration: 2000 };
+
+    if (from.role === 'Secretary') return EventWatcher.BEAM_COLORS['secretary_to_ceo'];
+    if (from.role === 'CEO') return EventWatcher.BEAM_COLORS['ceo_to_lead'];
+    if (from.department !== to.department) return EventWatcher.BEAM_COLORS['cross_dept'];
+    // Lead → Agent or Agent → Lead based on layer
+    if (from.layer < to.layer) return EventWatcher.BEAM_COLORS['lead_to_agent'];
+    return EventWatcher.BEAM_COLORS['report_up'];
+  }
+
+  private handleRoleEscalate(event: RoleEscalateEvent): void {
+    const beam = this.getBeamType(event.from, event.to);
+
+    // Arrive the target member
+    const toMember = this.config.members.find((m) => m.id === event.to);
+    const toDesk = getDeskByMemberId(event.to);
+    if (toMember && toDesk) {
+      this.webview!.postMessage({
+        type: 'jcMemberArriving',
+        agentId: -200 - Math.floor(Math.random() * 1000),
+        memberId: event.to,
+        deskId: toDesk.deskId,
+        seatUid: toDesk.deskId,
+        hueShift: toMember.hueShift,
+        palette: toMember.palette ?? 0,
+      });
+    }
+
+    // Beam + speech bubble
+    this.webview!.postMessage({
+      type: 'jcLiaison',
+      fromMemberId: event.from,
+      toMemberId: event.to,
+      color: beam.color,
+      duration: beam.duration,
+    });
+
+    const from = this.config.members.find((m) => m.id === event.from);
+    if (from) {
+      const bubble: SpeechBubble = {
+        id: `escalate-${Date.now()}`,
+        memberId: event.from,
+        text: event.message.slice(0, 25),
+        department: from.department,
+        timestamp: Date.now(),
+        duration: 3000,
+      };
+      this.webview!.postMessage({ type: 'jcSpeechBubble', bubble });
+    }
+  }
+
+  private handleDelegate(event: DelegateEvent): void {
+    // Arrive all delegatees
+    for (const memberId of event.to) {
+      const member = this.config.members.find((m) => m.id === memberId);
+      const desk = getDeskByMemberId(memberId);
+      if (member && desk) {
+        this.webview!.postMessage({
+          type: 'jcMemberArriving',
+          agentId: -200 - Math.floor(Math.random() * 1000),
+          memberId,
+          deskId: desk.deskId,
+          seatUid: desk.deskId,
+          hueShift: member.hueShift,
+          palette: member.palette ?? 0,
+        });
+      }
+
+      // Beam from delegator to each delegatee
+      const beam = this.getBeamType(event.from, memberId);
+      this.webview!.postMessage({
+        type: 'jcLiaison',
+        fromMemberId: event.from,
+        toMemberId: memberId,
+        color: beam.color,
+        duration: beam.duration,
+      });
+    }
+
+    // Speech bubble on delegator
+    const from = this.config.members.find((m) => m.id === event.from);
+    if (from) {
+      const bubble: SpeechBubble = {
+        id: `delegate-${Date.now()}`,
+        memberId: event.from,
+        text: event.message.slice(0, 25),
+        department: from.department,
+        timestamp: Date.now(),
+        duration: 3000,
+      };
+      this.webview!.postMessage({ type: 'jcSpeechBubble', bubble });
+    }
+  }
+
+  private handleDelegationComplete(event: DelegationCompleteEvent): void {
+    const beam = this.getBeamType(event.from, event.to);
+
+    // Beam from completer to report-to
+    this.webview!.postMessage({
+      type: 'jcLiaison',
+      fromMemberId: event.from,
+      toMemberId: event.to,
+      color: beam.color,
+      duration: beam.duration,
+    });
+
+    // Speech bubble on completer
+    const from = this.config.members.find((m) => m.id === event.from);
+    if (from) {
+      const bubble: SpeechBubble = {
+        id: `complete-${Date.now()}`,
+        memberId: event.from,
+        text: event.message.slice(0, 25),
+        department: from.department,
+        timestamp: Date.now(),
+        duration: 2000,
+      };
+      this.webview!.postMessage({ type: 'jcSpeechBubble', bubble });
+    }
+
+    // Set report-to member to reading (reviewing the output)
+    this.webview!.postMessage({
+      type: 'jcMemberStateChange',
+      agentId: -200 - Math.floor(Math.random() * 1000),
+      memberId: event.to,
+      jcState: 'reading',
+    });
+  }
+
+  private handleProgressCheck(event: ProgressCheckEvent): void {
+    const beam = EventWatcher.BEAM_COLORS['progress_check'];
+
+    // Beam from secretary to checked agent
+    this.webview!.postMessage({
+      type: 'jcLiaison',
+      fromMemberId: event.from,
+      toMemberId: event.to,
+      color: beam.color,
+      duration: beam.duration,
+    });
+
+    // Speech bubble on secretary
+    const from = this.config.members.find((m) => m.id === event.from);
+    if (from) {
+      const bubble: SpeechBubble = {
+        id: `progress-${Date.now()}`,
+        memberId: event.from,
+        text: event.message.slice(0, 25),
+        department: from.department,
+        timestamp: Date.now(),
+        duration: 2000,
+      };
+      this.webview!.postMessage({ type: 'jcSpeechBubble', bubble });
+    }
   }
 }

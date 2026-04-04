@@ -282,8 +282,31 @@ export function getTaskWatcher(): TaskWatcher | null {
 /** Get member IDs that should always be present in the office */
 export function getPermanentResidents(): string[] {
   if (!jcConfig) return [];
-  const permanentRoles = ['CEO', 'Secretary', 'PM / Director', 'Research Lead (Owner兼務)'];
+  // v1.2: Secretary is no longer a permanent resident — uses CEO-linked departure instead
+  const permanentRoles = ['CEO', 'PM / Director', 'Research Lead (Owner兼務)'];
   return jcConfig.members.filter((m) => permanentRoles.includes(m.role)).map((m) => m.id);
+}
+
+/** Get the secretary member ID */
+function getSecretaryId(): string | null {
+  if (!jcConfig) return null;
+  const sec = jcConfig.members.find((m) => m.role === 'Secretary');
+  return sec?.id ?? null;
+}
+
+/** Get the CEO member ID */
+function getCeoId(): string | null {
+  if (!jcConfig) return null;
+  const ceo = jcConfig.members.find((m) => m.role === 'CEO');
+  return ceo?.id ?? null;
+}
+
+/** Check if CEO is currently present in the office */
+function isCeoPresent(): boolean {
+  const ceoId = getCeoId();
+  if (!ceoId) return false;
+  const state = memberStates.get(ceoId);
+  return state !== undefined && state !== 'absent' && state !== 'leaving';
 }
 
 /** Send JC config to webview on initialization */
@@ -351,14 +374,40 @@ export function getEventWatcher(): EventWatcher | null {
   return eventWatcher;
 }
 
+/** Secretary progress monitoring interval (2 minutes) */
+const SECRETARY_MONITOR_MS = 2 * 60 * 1000;
+let lastSecretaryMonitor = 0;
+
 /** Check for idle members and trigger departures */
 function checkIdleMembers(webview: vscode.Webview): void {
   if (!jcConfig) return;
   const now = Date.now();
   const permanentIds = new Set(getPermanentResidents());
+  const secretaryId = getSecretaryId();
+  const ceoPresent = isCeoPresent();
 
   for (const [memberId, lastActivity] of memberLastActivity) {
     if (permanentIds.has(memberId)) continue; // Never depart permanent residents
+
+    // v1.2: Secretary CEO-linked departure rule
+    if (memberId === secretaryId) {
+      if (ceoPresent) continue; // Secretary stays while CEO is present
+      // CEO has left — secretary should depart too
+      const secState = memberStates.get(memberId);
+      if (secState && secState !== 'absent' && secState !== 'leaving') {
+        console.log(`[JC] Secretary CEO-linked departure — CEO has left`);
+        memberStates.set(memberId, 'leaving');
+        const agentId = getAgentForMember(memberId);
+        webview.postMessage({
+          type: 'jcMemberLeaving',
+          agentId: agentId ?? -300 - Math.floor(Math.random() * 1000),
+          memberId,
+        });
+        memberLastActivity.delete(memberId);
+      }
+      continue;
+    }
+
     if (now - lastActivity < IDLE_TIMEOUT_MS) continue;
 
     const state = memberStates.get(memberId);
@@ -372,6 +421,48 @@ function checkIdleMembers(webview: vscode.Webview): void {
         memberId,
       });
       memberLastActivity.delete(memberId);
+    }
+  }
+
+  // v1.2: Secretary progress monitoring (every 2 minutes)
+  if (secretaryId && now - lastSecretaryMonitor >= SECRETARY_MONITOR_MS) {
+    lastSecretaryMonitor = now;
+    const secState = memberStates.get(secretaryId);
+    if (secState && secState !== 'absent' && secState !== 'leaving') {
+      secretaryProgressCheck(webview, secretaryId, now);
+    }
+  }
+}
+
+/** Secretary monitors all agents and sends progress check bubbles */
+function secretaryProgressCheck(webview: vscode.Webview, secretaryId: string, now: number): void {
+  if (!jcConfig) return;
+
+  for (const [memberId, lastActivity] of memberLastActivity) {
+    if (memberId === secretaryId) continue;
+    const state = memberStates.get(memberId);
+    if (!state || state === 'absent' || state === 'leaving') continue;
+
+    // Agent idle for > 2 minutes
+    if (state === 'idle' && now - lastActivity > SECRETARY_MONITOR_MS) {
+      eventWatcher?.emitEvent({
+        event: 'progress_check',
+        timestamp: new Date().toISOString(),
+        from: secretaryId,
+        to: memberId,
+        message: '進捗いかがですか？',
+      });
+    }
+
+    // Agent in error for > 1 minute
+    if (state === 'error' && now - lastActivity > 60_000) {
+      eventWatcher?.emitEvent({
+        event: 'progress_check',
+        timestamp: new Date().toISOString(),
+        from: secretaryId,
+        to: memberId,
+        message: '問題ありますか？',
+      });
     }
   }
 }

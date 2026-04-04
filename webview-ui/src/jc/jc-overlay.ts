@@ -667,9 +667,10 @@ function renderLiaisonBeams(
     const y2 = offsetY + (liaison.toRow + 0.5) * s;
 
     const beamColor =
-      liaison.fromZone === 'research'
+      liaison.color ??
+      (liaison.fromZone === 'research'
         ? DEPT_NEON['research'].primary
-        : DEPT_NEON['marketing'].primary;
+        : DEPT_NEON['marketing'].primary);
 
     // Draw beam line with neon glow
     ctx.beginPath();

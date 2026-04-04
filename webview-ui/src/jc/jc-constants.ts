@@ -134,3 +134,19 @@ export const SPEECH_BUBBLE_COLORS: Record<string, string> = {
   research: '#9B59B6',
   exec: '#FFD700',
 };
+
+// ── Delegation Beam Presets (v1.2) ─────────────────────────────
+// Color and duration for delegation chain liaison beams.
+export const DELEGATION_BEAM: Record<string, { color: string; duration: number }> = {
+  secretary_to_ceo: { color: '#ffbf00', duration: 2000 },
+  ceo_to_lead: { color: '#39ff14', duration: 2000 },
+  lead_to_agent: { color: '#00b4ff', duration: 1500 },
+  cross_dept_request: { color: '#bf5fff', duration: 2000 },
+  cross_dept_return: { color: '#bf5fff', duration: 2000 },
+  agent_to_lead: { color: '#00b4ff', duration: 1500 },
+  lead_to_ceo: { color: '#39ff14', duration: 2000 },
+  progress_check: { color: '#666688', duration: 1000 },
+};
+
+// ── Secretary Monitoring Interval ──────────────────────────────
+export const SECRETARY_MONITOR_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
