@@ -40,8 +40,19 @@ export const CharacterState = {
   IDLE: 'idle',
   WALK: 'walk',
   TYPE: 'type',
+  THINK: 'think',
+  ERROR: 'error',
 } as const;
 export type CharacterState = (typeof CharacterState)[keyof typeof CharacterState];
+
+/** Check if character is in a sitting/desk state (TYPE, THINK, or ERROR) */
+export function isSittingState(state: CharacterState): boolean {
+  return (
+    state === CharacterState.TYPE ||
+    state === CharacterState.THINK ||
+    state === CharacterState.ERROR
+  );
+}
 
 export const Direction = {
   DOWN: 0,

@@ -53,6 +53,8 @@ export interface CharacterSprites {
   walk: Record<Direction, [SpriteData, SpriteData, SpriteData, SpriteData]>;
   typing: Record<Direction, [SpriteData, SpriteData]>;
   reading: Record<Direction, [SpriteData, SpriteData]>;
+  thinking: Record<Direction, [SpriteData, SpriteData, SpriteData]>;
+  error: Record<Direction, [SpriteData, SpriteData, SpriteData]>;
 }
 
 const spriteCache = new Map<string, CharacterSprites>();
@@ -73,6 +75,9 @@ function hueShiftSprites(sprites: CharacterSprites, hueShift: number): Character
     shift(arr[0]),
     shift(arr[1]),
   ];
+  const shiftTriple = (
+    arr: [SpriteData, SpriteData, SpriteData],
+  ): [SpriteData, SpriteData, SpriteData] => [shift(arr[0]), shift(arr[1]), shift(arr[2])];
   return {
     walk: {
       [Dir.DOWN]: shiftWalk(sprites.walk[Dir.DOWN]),
@@ -92,6 +97,18 @@ function hueShiftSprites(sprites: CharacterSprites, hueShift: number): Character
       [Dir.RIGHT]: shiftPair(sprites.reading[Dir.RIGHT]),
       [Dir.LEFT]: shiftPair(sprites.reading[Dir.LEFT]),
     } as Record<Direction, [SpriteData, SpriteData]>,
+    thinking: {
+      [Dir.DOWN]: shiftTriple(sprites.thinking[Dir.DOWN]),
+      [Dir.UP]: shiftTriple(sprites.thinking[Dir.UP]),
+      [Dir.RIGHT]: shiftTriple(sprites.thinking[Dir.RIGHT]),
+      [Dir.LEFT]: shiftTriple(sprites.thinking[Dir.LEFT]),
+    } as Record<Direction, [SpriteData, SpriteData, SpriteData]>,
+    error: {
+      [Dir.DOWN]: shiftTriple(sprites.error[Dir.DOWN]),
+      [Dir.UP]: shiftTriple(sprites.error[Dir.UP]),
+      [Dir.RIGHT]: shiftTriple(sprites.error[Dir.RIGHT]),
+      [Dir.LEFT]: shiftTriple(sprites.error[Dir.LEFT]),
+    } as Record<Direction, [SpriteData, SpriteData, SpriteData]>,
   };
 }
 
@@ -118,6 +135,20 @@ export function getCharacterSprites(paletteIndex: number, hueShift = 0): Charact
     const u = char.up;
     const rt = char.right;
     const flip = flipSpriteHorizontal;
+    const e = emptySprite(16, 32);
+
+    // Thinking: Col 7-9 front-facing only (Row 0). Rows 1-2 fallback to standing.
+    const thinkD: [SpriteData, SpriteData, SpriteData] = [d[7] ?? d[1], d[8] ?? d[1], d[9] ?? d[1]];
+    const thinkU: [SpriteData, SpriteData, SpriteData] = [u[7] ?? u[1], u[8] ?? u[1], u[9] ?? u[1]];
+    const thinkR: [SpriteData, SpriteData, SpriteData] = [
+      rt[7] ?? rt[1],
+      rt[8] ?? rt[1],
+      rt[9] ?? rt[1],
+    ];
+
+    // Error: Col 10 — 3 frames stored as Row0/Row1/Row2 (direction-independent).
+    // All directions show the same front-facing error animation.
+    const errFrames: [SpriteData, SpriteData, SpriteData] = [d[10] ?? e, u[10] ?? e, rt[10] ?? e];
 
     sprites = {
       walk: {
@@ -138,12 +169,25 @@ export function getCharacterSprites(paletteIndex: number, hueShift = 0): Charact
         [Dir.RIGHT]: [rt[5], rt[6]],
         [Dir.LEFT]: [flip(rt[5]), flip(rt[6])],
       },
+      thinking: {
+        [Dir.DOWN]: thinkD,
+        [Dir.UP]: thinkU,
+        [Dir.RIGHT]: thinkR,
+        [Dir.LEFT]: [flip(thinkR[0]), flip(thinkR[1]), flip(thinkR[2])],
+      },
+      error: {
+        [Dir.DOWN]: errFrames,
+        [Dir.UP]: errFrames,
+        [Dir.RIGHT]: errFrames,
+        [Dir.LEFT]: errFrames,
+      },
     };
   } else {
     // Fallback: return transparent placeholder sprites (16×32)
     const e = emptySprite(16, 32);
     const walkSet: [SpriteData, SpriteData, SpriteData, SpriteData] = [e, e, e, e];
     const pairSet: [SpriteData, SpriteData] = [e, e];
+    const tripleSet: [SpriteData, SpriteData, SpriteData] = [e, e, e];
     sprites = {
       walk: {
         [Dir.DOWN]: walkSet,
@@ -162,6 +206,18 @@ export function getCharacterSprites(paletteIndex: number, hueShift = 0): Charact
         [Dir.UP]: pairSet,
         [Dir.RIGHT]: pairSet,
         [Dir.LEFT]: pairSet,
+      },
+      thinking: {
+        [Dir.DOWN]: tripleSet,
+        [Dir.UP]: tripleSet,
+        [Dir.RIGHT]: tripleSet,
+        [Dir.LEFT]: tripleSet,
+      },
+      error: {
+        [Dir.DOWN]: tripleSet,
+        [Dir.UP]: tripleSet,
+        [Dir.RIGHT]: tripleSet,
+        [Dir.LEFT]: tripleSet,
       },
     };
   }

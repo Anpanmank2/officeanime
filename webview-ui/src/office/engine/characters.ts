@@ -1,7 +1,9 @@
 import {
+  ERROR_FRAME_DURATION_SEC,
   READ_FRAME_DURATION_SEC,
   SEAT_REST_MAX_SEC,
   SEAT_REST_MIN_SEC,
+  THINK_FRAME_DURATION_SEC,
   TYPE_FRAME_DURATION_SEC,
   WALK_FRAME_DURATION_SEC,
   WALK_SPEED_PX_PER_SEC,
@@ -18,9 +20,23 @@ import { CharacterState, Direction, TILE_SIZE } from '../types.js';
 /** Tools that show reading animation instead of typing */
 const READING_TOOLS = new Set(['Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch']);
 
+/** Tools that show thinking animation */
+const THINKING_TOOLS = new Set(['Task', 'Agent', 'EnterPlanMode']);
+
 export function isReadingTool(tool: string | null): boolean {
   if (!tool) return false;
   return READING_TOOLS.has(tool);
+}
+
+export function isThinkingTool(tool: string | null): boolean {
+  if (!tool) return false;
+  return THINKING_TOOLS.has(tool);
+}
+
+/** Pick the correct desk CharacterState for the active tool */
+export function deskStateForTool(tool: string | null): CharacterState {
+  if (isThinkingTool(tool)) return CharacterState.THINK;
+  return CharacterState.TYPE;
 }
 
 /** Pixel center of a tile */
@@ -106,6 +122,13 @@ export function updateCharacter(
         ch.frameTimer -= frameDur;
         ch.frame = (ch.frame + 1) % 2;
       }
+      // If tool changed to thinking, switch state
+      if (ch.isActive && isThinkingTool(ch.currentTool)) {
+        ch.state = CharacterState.THINK;
+        ch.frame = 0;
+        ch.frameTimer = 0;
+        break;
+      }
       // If no longer active, stand up and start wandering (after seatTimer expires)
       if (!ch.isActive) {
         if (ch.seatTimer > 0) {
@@ -113,6 +136,54 @@ export function updateCharacter(
           break;
         }
         ch.seatTimer = 0; // clear sentinel
+        ch.state = CharacterState.IDLE;
+        ch.frame = 0;
+        ch.frameTimer = 0;
+        ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC);
+        ch.wanderCount = 0;
+        ch.wanderLimit = randomInt(WANDER_MOVES_BEFORE_REST_MIN, WANDER_MOVES_BEFORE_REST_MAX);
+      }
+      break;
+    }
+
+    case CharacterState.THINK: {
+      if (ch.frameTimer >= THINK_FRAME_DURATION_SEC) {
+        ch.frameTimer -= THINK_FRAME_DURATION_SEC;
+        ch.frame = (ch.frame + 1) % 3;
+      }
+      // If tool changed away from thinking, switch back to TYPE
+      if (ch.isActive && !isThinkingTool(ch.currentTool)) {
+        ch.state = CharacterState.TYPE;
+        ch.frame = 0;
+        ch.frameTimer = 0;
+        break;
+      }
+      // If no longer active, stand up
+      if (!ch.isActive) {
+        ch.state = CharacterState.IDLE;
+        ch.frame = 0;
+        ch.frameTimer = 0;
+        ch.wanderTimer = randomRange(WANDER_PAUSE_MIN_SEC, WANDER_PAUSE_MAX_SEC);
+        ch.wanderCount = 0;
+        ch.wanderLimit = randomInt(WANDER_MOVES_BEFORE_REST_MIN, WANDER_MOVES_BEFORE_REST_MAX);
+      }
+      break;
+    }
+
+    case CharacterState.ERROR: {
+      if (ch.frameTimer >= ERROR_FRAME_DURATION_SEC) {
+        ch.frameTimer -= ERROR_FRAME_DURATION_SEC;
+        ch.frame = (ch.frame + 1) % 3;
+      }
+      // If becomes active again (error cleared), return to appropriate desk state
+      if (ch.isActive && ch.currentTool) {
+        ch.state = deskStateForTool(ch.currentTool);
+        ch.frame = 0;
+        ch.frameTimer = 0;
+        break;
+      }
+      // If no longer active, go idle
+      if (!ch.isActive) {
         ch.state = CharacterState.IDLE;
         ch.frame = 0;
         ch.frameTimer = 0;
@@ -226,12 +297,12 @@ export function updateCharacter(
 
         if (ch.isActive) {
           if (!ch.seatId) {
-            // No seat — type in place
-            ch.state = CharacterState.TYPE;
+            // No seat — work in place
+            ch.state = deskStateForTool(ch.currentTool);
           } else {
             const seat = seats.get(ch.seatId);
             if (seat && ch.tileCol === seat.seatCol && ch.tileRow === seat.seatRow) {
-              ch.state = CharacterState.TYPE;
+              ch.state = deskStateForTool(ch.currentTool);
               ch.dir = seat.facingDir;
             } else {
               ch.state = CharacterState.IDLE;
@@ -325,6 +396,10 @@ export function getCharacterSprite(ch: Character, sprites: CharacterSprites): Sp
         return sprites.reading[ch.dir][ch.frame % 2];
       }
       return sprites.typing[ch.dir][ch.frame % 2];
+    case CharacterState.THINK:
+      return sprites.thinking[ch.dir][ch.frame % 3];
+    case CharacterState.ERROR:
+      return sprites.error[ch.dir][ch.frame % 3];
     case CharacterState.WALK:
       return sprites.walk[ch.dir][ch.frame % 4];
     case CharacterState.IDLE:

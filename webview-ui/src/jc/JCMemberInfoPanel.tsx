@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { CHARACTER_SITTING_OFFSET_PX } from '../constants.js';
 import type { OfficeState } from '../office/engine/officeState.js';
-import { CharacterState, TILE_SIZE } from '../office/types.js';
+import { isSittingState, TILE_SIZE } from '../office/types.js';
 import { vscode } from '../vscodeApi.js';
 import { DEPT_COLORS, DEPT_LABELS, STATE_COLORS, STATE_LABELS } from './jc-constants.js';
 import { jcGetActivitySummary, jcGetMemberInfo, jcGetMemberTaskStatus } from './jc-state.js';
@@ -59,7 +59,7 @@ export function JCMemberInfoPanel({
   const mapH = layout.rows * TILE_SIZE * zoom;
   const deviceOffsetX = Math.floor((canvasW - mapW) / 2) + Math.round(panRef.current.x);
   const deviceOffsetY = Math.floor((canvasH - mapH) / 2) + Math.round(panRef.current.y);
-  const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0;
+  const sittingOffset = isSittingState(ch.state) ? CHARACTER_SITTING_OFFSET_PX : 0;
   const screenX = (deviceOffsetX + ch.x * zoom) / dpr;
   const screenY = (deviceOffsetY + (ch.y + sittingOffset + 16) * zoom) / dpr;
 

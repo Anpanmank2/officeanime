@@ -27,7 +27,12 @@ import { buildDynamicCatalog } from '../office/layout/furnitureCatalog.js';
 import { migrateLayoutColors } from '../office/layout/layoutSerializer.js';
 import { setCharacterTemplates } from '../office/sprites/spriteData.js';
 import { extractToolName } from '../office/toolUtils.js';
-import { type OfficeLayout, TILE_SIZE, type ToolActivity } from '../office/types.js';
+import {
+  CharacterState,
+  type OfficeLayout,
+  TILE_SIZE,
+  type ToolActivity,
+} from '../office/types.js';
 import { setWallSprites } from '../office/wallTiles.js';
 import { vscode } from '../vscodeApi.js';
 
@@ -664,7 +669,7 @@ export function useExtensionMessages(
             ch.isActive = true;
             os.sendToSeat(agentId);
           } else if (jcState === 'thinking') {
-            ch.currentTool = null;
+            ch.currentTool = 'Task'; // triggers thinking animation
             ch.isActive = true;
             os.sendToSeat(agentId);
           } else if (jcState === 'idle') {
@@ -672,7 +677,10 @@ export function useExtensionMessages(
             ch.isActive = false; // will trigger idle wander
           } else if (jcState === 'error') {
             ch.currentTool = null;
-            ch.isActive = true;
+            ch.isActive = false; // keep at desk but show error animation
+            ch.state = CharacterState.ERROR;
+            ch.frame = 0;
+            ch.frameTimer = 0;
             os.sendToSeat(agentId);
           } else if (jcState === 'break') {
             ch.currentTool = null;

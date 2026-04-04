@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import type { SubagentCharacter } from '../hooks/useExtensionMessages.js';
 import type { OfficeState } from '../office/engine/officeState.js';
-import { CharacterState, TILE_SIZE } from '../office/types.js';
+import { isSittingState, TILE_SIZE } from '../office/types.js';
 
 interface AgentLabelsProps {
   officeState: OfficeState;
@@ -63,7 +63,7 @@ export function AgentLabels({
         if (!ch) return null;
 
         // Character position: device pixels → CSS pixels (follow sitting offset)
-        const sittingOffset = ch.state === CharacterState.TYPE ? 6 : 0;
+        const sittingOffset = isSittingState(ch.state) ? 6 : 0;
         const screenX = (deviceOffsetX + ch.x * zoom) / dpr;
         const screenY = (deviceOffsetY + (ch.y + sittingOffset - 24) * zoom) / dpr;
 

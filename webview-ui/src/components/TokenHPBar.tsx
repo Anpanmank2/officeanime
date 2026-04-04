@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { CHARACTER_SITTING_OFFSET_PX } from '../constants.js';
 import type { TokenUsage } from '../hooks/useExtensionMessages.js';
 import type { OfficeState } from '../office/engine/officeState.js';
-import { CharacterState, TILE_SIZE } from '../office/types.js';
+import { isSittingState, TILE_SIZE } from '../office/types.js';
 
 /** Default max tokens per session (can be overridden via settings) */
 const DEFAULT_MAX_TOKENS = 100_000;
@@ -89,7 +89,7 @@ export function TokenHPBar({
         const barBgColor = getBarBgColor(ratio);
 
         // Position above character (higher than ToolOverlay)
-        const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0;
+        const sittingOffset = isSittingState(ch.state) ? CHARACTER_SITTING_OFFSET_PX : 0;
         const screenX = (deviceOffsetX + ch.x * zoom) / dpr;
         const screenY = (deviceOffsetY + (ch.y + sittingOffset - 40) * zoom) / dpr;
 

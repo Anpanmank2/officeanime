@@ -15,5 +15,5 @@ export const FLOOR_TILE_SIZE = 16;
 export const CHARACTER_DIRECTIONS = ['down', 'up', 'right'] as const;
 export const CHAR_FRAME_W = 16;
 export const CHAR_FRAME_H = 32;
-export const CHAR_FRAMES_PER_ROW = 7;
+export const CHAR_FRAMES_PER_ROW = 11;
 export const CHAR_COUNT = 6;

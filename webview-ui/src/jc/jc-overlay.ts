@@ -5,7 +5,7 @@
 // v2: Neon startup aesthetic — "who, where, what" management dashboard
 
 import type { Character } from '../office/types.js';
-import { CharacterState, TILE_SIZE } from '../office/types.js';
+import { isSittingState, TILE_SIZE } from '../office/types.js';
 import {
   BUBBLE_EMOJIS,
   DEPT_LABELS,
@@ -892,7 +892,7 @@ function renderJCCharacterBubbles(
     const runtime = jcGetMemberRuntime(memberId);
     if (!runtime || !runtime.bubbleType) continue;
 
-    const sittingOff = ch.state === CharacterState.TYPE ? -4 : 0;
+    const sittingOff = isSittingState(ch.state) ? -4 : 0;
     const screenX = offsetX + ch.x * zoom;
     const screenY = offsetY + (ch.y + sittingOff) * zoom;
 
@@ -930,7 +930,7 @@ function renderActivityBubbles(
     const summary = jcGetActivitySummary(memberId);
     if (!summary) continue;
 
-    const sittingOff = ch.state === CharacterState.TYPE ? -4 : 0;
+    const sittingOff = isSittingState(ch.state) ? -4 : 0;
     const screenX = offsetX + ch.x * zoom;
     const screenY = offsetY + (ch.y + sittingOff) * zoom + BUBBLE_OFFSET_Y;
 
@@ -1003,7 +1003,7 @@ function renderSpeechBubbles(
       if (ch.isSubagent) continue;
       const memberId = jcGetMemberForAgent(ch.id);
       if (memberId === bubble.memberId) {
-        const sittingOff = ch.state === CharacterState.TYPE ? -4 : 0;
+        const sittingOff = isSittingState(ch.state) ? -4 : 0;
         charX = offsetX + ch.x * zoom;
         charY = offsetY + (ch.y + sittingOff) * zoom;
         break;
