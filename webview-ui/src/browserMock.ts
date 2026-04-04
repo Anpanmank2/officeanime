@@ -280,6 +280,11 @@ export function dispatchMockMessages(): void {
     window.dispatchEvent(new MessageEvent('message', { data }));
   }
 
+  // JC config must load BEFORE layoutLoaded (so member data is available for arrivals)
+  if (jcConfigData?.members) {
+    dispatch({ type: 'jcConfigLoaded', config: jcConfigData });
+  }
+
   // Must match the load order defined in CLAUDE.md:
   // characterSpritesLoaded → floorTilesLoaded → wallTilesLoaded → furnitureAssetsLoaded → layoutLoaded
   dispatch({ type: 'characterSpritesLoaded', characters });
@@ -294,26 +299,28 @@ export function dispatchMockMessages(): void {
     lastSeenVersion: '1.1',
   });
 
-  // Spawn permanent residents synchronously (same context as layoutLoaded)
-  if (jcConfigData?.members) {
-    dispatch({ type: 'jcConfigLoaded', config: jcConfigData });
-    const permanentRoles = ['CEO', 'Secretary', 'PM / Director', 'Research Lead (Owner兼務)'];
-    const residents = jcConfigData.members.filter((m) => permanentRoles.includes(m.role));
-    residents.forEach((member, idx) => {
-      dispatch({
-        type: 'jcMemberArriving',
-        agentId: -100 - idx,
-        memberId: member.id,
-        deskId: member.deskId,
-        seatUid: member.deskId,
-        hueShift: member.hueShift,
-        palette: member.palette ?? 0,
-      });
-    });
-    console.log(`[BrowserMock] ${residents.length} permanent residents dispatched`);
-  }
-
   console.log('[BrowserMock] Messages dispatched');
+
+  // Spawn permanent residents AFTER layoutLoaded has been processed.
+  // Use setTimeout to ensure layoutReadyRef is true before arrivals are dispatched.
+  if (jcConfigData?.members) {
+    setTimeout(() => {
+      const permanentRoles = ['CEO', 'Secretary', 'PM / Director', 'Research Lead (Owner兼務)'];
+      const residents = jcConfigData!.members!.filter((m) => permanentRoles.includes(m.role));
+      residents.forEach((member, idx) => {
+        dispatch({
+          type: 'jcMemberArriving',
+          agentId: -100 - idx,
+          memberId: member.id,
+          deskId: member.deskId,
+          seatUid: member.deskId,
+          hueShift: member.hueShift,
+          palette: member.palette ?? 0,
+        });
+      });
+      console.log(`[BrowserMock] ${residents.length} permanent residents dispatched`);
+    }, 100);
+  }
 
   // Start event listening — prefer HMR push, fall back to polling
   startEventListening();

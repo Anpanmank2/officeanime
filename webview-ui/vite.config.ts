@@ -74,8 +74,26 @@ function browserMockAssetsPlugin(): Plugin {
         res.end(JSON.stringify(cache.furniture));
       });
 
-      // jc-events.json endpoint (serves from workspace root for browser-side event polling)
+      // Serve files from workspace root (jc-config.json, jc-events.json)
       const workspaceRoot = path.resolve(__dirname, '..');
+
+      // jc-config.json — required for JC member data in browser mode
+      server.middlewares.use(`${base}/jc-config.json`, (_req, res) => {
+        const configPath = path.join(workspaceRoot, 'jc-config.json');
+        try {
+          if (fs.existsSync(configPath)) {
+            const raw = fs.readFileSync(configPath, 'utf-8');
+            res.setHeader('Content-Type', 'application/json');
+            res.end(raw);
+          } else {
+            res.statusCode = 404;
+            res.end('{}');
+          }
+        } catch {
+          res.statusCode = 500;
+          res.end('{}');
+        }
+      });
       server.middlewares.use(`${base}/jc-events.json`, (_req, res) => {
         const eventsPath = path.join(workspaceRoot, 'jc-events.json');
         try {
