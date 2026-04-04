@@ -1,1 +1,37 @@
 npm run compile
+
+# ── Quality Gate (auto-enforced) ──────────────────────────────
+# Ref: .company/engineering/knowledge/2026-04-03-pixel-agents-quality-gate.md
+# These tests BLOCK push if they fail. No bypass.
+
+echo "🔒 Running quality gate tests..."
+
+# 1. Sprite decode verification (176×96, 11 frames, thinking/error non-empty)
+node scripts/test-sprite-decode.mjs
+if [ $? -ne 0 ]; then
+  echo "❌ BLOCKED: Sprite decode test failed"
+  exit 1
+fi
+
+# 2. State machine verification (toolToJCState + transitions)
+node scripts/test-state-machine.mjs
+if [ $? -ne 0 ]; then
+  echo "❌ BLOCKED: State machine test failed"
+  exit 1
+fi
+
+# 3. jc-events verification (event types + parsing)
+node scripts/test-jc-events.mjs
+if [ $? -ne 0 ]; then
+  echo "❌ BLOCKED: jc-events test failed"
+  exit 1
+fi
+
+# 4. Playwright E2E: browser loads, permanent residents appear
+node scripts/test-e2e-browser.mjs
+if [ $? -ne 0 ]; then
+  echo "❌ BLOCKED: Browser E2E test failed — characters not visible"
+  exit 1
+fi
+
+echo "✅ Quality gate passed"

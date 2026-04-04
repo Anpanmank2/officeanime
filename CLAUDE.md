@@ -178,6 +178,23 @@ npm install && cd webview-ui && npm install && cd .. && npm run build
 ```
 Build: type-check → lint → esbuild (extension) → vite (webview). F5 for Extension Dev Host.
 
+## Quality Gate (pre-push自動実行)
+
+**push前に以下が自動実行される。Failしたらpushブロック。**
+
+```sh
+node scripts/test-sprite-decode.mjs   # スプライト176×96、11フレーム、thinking/error非空
+node scripts/test-state-machine.mjs   # toolToJCState + canTransition全パターン
+node scripts/test-jc-events.mjs       # イベント型パース + ロバストネス
+node scripts/test-e2e-browser.mjs     # Playwright: ブラウザ起動 → キャラ出勤 → イベント受信
+```
+
+**変更時の必須確認（ナレッジ参照義務）:**
+- `.company/engineering/knowledge/2026-04-03-pixel-agents-quality-gate.md` を Read すること
+- `.company/engineering/knowledge/2026-04-03-pixel-office-verification-failure.md` を Read すること
+- ビルド成功 ≠ 動作確認。**Playwrightスクリーンショットで目視確認**するまで「完了」としない
+- 「環境制約で未実施」は完了報告として認められない。手段がなければ作る
+
 ## TypeScript Constraints
 
 - No `enum` (`erasableSyntaxOnly`) — use `as const` objects
