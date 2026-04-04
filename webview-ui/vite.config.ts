@@ -74,6 +74,25 @@ function browserMockAssetsPlugin(): Plugin {
         res.end(JSON.stringify(cache.furniture));
       });
 
+      // jc-events.json endpoint (serves from workspace root for browser-side event polling)
+      const workspaceRoot = path.resolve(__dirname, '..');
+      server.middlewares.use(`${base}/jc-events.json`, (_req, res) => {
+        const eventsPath = path.join(workspaceRoot, 'jc-events.json');
+        try {
+          if (fs.existsSync(eventsPath)) {
+            const raw = fs.readFileSync(eventsPath, 'utf-8');
+            res.setHeader('Content-Type', 'application/json');
+            res.end(raw);
+          } else {
+            res.setHeader('Content-Type', 'application/json');
+            res.end('{"version":1,"events":[]}');
+          }
+        } catch {
+          res.setHeader('Content-Type', 'application/json');
+          res.end('{"version":1,"events":[]}');
+        }
+      });
+
       // Hot-reload on asset file changes (PNGs, manifests, layouts)
       server.watcher.add(assetsDir);
       server.watcher.on('change', (file) => {
@@ -83,6 +102,77 @@ function browserMockAssetsPlugin(): Plugin {
           server.ws.send({ type: 'full-reload' });
         }
       });
+
+      // ── jc-events.json HMR push ─────────────────────────────────────────
+      // Watch jc-events.json and push new events to the browser via HMR
+      // custom event, so characters react in real-time without polling.
+      const eventsPath = path.join(workspaceRoot, 'jc-events.json');
+      let lastPushedIndex = 0;
+
+      function readAndPushNewEvents(): void {
+        try {
+          if (!fs.existsSync(eventsPath)) return;
+          const raw = fs.readFileSync(eventsPath, 'utf-8');
+          const file = JSON.parse(raw) as { version: number; events: unknown[] };
+          if (!file.events || !Array.isArray(file.events)) return;
+
+          // Reset if file was rewritten with fewer events
+          if (file.events.length < lastPushedIndex) {
+            console.log(
+              `[jc-events-hmr] File rewritten (${lastPushedIndex} → ${file.events.length}), resetting`,
+            );
+            lastPushedIndex = 0;
+          }
+
+          if (file.events.length <= lastPushedIndex) return;
+
+          const newEvents = file.events.slice(lastPushedIndex);
+          lastPushedIndex = file.events.length;
+
+          console.log(`[jc-events-hmr] Pushing ${newEvents.length} new event(s) to browser`);
+          server.ws.send({
+            type: 'custom',
+            event: 'jc-events-update',
+            data: { events: newEvents },
+          });
+        } catch {
+          // File mid-write or invalid JSON — skip this cycle
+        }
+      }
+
+      // Initialize index from current file content (don't replay old events)
+      try {
+        if (fs.existsSync(eventsPath)) {
+          const raw = fs.readFileSync(eventsPath, 'utf-8');
+          const file = JSON.parse(raw) as { version: number; events: unknown[] };
+          if (file.events && Array.isArray(file.events)) {
+            lastPushedIndex = file.events.length;
+            console.log(`[jc-events-hmr] Initialized at index ${lastPushedIndex}`);
+          }
+        }
+      } catch {
+        // File doesn't exist yet — will start from 0
+      }
+
+      // Use fs.watch with debounce for rapid writes
+      let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+      try {
+        fs.watch(eventsPath, () => {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(readAndPushNewEvents, 100);
+        });
+        console.log(`[jc-events-hmr] Watching ${eventsPath}`);
+      } catch {
+        // File doesn't exist yet — watch the directory for creation
+        const dirPath = path.dirname(eventsPath);
+        fs.watch(dirPath, (_eventType, filename) => {
+          if (filename === 'jc-events.json') {
+            if (debounceTimer) clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(readAndPushNewEvents, 100);
+          }
+        });
+        console.log(`[jc-events-hmr] Watching directory ${dirPath} for jc-events.json creation`);
+      }
     },
     // Build output includes lightweight metadata consumed by browser runtime.
     closeBundle() {

@@ -191,6 +191,7 @@ let jcConfigData: {
   members?: Array<{
     id: string;
     role: string;
+    department?: string;
     hueShift: number;
     palette?: number;
     deskId: string;
@@ -313,4 +314,350 @@ export function dispatchMockMessages(): void {
   }
 
   console.log('[BrowserMock] Messages dispatched');
+
+  // Start event listening — prefer HMR push, fall back to polling
+  startEventListening();
+}
+
+// ── jc-events listening (HMR push primary, polling fallback) ────────────────
+
+const EVENT_POLL_MS = 3000;
+let lastEventIndex = 0;
+let hmrConnected = false;
+
+interface JCEventsFile {
+  version: number;
+  events: Array<Record<string, unknown>>;
+}
+
+function startEventListening(): void {
+  // Primary: HMR custom event from Vite server (real-time, no polling)
+  if (import.meta.hot) {
+    import.meta.hot.on('jc-events-update', (data: { events: Record<string, unknown>[] }) => {
+      if (!hmrConnected) {
+        hmrConnected = true;
+        console.log('[BrowserMock] HMR event channel connected');
+      }
+      if (data.events && Array.isArray(data.events)) {
+        console.log(`[BrowserMock] HMR push: ${data.events.length} event(s)`);
+        for (const event of data.events) {
+          handleBrowserEvent(event);
+        }
+      }
+    });
+    console.log('[BrowserMock] HMR event listener registered');
+  }
+
+  // Fallback: polling for production builds or when HMR is unavailable
+  if (!import.meta.hot) {
+    startEventPolling();
+  } else {
+    // Even with HMR, start polling after a delay as safety net
+    // (in case HMR connection drops)
+    setTimeout(() => {
+      if (!hmrConnected) {
+        console.log('[BrowserMock] HMR not delivering events, starting polling fallback');
+        startEventPolling();
+      }
+    }, 5000);
+  }
+}
+
+function startEventPolling(): void {
+  setInterval(async () => {
+    try {
+      const res = await fetch(`${import.meta.env.BASE_URL}jc-events.json?t=${Date.now()}`);
+      if (!res.ok) return;
+      const file = (await res.json()) as JCEventsFile;
+      if (!file.events) return;
+
+      // Reset index if file was rewritten with fewer events
+      if (file.events.length < lastEventIndex) {
+        console.log(
+          `[BrowserMock] Events file rewritten (${lastEventIndex} → ${file.events.length}), resetting`,
+        );
+        lastEventIndex = 0;
+      }
+
+      if (file.events.length <= lastEventIndex) return;
+
+      const newEvents = file.events.slice(lastEventIndex);
+      lastEventIndex = file.events.length;
+
+      for (const event of newEvents) {
+        handleBrowserEvent(event);
+      }
+    } catch {
+      // File not available or mid-write
+    }
+  }, EVENT_POLL_MS);
+  console.log(`[BrowserMock] Event polling started (${EVENT_POLL_MS}ms interval)`);
+}
+
+function dispatch(data: unknown): void {
+  window.dispatchEvent(new MessageEvent('message', { data }));
+}
+
+function findMember(id: string) {
+  return jcConfigData?.members?.find((m) => m.id === id);
+}
+
+function handleBrowserEvent(event: Record<string, unknown>): void {
+  const type = event.event as string;
+  console.log(`[BrowserMock] Event: ${type}`, event);
+
+  switch (type) {
+    case 'agent_leave': {
+      const memberId = event.agent as string;
+      dispatch({ type: 'jcMemberLeaving', agentId: -200 - Math.random() * 1000, memberId });
+      break;
+    }
+
+    case 'task_received': {
+      // CEO gets speech bubble
+      const ceo = jcConfigData?.members?.find((m) => m.role === 'CEO');
+      if (ceo) {
+        dispatch({
+          type: 'jcSpeechBubble',
+          bubble: {
+            id: `recv-${Date.now()}`,
+            memberId: ceo.id,
+            text: `受領: ${(event.task as string)?.slice(0, 20) ?? ''}`,
+            department: 'exec',
+            timestamp: Date.now(),
+            duration: 3000,
+          },
+        });
+      }
+      break;
+    }
+
+    case 'task_assigned': {
+      const toIds = event.to as string[];
+      for (const memberId of toIds) {
+        const member = findMember(memberId);
+        if (member) {
+          dispatch({
+            type: 'jcMemberArriving',
+            agentId: -200 - Math.floor(Math.random() * 1000),
+            memberId,
+            deskId: member.deskId,
+            seatUid: member.deskId,
+            hueShift: member.hueShift,
+            palette: member.palette ?? 0,
+          });
+        }
+      }
+      // Speech bubble on assigner
+      const fromId = event.from as string;
+      const from = findMember(fromId);
+      if (from) {
+        dispatch({
+          type: 'jcSpeechBubble',
+          bubble: {
+            id: `assign-${Date.now()}`,
+            memberId: fromId,
+            text: `${(event.task as string)?.slice(0, 15) ?? ''}をお願い`,
+            department: from.department ?? 'exec',
+            timestamp: Date.now(),
+            duration: 3000,
+          },
+        });
+      }
+      break;
+    }
+
+    case 'role_escalate': {
+      // Arrive target, beam, speech bubble
+      const toId = event.to as string;
+      const toMember = findMember(toId);
+      if (toMember) {
+        dispatch({
+          type: 'jcMemberArriving',
+          agentId: -200 - Math.floor(Math.random() * 1000),
+          memberId: toId,
+          deskId: toMember.deskId,
+          seatUid: toMember.deskId,
+          hueShift: toMember.hueShift,
+          palette: toMember.palette ?? 0,
+        });
+      }
+      dispatch({
+        type: 'jcLiaison',
+        fromMemberId: event.from as string,
+        toMemberId: toId,
+        color: '#ffbf00',
+        duration: 2000,
+      });
+      const fromMember = findMember(event.from as string);
+      if (fromMember) {
+        dispatch({
+          type: 'jcSpeechBubble',
+          bubble: {
+            id: `escalate-${Date.now()}`,
+            memberId: event.from as string,
+            text: ((event.message as string) ?? '').slice(0, 25),
+            department: fromMember.department ?? 'exec',
+            timestamp: Date.now(),
+            duration: 3000,
+          },
+        });
+      }
+      break;
+    }
+
+    case 'delegate': {
+      const delegatees = event.to as string[];
+      for (const memberId of delegatees) {
+        const member = findMember(memberId);
+        if (member) {
+          dispatch({
+            type: 'jcMemberArriving',
+            agentId: -200 - Math.floor(Math.random() * 1000),
+            memberId,
+            deskId: member.deskId,
+            seatUid: member.deskId,
+            hueShift: member.hueShift,
+            palette: member.palette ?? 0,
+          });
+          dispatch({
+            type: 'jcLiaison',
+            fromMemberId: event.from as string,
+            toMemberId: memberId,
+            color: '#39ff14',
+            duration: 2000,
+          });
+        }
+      }
+      const delFrom = findMember(event.from as string);
+      if (delFrom) {
+        dispatch({
+          type: 'jcSpeechBubble',
+          bubble: {
+            id: `delegate-${Date.now()}`,
+            memberId: event.from as string,
+            text: ((event.message as string) ?? '').slice(0, 25),
+            department: delFrom.department ?? 'exec',
+            timestamp: Date.now(),
+            duration: 3000,
+          },
+        });
+      }
+      break;
+    }
+
+    case 'delegation_complete': {
+      dispatch({
+        type: 'jcLiaison',
+        fromMemberId: event.from as string,
+        toMemberId: event.to as string,
+        color: '#00b4ff',
+        duration: 1500,
+      });
+      const compFrom = findMember(event.from as string);
+      if (compFrom) {
+        dispatch({
+          type: 'jcSpeechBubble',
+          bubble: {
+            id: `complete-${Date.now()}`,
+            memberId: event.from as string,
+            text: ((event.message as string) ?? '').slice(0, 25),
+            department: compFrom.department ?? 'exec',
+            timestamp: Date.now(),
+            duration: 2000,
+          },
+        });
+      }
+      break;
+    }
+
+    case 'work_started': {
+      const agentId = event.agent as string;
+      dispatch({
+        type: 'jcMemberStateChange',
+        agentId: -200 - Math.floor(Math.random() * 1000),
+        memberId: agentId,
+        jcState: 'coding',
+      });
+      break;
+    }
+
+    case 'cross_dept_message': {
+      dispatch({
+        type: 'jcLiaison',
+        fromMemberId: event.from as string,
+        toMemberId: event.to as string,
+        color: '#bf5fff',
+        duration: 2000,
+      });
+      const msgFrom = findMember(event.from as string);
+      if (msgFrom) {
+        dispatch({
+          type: 'jcSpeechBubble',
+          bubble: {
+            id: `msg-${Date.now()}`,
+            memberId: event.from as string,
+            text: ((event.message as string) ?? '').slice(0, 25),
+            department: msgFrom.department ?? 'exec',
+            timestamp: Date.now(),
+            duration: 3000,
+          },
+        });
+      }
+      break;
+    }
+
+    case 'task_completed': {
+      const doneAgent = event.agent as string;
+      const doneMember = findMember(doneAgent);
+      if (doneMember) {
+        dispatch({
+          type: 'jcSpeechBubble',
+          bubble: {
+            id: `done-${Date.now()}`,
+            memberId: doneAgent,
+            text: '完了しました！',
+            department: doneMember.department ?? 'exec',
+            timestamp: Date.now(),
+            duration: 3000,
+          },
+        });
+      }
+      dispatch({
+        type: 'jcMemberStateChange',
+        agentId: -200 - Math.floor(Math.random() * 1000),
+        memberId: doneAgent,
+        jcState: 'idle',
+      });
+      break;
+    }
+
+    case 'progress_check': {
+      dispatch({
+        type: 'jcLiaison',
+        fromMemberId: event.from as string,
+        toMemberId: event.to as string,
+        color: '#666688',
+        duration: 1000,
+      });
+      const secFrom = findMember(event.from as string);
+      if (secFrom) {
+        dispatch({
+          type: 'jcSpeechBubble',
+          bubble: {
+            id: `progress-${Date.now()}`,
+            memberId: event.from as string,
+            text: ((event.message as string) ?? '').slice(0, 25),
+            department: secFrom.department ?? 'exec',
+            timestamp: Date.now(),
+            duration: 2000,
+          },
+        });
+      }
+      break;
+    }
+
+    default:
+      console.log(`[BrowserMock] Unknown event type: ${type}`);
+  }
 }
