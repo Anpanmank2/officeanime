@@ -2,26 +2,26 @@
 
 import { JCState } from './types.js';
 
-/** Valid state transitions */
+/**
+ * Valid state transitions — v1 scope (8 core states).
+ * v2 states (break, meeting, handoff, reviewing, presenting) are defined
+ * in JCState but have no valid transitions until v2 implementation.
+ */
 const TRANSITIONS: Record<JCState, readonly JCState[]> = {
+  // ── v1 core states ──
   [JCState.ABSENT]: [JCState.ARRIVING],
   [JCState.ARRIVING]: [JCState.CODING, JCState.THINKING, JCState.READING, JCState.IDLE],
   [JCState.CODING]: [
     JCState.THINKING,
     JCState.READING,
-    JCState.REVIEWING,
     JCState.IDLE,
-    JCState.BREAK,
     JCState.ERROR,
-    JCState.MEETING,
-    JCState.HANDOFF,
     JCState.LEAVING,
   ],
   [JCState.THINKING]: [
     JCState.CODING,
     JCState.READING,
     JCState.IDLE,
-    JCState.BREAK,
     JCState.ERROR,
     JCState.LEAVING,
   ],
@@ -29,32 +29,18 @@ const TRANSITIONS: Record<JCState, readonly JCState[]> = {
     JCState.CODING,
     JCState.THINKING,
     JCState.IDLE,
-    JCState.BREAK,
     JCState.ERROR,
     JCState.LEAVING,
   ],
-  [JCState.REVIEWING]: [JCState.CODING, JCState.IDLE, JCState.LEAVING],
-  [JCState.PRESENTING]: [JCState.IDLE, JCState.LEAVING],
-  [JCState.MEETING]: [JCState.CODING, JCState.IDLE, JCState.LEAVING],
-  [JCState.BREAK]: [
-    JCState.CODING,
-    JCState.THINKING,
-    JCState.READING,
-    JCState.IDLE,
-    JCState.LEAVING,
-  ],
   [JCState.ERROR]: [JCState.CODING, JCState.IDLE, JCState.LEAVING],
-  [JCState.IDLE]: [
-    JCState.CODING,
-    JCState.THINKING,
-    JCState.READING,
-    JCState.BREAK,
-    JCState.MEETING,
-    JCState.HANDOFF,
-    JCState.LEAVING,
-  ],
-  [JCState.HANDOFF]: [JCState.MEETING, JCState.IDLE, JCState.LEAVING],
+  [JCState.IDLE]: [JCState.CODING, JCState.THINKING, JCState.READING, JCState.LEAVING],
   [JCState.LEAVING]: [JCState.ABSENT],
+  // ── v2 states (no transitions until v2) ──
+  [JCState.REVIEWING]: [],
+  [JCState.PRESENTING]: [],
+  [JCState.MEETING]: [],
+  [JCState.BREAK]: [],
+  [JCState.HANDOFF]: [],
 };
 
 /** Check if a transition is valid */

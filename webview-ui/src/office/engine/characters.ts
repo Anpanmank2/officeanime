@@ -1,4 +1,5 @@
 import {
+  READ_FRAME_DURATION_SEC,
   SEAT_REST_MAX_SEC,
   SEAT_REST_MIN_SEC,
   TYPE_FRAME_DURATION_SEC,
@@ -98,8 +99,11 @@ export function updateCharacter(
 
   switch (ch.state) {
     case CharacterState.TYPE: {
-      if (ch.frameTimer >= TYPE_FRAME_DURATION_SEC) {
-        ch.frameTimer -= TYPE_FRAME_DURATION_SEC;
+      const frameDur = isReadingTool(ch.currentTool)
+        ? READ_FRAME_DURATION_SEC
+        : TYPE_FRAME_DURATION_SEC;
+      if (ch.frameTimer >= frameDur) {
+        ch.frameTimer -= frameDur;
         ch.frame = (ch.frame + 1) % 2;
       }
       // If no longer active, stand up and start wandering (after seatTimer expires)

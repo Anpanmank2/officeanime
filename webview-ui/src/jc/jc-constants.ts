@@ -125,7 +125,7 @@ export const PERMANENT_ROLES = new Set([
 ]);
 
 // ── Timing ──────────────────────────────────────────────────────
-export const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+export const IDLE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes (v1 spec)
 
 // ── Speech Bubble Department Colors ─────────────────────────────
 export const SPEECH_BUBBLE_COLORS: Record<string, string> = {

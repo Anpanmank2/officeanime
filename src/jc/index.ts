@@ -33,8 +33,8 @@ const memberStates = new Map<string, JCState>();
 /** Per-member last activity timestamp (for idle timeout) */
 const memberLastActivity = new Map<string, number>();
 
-/** Idle timeout: 5 minutes */
-const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+/** Idle timeout: 3 minutes (v1 spec) */
+const IDLE_TIMEOUT_MS = 3 * 60 * 1000;
 
 /** Idle check timer */
 let idleCheckTimer: ReturnType<typeof setInterval> | null = null;
