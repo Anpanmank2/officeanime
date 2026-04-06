@@ -161,9 +161,29 @@ async function main(): Promise<void> {
   });
 
   // Start event queue watcher (jc-events.json)
+  // Resolve workspace root: --workspace= arg > parent dir with jc-events.json > cwd
   let eventWatcher: EventWatcher | null = null;
   if (jcConfig) {
-    const workspaceRoot = process.cwd();
+    const wsArg = args.find((a) => a.startsWith('--workspace='));
+    let workspaceRoot = wsArg ? path.resolve(wsArg.split('=')[1]) : process.cwd();
+
+    // If cwd is inside pixel-agents, check parent directory for jc-events.json
+    // (common case: /company skill writes to cc-company/jc-events.json)
+    const parentDir = path.resolve(workspaceRoot, '..');
+    const parentEventsFile = path.join(parentDir, 'jc-events.json');
+    const cwdEventsFile = path.join(workspaceRoot, 'jc-events.json');
+    if (!fs.existsSync(cwdEventsFile) && fs.existsSync(parentEventsFile)) {
+      workspaceRoot = parentDir;
+      console.log(`[JC] Event watcher using parent directory: ${parentDir}`);
+    }
+
+    // Also watch parent if it has a .company/ directory (company skill workspace)
+    const parentCompanyDir = path.join(parentDir, '.company');
+    if (!wsArg && fs.existsSync(parentCompanyDir)) {
+      workspaceRoot = parentDir;
+      console.log(`[JC] Detected .company/ in parent — watching ${parentDir}/jc-events.json`);
+    }
+
     eventWatcher = new EventWatcher(jcConfig as JCConfig, workspaceRoot);
     // Create a pseudo-webview that broadcasts to all browser clients
     const pseudoWebview = { postMessage: (msg: unknown) => server.broadcast(msg) } as any;

@@ -46,6 +46,20 @@ export class EventWatcher {
     this.webview = webview;
     const eventFilePath = this.getEventFilePath();
 
+    // Ensure the event file exists so /company skill can append to it
+    if (!fs.existsSync(eventFilePath)) {
+      try {
+        fs.writeFileSync(
+          eventFilePath,
+          JSON.stringify({ version: 1, events: [] }, null, 2),
+          'utf-8',
+        );
+        console.log(`[JC-Events] Created empty event file: ${eventFilePath}`);
+      } catch (err) {
+        console.warn(`[JC-Events] Could not create event file: ${err}`);
+      }
+    }
+
     // Try fs.watch first
     try {
       if (fs.existsSync(eventFilePath)) {
