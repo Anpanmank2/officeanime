@@ -588,9 +588,33 @@ export interface DashboardMember {
   childMemberIds: string[];
 }
 
+export interface SubagentCharacterRef {
+  id: number;
+  parentAgentId: number;
+}
+
 /** Get all members as dashboard entries for the Team HUD */
-export function jcGetDashboardMembers(): DashboardMember[] {
+export function jcGetDashboardMembers(
+  subagentCharacters: SubagentCharacterRef[] = [],
+): DashboardMember[] {
   if (!jcConfig) return [];
+
+  // Build parentMemberId map: memberId -> parentMemberId
+  // subagentCharacter.id is the sub-agent's agentId; parentAgentId is the parent's agentId
+  const parentMemberIdMap = new Map<string, string>();
+  const childMemberIdsMap = new Map<string, string[]>();
+
+  for (const sub of subagentCharacters) {
+    const subMemberId = agentToMember.get(sub.id);
+    const parentMemberId = agentToMember.get(sub.parentAgentId);
+    if (subMemberId && parentMemberId) {
+      parentMemberIdMap.set(subMemberId, parentMemberId);
+      const children = childMemberIdsMap.get(parentMemberId) ?? [];
+      if (!children.includes(subMemberId)) children.push(subMemberId);
+      childMemberIdsMap.set(parentMemberId, children);
+    }
+  }
+
   const members: DashboardMember[] = [];
   for (const member of jcConfig.members) {
     const pos = DESK_POSITIONS[member.deskId];
@@ -614,8 +638,8 @@ export function jcGetDashboardMembers(): DashboardMember[] {
       activitySummary,
       stateSince: runtime?.stateSince ?? Date.now(),
       currentTask: activitySummary,
-      parentMemberId: null, // [PHASE-B] resolve via subagentCharacters
-      childMemberIds: [], // [PHASE-B] resolve via subagentCharacters
+      parentMemberId: parentMemberIdMap.get(member.id) ?? null,
+      childMemberIds: childMemberIdsMap.get(member.id) ?? [],
     });
   }
   return members;

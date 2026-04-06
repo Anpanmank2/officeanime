@@ -389,7 +389,11 @@ function App() {
         onToggleDashboard={handleToggleDashboard}
       />
 
-      <AgentDashboard isOpen={isDashboardOpen} onClose={() => setIsDashboardOpen(false)} />
+      <AgentDashboard
+        isOpen={isDashboardOpen}
+        onClose={() => setIsDashboardOpen(false)}
+        subagentCharacters={subagentCharacters}
+      />
 
       <VersionIndicator
         currentVersion={extensionVersion}

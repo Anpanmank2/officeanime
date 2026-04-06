@@ -61,7 +61,7 @@ function DashboardMemberCardInner({ member, now }: DashboardMemberCardProps) {
             whiteSpace: 'nowrap',
           }}
         >
-          {member.nameEn}
+          {`${member.nameEn} (${member.role})`}
         </div>
         {/* Sub-agent children count */}
         {hasChildren && (

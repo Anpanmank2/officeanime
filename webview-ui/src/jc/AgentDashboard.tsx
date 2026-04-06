@@ -7,23 +7,27 @@ import { useMemo, useState } from 'react';
 
 import { DashboardMemberCard } from './DashboardMemberCard.js';
 import { DEPT_COLORS, DEPT_LABELS } from './jc-constants.js';
-import { jcGetDashboardMembers } from './jc-state.js';
+import { jcGetDashboardMembers, type SubagentCharacterRef } from './jc-state.js';
 import { useDashboardTimer } from './useDashboardTimer.js';
 
 interface AgentDashboardProps {
   isOpen: boolean;
   onClose: () => void;
+  subagentCharacters: SubagentCharacterRef[];
 }
 
 const DEPT_ORDER = ['engineering', 'marketing', 'research', 'exec'];
 
-export function AgentDashboard({ isOpen, onClose }: AgentDashboardProps) {
+export function AgentDashboard({ isOpen, onClose, subagentCharacters }: AgentDashboardProps) {
   const [presentOnly, setPresentOnly] = useState(true);
   const [collapsedDepts, setCollapsedDepts] = useState<Set<string>>(new Set());
 
   const now = useDashboardTimer(isOpen);
 
-  const allMembers = useMemo(() => jcGetDashboardMembers(), [now]);
+  const allMembers = useMemo(
+    () => jcGetDashboardMembers(subagentCharacters),
+    [now, subagentCharacters],
+  );
 
   const filteredMembers = useMemo(
     () => (presentOnly ? allMembers.filter((m) => m.isPresent) : allMembers),
