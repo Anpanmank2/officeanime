@@ -24,6 +24,31 @@ export const BUBBLE_WAITING_SPRITE: SpriteData = resolveBubbleSprite(bubbleWaiti
 // ════════════════════════════════════════════════════════════════
 // Loaded character sprites (from PNG assets)
 // ════════════════════════════════════════════════════════════════
+//
+// ── FUTURE: Per-Member Idle Animations (v3 Extension Point) ────
+//
+// Current sprite sheet: 112×96 per palette (7 frames × 3 directions)
+//   Frame layout: walk1, walk2, walk3, type1, type2, read1, read2
+//   Rows: down(0), up(1), right(2). Left = flipped right.
+//
+// To add per-member idle animations (e.g., "coffee sip", "pen spin"):
+//   1. Extend each char_N.png to 144×96 (9 frames × 3 directions)
+//   2. New columns 7-8: idle1, idle2 (2-frame idle animation)
+//   3. Map member ID → idle frame pair in a MEMBER_IDLE_FRAMES record
+//   4. In characters.ts FSM, when idle + member has custom frames,
+//      use idle1/idle2 instead of walk2 (standing pose)
+//   5. Update CHAR_FRAMES_PER_ROW from 7 → 9 in shared/assets/constants.ts
+//
+// Estimated sprite budget per member: 2 frames × 3 dirs = 6 sprites
+// Total for 28 members sharing 6 palettes: 6 palettes × 2 new cols = 12 sprites
+// (Members sharing a palette share idle frames; hueShift differentiates)
+//
+// Priority candidates for custom idle animations:
+//   - Secretary: ペン回し (pen spin) — 2-frame oscillation
+//   - Marcus: ポーカーチップ回し (chip flip) — 2-frame rotation
+//   - Sora: スマホスクロール (phone scroll) — 2-frame thumb movement
+//   - Kai: TikTokスワイプ (swipe) — 2-frame hand gesture
+// ────────────────────────────────────────────────────────────────
 
 interface LoadedCharacterData {
   down: SpriteData[];

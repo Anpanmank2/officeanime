@@ -10,6 +10,10 @@ import {
   BUBBLE_EMOJIS,
   DEPT_LABELS,
   DEPT_NEON,
+  IDLE_EMOJI_OFF_MS,
+  IDLE_EMOJI_ON_MS,
+  IDLE_EMOJI_TRIGGER_MS,
+  MEMBER_IDLE_EMOJIS,
   SPEECH_BUBBLE_COLORS,
   TASK_STATUS_COLORS,
 } from './jc-constants.js';
@@ -886,19 +890,102 @@ function renderJCCharacterBubbles(
   offsetY: number,
   zoom: number,
 ): void {
+  const now = Date.now();
   for (const ch of characters) {
     if (ch.isSubagent) continue;
     const memberId = jcGetMemberForAgent(ch.id);
     if (!memberId) continue;
     const runtime = jcGetMemberRuntime(memberId);
-    if (!runtime || !runtime.bubbleType) continue;
+    if (!runtime) continue;
 
     const sittingOff = isSittingState(ch.state) ? -4 : 0;
     const screenX = offsetX + ch.x * zoom;
     const screenY = offsetY + (ch.y + sittingOff) * zoom;
 
+    // ── Temporary emotion emoji (highest priority) ──
+    if (runtime.emotionEmoji && now < runtime.emotionUntil) {
+      renderIdleEmoji(ctx, runtime.emotionEmoji, screenX, screenY, zoom);
+      continue;
+    }
+    // Clear expired emotions
+    if (runtime.emotionEmoji && now >= runtime.emotionUntil) {
+      runtime.emotionEmoji = null;
+    }
+
+    // ── Focus mode: 🔥 after 3 min of coding/reading ──
+    if (runtime.workingSince && (runtime.jcState === 'coding' || runtime.jcState === 'reading')) {
+      const workElapsed = now - runtime.workingSince;
+      if (workElapsed >= 3 * 60 * 1000) {
+        renderIdleEmoji(ctx, '🔥', screenX, screenY, zoom);
+        continue;
+      }
+    }
+
+    // ── Long idle (10min+) → 💤 sleeping ──
+    if (runtime.jcState === 'idle' && runtime.idleSince) {
+      const idleElapsed = now - runtime.idleSince;
+      if (idleElapsed >= 10 * 60 * 1000) {
+        renderIdleEmoji(ctx, '💤', screenX, screenY, zoom);
+        continue;
+      }
+    }
+
+    // ── Per-member idle emoji (blink cycle: 5s on / 3s off) ──
+    if (runtime.jcState === 'idle' && runtime.idleSince) {
+      const elapsed = now - runtime.idleSince;
+      if (elapsed >= IDLE_EMOJI_TRIGGER_MS) {
+        const memberEmoji = MEMBER_IDLE_EMOJIS[memberId];
+        if (memberEmoji) {
+          const cycleMs = IDLE_EMOJI_ON_MS + IDLE_EMOJI_OFF_MS;
+          const phase = (elapsed - IDLE_EMOJI_TRIGGER_MS) % cycleMs;
+          if (phase < IDLE_EMOJI_ON_MS) {
+            renderIdleEmoji(ctx, memberEmoji, screenX, screenY, zoom);
+            continue; // Skip default bubble when showing idle emoji
+          }
+        }
+      }
+    }
+
+    // Default state bubble
+    if (!runtime.bubbleType) continue;
     renderJCBubble(ctx, runtime.bubbleType, screenX, screenY, zoom);
   }
+}
+
+/** Render a per-member idle emoji bubble (same position as state bubble) */
+function renderIdleEmoji(
+  ctx: CanvasRenderingContext2D,
+  emoji: string,
+  charX: number,
+  charY: number,
+  zoom: number,
+): void {
+  ctx.save();
+  ctx.font = `${10 * zoom}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+
+  const bx = charX;
+  const by = charY - 20 * zoom;
+  const bgSize = 12 * zoom;
+
+  // Soft white bubble background
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+  ctx.beginPath();
+  ctx.arc(bx, by, bgSize / 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Subtle ring (research green tint for idle personality)
+  ctx.beginPath();
+  ctx.arc(bx, by, bgSize / 2 + 1, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(102, 102, 136, 0.4)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Emoji
+  ctx.globalAlpha = 1;
+  ctx.fillText(emoji, bx, by + bgSize / 3);
+  ctx.restore();
 }
 
 /** Render activity summary speech bubbles above characters */

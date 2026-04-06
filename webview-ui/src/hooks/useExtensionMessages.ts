@@ -18,6 +18,9 @@ import {
   jcTasksBulkSync,
   jcTaskUpdate,
   jcTriggerLiaison,
+  jcTriggerSubagentThinking,
+  jcTriggerTaskCompleted,
+  jcTriggerWave,
   jcUpdateMappings,
 } from '../jc/index.js';
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js';
@@ -705,6 +708,12 @@ export function useExtensionMessages(
             os.walkToTile(agentId, handoffSeat.col, handoffSeat.row);
           }
         }
+      } else if (msg.type === 'jcTaskCompleted') {
+        jcTriggerTaskCompleted(msg.memberId as string);
+      } else if (msg.type === 'jcWave') {
+        jcTriggerWave(msg.memberId as string);
+      } else if (msg.type === 'jcSubagentThinking') {
+        jcTriggerSubagentThinking(msg.memberId as string);
       } else if (msg.type === 'jcLiaison') {
         const fromMemberId = msg.fromMemberId as string;
         const toMemberId = msg.toMemberId as string;

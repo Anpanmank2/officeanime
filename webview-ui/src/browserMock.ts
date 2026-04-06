@@ -305,7 +305,7 @@ export function dispatchMockMessages(): void {
   // Use setTimeout to ensure layoutReadyRef is true before arrivals are dispatched.
   if (jcConfigData?.members) {
     setTimeout(() => {
-      const permanentRoles = ['CEO', 'Secretary', 'PM / Director', 'Research Lead (Owner兼務)'];
+      const permanentRoles = ['CEO', 'Secretary', 'PM / Director'];
       const residents = jcConfigData!.members!.filter((m) => permanentRoles.includes(m.role));
       residents.forEach((member, idx) => {
         dispatch({
@@ -597,6 +597,11 @@ function handleBrowserEvent(event: Record<string, unknown>): void {
         color: '#bf5fff',
         duration: 2000,
       });
+      // Trigger 👋 wave on the recipient
+      dispatch({
+        type: 'jcWave',
+        memberId: event.to as string,
+      });
       const msgFrom = findMember(event.from as string);
       if (msgFrom) {
         dispatch({
@@ -630,6 +635,11 @@ function handleBrowserEvent(event: Record<string, unknown>): void {
           },
         });
       }
+      // Trigger 🎉 emotion emoji
+      dispatch({
+        type: 'jcTaskCompleted',
+        memberId: doneAgent,
+      });
       dispatch({
         type: 'jcMemberStateChange',
         agentId: -200 - Math.floor(Math.random() * 1000),

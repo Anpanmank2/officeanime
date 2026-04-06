@@ -56,6 +56,9 @@ export {
   jcTasksBulkSync,
   jcTaskUpdate,
   jcTriggerLiaison,
+  jcTriggerSubagentThinking,
+  jcTriggerTaskCompleted,
+  jcTriggerWave,
   jcUpdateMappings,
   POKER_TABLE_SEATS,
 } from './jc-state.js';

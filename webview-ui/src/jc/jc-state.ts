@@ -68,12 +68,14 @@ const DESK_POSITIONS: Record<string, { col: number; row: number; facingDir: numb
 
   // ── Research Lab — 学者の書斎 (cols 1-11, rows 15-21) ──
   // ゼミ配置: 本棚を背にした上座 + 向かい合わせペア + 独立席
-  'res-desk-01': { col: 3, row: 17, facingDir: 3 }, // Lead (Owner) — 本棚背、最奥の上座（南向き）
-  'res-desk-02': { col: 7, row: 17, facingDir: 3 }, // Sora — Leadの隣、シニア研究員（南向き）
+  'res-desk-01': { col: 3, row: 17, facingDir: 3 }, // Haruki (Dir) — 本棚背、最奥の上座（南向き）
+  'res-desk-02': { col: 7, row: 17, facingDir: 3 }, // Sora — シニア研究員（南向き）
   'res-desk-03': { col: 2, row: 20, facingDir: 1 }, // Marina — 向かい合わせペア（右向き→Kaiへ）
   'res-desk-04': { col: 5, row: 20, facingDir: 2 }, // Kai — 向かい合わせペア（左向き→Marinaへ）
   'res-desk-05': { col: 8, row: 20, facingDir: 2 }, // Priya — 独立席、壁向き（西向き）
-  'res-desk-06': { col: 10, row: 20, facingDir: 3 }, // Vacant — 空席（南向き）
+  'res-desk-06': { col: 10, row: 20, facingDir: 3 }, // Yuto — データ統合席（南向き）
+  'res-desk-07': { col: 5, row: 17, facingDir: 3 }, // Marcus (L2) — Director右隣、戦略参謀（南向き）
+  'res-desk-08': { col: 10, row: 17, facingDir: 3 }, // Ayane — 上段右端、SEO分析席（南向き）
 
   // ── Executive — Exec Area (permanent residents) ──
   // "静かな威圧感" — ミニマルで品格のある空間
@@ -97,6 +99,10 @@ export function jcLoadConfig(config: JCConfigData): void {
       jcState: 'absent',
       isPresent: false,
       bubbleType: null,
+      idleSince: null,
+      emotionEmoji: null,
+      emotionUntil: 0,
+      workingSince: null,
     });
   }
   console.log(`[JC-WV] Config loaded: ${config.members.length} members`);
@@ -133,6 +139,10 @@ export function jcMemberDeparted(memberId: string): void {
     runtime.jcState = 'absent';
     runtime.isPresent = false;
     runtime.bubbleType = null;
+    runtime.idleSince = null;
+    runtime.emotionEmoji = null;
+    runtime.emotionUntil = 0;
+    runtime.workingSince = null;
   }
 }
 
@@ -140,8 +150,56 @@ export function jcMemberDeparted(memberId: string): void {
 export function jcMemberStateChange(memberId: string, newState: JCState): void {
   const runtime = memberRuntimes.get(memberId);
   if (runtime) {
+    const prevState = runtime.jcState;
     runtime.jcState = newState;
     runtime.bubbleType = stateToBubble(newState, runtime.config.breakBehavior);
+
+    // Track idle entry time for per-member idle emoji trigger
+    if (newState === 'idle') {
+      if (!runtime.idleSince) runtime.idleSince = Date.now();
+    } else {
+      runtime.idleSince = null;
+    }
+
+    // Track coding/reading start time for focus mode (🔥 after 3 min)
+    if (newState === 'coding' || newState === 'reading') {
+      if (!runtime.workingSince) runtime.workingSince = Date.now();
+    } else {
+      runtime.workingSince = null;
+    }
+
+    // Emotion triggers
+    if (newState === 'error' && prevState !== 'error') {
+      runtime.emotionEmoji = '😤';
+      runtime.emotionUntil = Date.now() + 2000;
+    }
+  }
+}
+
+/** Trigger a task_completed emotion emoji on a member */
+export function jcTriggerTaskCompleted(memberId: string): void {
+  const runtime = memberRuntimes.get(memberId);
+  if (runtime) {
+    runtime.emotionEmoji = '🎉';
+    runtime.emotionUntil = Date.now() + 2000;
+  }
+}
+
+/** Trigger a cross-department wave 👋 on a member */
+export function jcTriggerWave(memberId: string): void {
+  const runtime = memberRuntimes.get(memberId);
+  if (runtime) {
+    runtime.emotionEmoji = '👋';
+    runtime.emotionUntil = Date.now() + 2000;
+  }
+}
+
+/** Trigger a sub-agent thinking 🧠 on a parent member */
+export function jcTriggerSubagentThinking(memberId: string): void {
+  const runtime = memberRuntimes.get(memberId);
+  if (runtime) {
+    runtime.emotionEmoji = '🧠';
+    runtime.emotionUntil = Date.now() + 3000;
   }
 }
 

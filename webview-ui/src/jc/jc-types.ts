@@ -67,6 +67,14 @@ export interface JCMemberRuntime {
   isPresent: boolean;
   /** Overlay bubble type */
   bubbleType: JCBubbleType;
+  /** Timestamp when member entered idle state (for idle emoji trigger) */
+  idleSince: number | null;
+  /** Temporary emotion emoji overlay (e.g. 🎉 on task complete) */
+  emotionEmoji: string | null;
+  /** Emotion emoji expiry timestamp */
+  emotionUntil: number;
+  /** Timestamp when member started coding/reading (for focus 🔥 after 3min) */
+  workingSince: number | null;
 }
 
 /** Bubble overlay types */

@@ -105,7 +105,59 @@ export const BUBBLE_EMOJIS: Record<string, string> = {
   sofa: '💤',
   arcade: '🎮',
   bookshelf: '📚',
+  // ── Emotion triggers ──
+  task_completed: '🎉',
+  focus: '🔥',
+  error_frustration: '😤',
+  wave: '👋',
+  subagent_thinking: '🧠',
+  sleeping: '💤',
 };
+
+// ── Per-Member Idle Emojis ──────────────────────────────────────
+// Unique idle-habit emoji for each member, derived from persona idle癖.
+// Displayed when a member has been idle for IDLE_EMOJI_TRIGGER_MS.
+export const MEMBER_IDLE_EMOJIS: Record<string, string> = {
+  // ── Exec ──
+  'exec-ceo': '📋', // KPIダッシュボード確認 + ブラックコーヒー
+  'exec-sec': '🖊️', // TODOリスト整理 + ペン回し
+
+  // ── Engineering ──
+  'eng-01': '👀', // コードレビューを黙々と進める
+  'eng-02': '🖥️', // ターミナルのログを黙々と眺める
+  'eng-03': '🎨', // Figmaとコードエディタを交互に見比べる
+  'eng-04': '📝', // チームメンバーの様子を見回しながらメモ
+  'eng-05': '🎭', // Pinterestで参考画像を集めてムードボード更新
+  'eng-06': '🎲', // ゲームを遊びながらメカニクス研究
+
+  // ── Marketing ──
+  'mkt-01': '💹', // P/Lダッシュボードを眺めながら考え込む
+  'mkt-02': '🗂️', // フレームワーク図をノートに整理
+  'mkt-03': '💬', // メンバーのデスクを回って雑談
+  'mkt-04': '✍️', // 過去のA/Bテスト結果ファイルを見返す
+  'mkt-05': '🪶', // 窓の外を見ながら万年筆でメモ
+  'mkt-06': '📌', // タスクボードのカードを並べ替えて最適化
+  'mkt-07': '🔢', // SQLを書きながらデータパターンを探す
+  'mkt-08': '📐', // 配信シナリオのフロー図をホワイトボードに描く
+  'mkt-09': '📱', // SNSフィードをスクロールしてトレンドチェック
+  'mkt-10': '🗺️', // 会場のフロア図面に動線を書き込む
+  'mkt-11': '📉', // 広告ダッシュボードのCACをリアルタイム監視
+
+  // ── Research ──
+  'res-01': '📊', // ダッシュボード数値を眺めながら仮説メモ
+  'res-02': '📱', // TweetDeckの複数カラムを高速スクロール — NOTE: same emoji as mkt-09 but different member
+  'res-03': '🎨', // ムードボードを整理しながら色彩パレット吟味 — NOTE: same emoji as eng-03
+  'res-04': '📲', // スマホでTikTokをスワイプしながらフック構造メモ
+  'res-05': '📖', // 学術論文を読みながらノートに要点
+  'res-06': '📈', // ダッシュボードのレイアウトを微調整
+  'res-07': '🃏', // Bloomberg端末風画面 + ポーカーチップを回す
+  'res-08': '🔎', // Search Consoleのクエリレポートをスクロール
+};
+
+// ── Idle Emoji Timing ───────────────────────────────────────────
+export const IDLE_EMOJI_TRIGGER_MS = 10_000; // 10s idle before showing member emoji
+export const IDLE_EMOJI_ON_MS = 5_000; // 5s display
+export const IDLE_EMOJI_OFF_MS = 3_000; // 3s hidden (blink cycle)
 
 // ── Task Status Colors (canvas overlay) ─────────────────────────
 export const TASK_STATUS_COLORS: Record<string, string> = {
@@ -117,12 +169,7 @@ export const TASK_STATUS_COLORS: Record<string, string> = {
 
 // ── Permanent Resident Roles ────────────────────────────────────
 // Members with these roles never auto-depart on idle timeout.
-export const PERMANENT_ROLES = new Set([
-  'CEO',
-  'Secretary',
-  'PM / Director',
-  'Research Lead (Owner兼務)',
-]);
+export const PERMANENT_ROLES = new Set(['CEO', 'Secretary', 'PM / Director']);
 
 // ── Timing ──────────────────────────────────────────────────────
 export const IDLE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes (v1 spec)
