@@ -12,6 +12,7 @@ import { useEditorActions } from './hooks/useEditorActions.js';
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js';
 import { useExtensionMessages } from './hooks/useExtensionMessages.js';
 import { AbsentStatusPopup } from './jc/AbsentStatusPopup.js';
+import { AgentDashboard } from './jc/AgentDashboard.js';
 import type { AbsenceInfo } from './jc/jc-types.js';
 import { JCMemberInfoPanel } from './jc/JCMemberInfoPanel.js';
 import { TaskInputForm } from './jc/TaskInputForm.js';
@@ -173,6 +174,8 @@ function App() {
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
   const [isDebugMode, setIsDebugMode] = useState(false);
   const [alwaysShowOverlay, setAlwaysShowOverlay] = useState(false);
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const handleToggleDashboard = useCallback(() => setIsDashboardOpen((prev) => !prev), []);
 
   // Absent desk popup state
   const [absentPopup, setAbsentPopup] = useState<{
@@ -382,7 +385,11 @@ function App() {
           setWatchAllSessions(newVal);
           vscode.postMessage({ type: 'setWatchAllSessions', enabled: newVal });
         }}
+        isDashboardOpen={isDashboardOpen}
+        onToggleDashboard={handleToggleDashboard}
       />
+
+      <AgentDashboard isOpen={isDashboardOpen} onClose={() => setIsDashboardOpen(false)} />
 
       <VersionIndicator
         currentVersion={extensionVersion}

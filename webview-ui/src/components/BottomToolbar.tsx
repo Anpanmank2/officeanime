@@ -20,6 +20,8 @@ interface BottomToolbarProps {
   externalAssetDirectories: string[];
   watchAllSessions: boolean;
   onToggleWatchAllSessions: () => void;
+  isDashboardOpen: boolean;
+  onToggleDashboard: () => void;
 }
 
 const panelStyle: React.CSSProperties = {
@@ -69,6 +71,8 @@ export function BottomToolbar({
   externalAssetDirectories,
   watchAllSessions,
   onToggleWatchAllSessions,
+  isDashboardOpen,
+  onToggleDashboard,
 }: BottomToolbarProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -338,6 +342,24 @@ export function BottomToolbar({
         title="Task board"
       >
         Tasks
+      </button>
+      {/* Dashboard button */}
+      <button
+        onClick={onToggleDashboard}
+        onMouseEnter={() => setHovered('dashboard')}
+        onMouseLeave={() => setHovered(null)}
+        style={
+          isDashboardOpen
+            ? { ...btnActive }
+            : {
+                ...btnBase,
+                background:
+                  hovered === 'dashboard' ? 'var(--pixel-btn-hover-bg)' : btnBase.background,
+              }
+        }
+        title="Agent Dashboard"
+      >
+        Dashboard
       </button>
       {/* Broadcast button */}
       <div ref={broadcastRef} style={{ position: 'relative' }}>

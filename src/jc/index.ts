@@ -17,6 +17,12 @@ import {
   resolveMapping,
 } from './agent-mapper.js';
 import { isJCEnabled, loadJCConfig } from './config.js';
+import {
+  buildDashboardSnapshot,
+  clearMember,
+  recordActivitySummary,
+  recordStateChange,
+} from './dashboard-collector.js';
 import { getDeskByMemberId } from './desk-registry.js';
 import { EventWatcher } from './event-watcher.js';
 import { toolToJCState } from './state-machine.js';
@@ -162,6 +168,7 @@ export function onAgentRemoved(agentId: number, webview: vscode.Webview | undefi
   if (memberId) {
     memberStates.set(memberId, 'leaving');
     absenceTracker?.onAgentRemoved(memberId);
+    clearMember(memberId);
     webview?.postMessage({ type: 'jcMemberLeaving', agentId, memberId });
     webview?.postMessage({ type: 'jcMappingUpdate', mappings: getAllMappings() });
   }
@@ -206,6 +213,7 @@ export function onToolStart(
 
   const newState = toolToJCState(toolName);
   const currentState = memberStates.get(memberId);
+  const stateSince = recordStateChange(memberId, newState);
 
   if (currentState !== newState) {
     memberStates.set(memberId, newState);
@@ -214,12 +222,14 @@ export function onToolStart(
       agentId,
       memberId,
       jcState: newState,
+      stateSince,
     });
   }
 
   if (activitySummarizer) {
     const summary = activitySummarizer.addEvent(agentId, toolName, status);
     if (summary) {
+      recordActivitySummary(memberId, summary);
       webview?.postMessage({
         type: 'jcActivitySummary',
         agentId,
@@ -239,14 +249,17 @@ export function onAgentIdle(agentId: number, webview: vscode.Webview | undefined
   const memberId = getMemberForAgent(agentId);
   if (!memberId) return;
 
+  const stateSince = recordStateChange(memberId, 'idle');
   memberStates.set(memberId, 'idle');
   webview?.postMessage({
     type: 'jcMemberStateChange',
     agentId,
     memberId,
     jcState: 'idle',
+    stateSince,
   });
 
+  recordActivitySummary(memberId, null);
   activitySummarizer?.clearAgent(agentId);
   webview?.postMessage({
     type: 'jcActivitySummary',
@@ -357,6 +370,12 @@ export function sendJCConfig(webview: vscode.Webview): void {
   // Start idle timeout checker (every 30s)
   if (idleCheckTimer) clearInterval(idleCheckTimer);
   idleCheckTimer = setInterval(() => checkIdleMembers(webview), 30000);
+
+  // Send initial dashboard snapshot for Webview re-initialization restoration
+  const snapshot = buildDashboardSnapshot();
+  if (snapshot.length > 0) {
+    webview.postMessage({ type: 'jcDashboardSync', members: snapshot });
+  }
 }
 
 /** Get the set of currently present member IDs */

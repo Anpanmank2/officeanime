@@ -103,6 +103,7 @@ export function jcLoadConfig(config: JCConfigData): void {
       emotionEmoji: null,
       emotionUntil: 0,
       workingSince: null,
+      stateSince: Date.now(),
     });
   }
   console.log(`[JC-WV] Config loaded: ${config.members.length} members`);
@@ -143,14 +144,22 @@ export function jcMemberDeparted(memberId: string): void {
     runtime.emotionEmoji = null;
     runtime.emotionUntil = 0;
     runtime.workingSince = null;
+    runtime.stateSince = Date.now();
   }
 }
 
 /** Handle state change */
-export function jcMemberStateChange(memberId: string, newState: JCState): void {
+export function jcMemberStateChange(
+  memberId: string,
+  newState: JCState,
+  stateSince?: number,
+): void {
   const runtime = memberRuntimes.get(memberId);
   if (runtime) {
     const prevState = runtime.jcState;
+    if (prevState !== newState) {
+      runtime.stateSince = stateSince ?? Date.now();
+    }
     runtime.jcState = newState;
     runtime.bubbleType = stateToBubble(newState, runtime.config.breakBehavior);
 
@@ -569,6 +578,14 @@ export interface DashboardMember {
   deskCol: number;
   deskRow: number;
   activitySummary: string | null;
+  /** Timestamp when member entered current state (for duration display) */
+  stateSince: number;
+  /** Current task summary from activity summarizer */
+  currentTask: string | null;
+  /** Parent member ID if this is a sub-agent */
+  parentMemberId: string | null;
+  /** Child member IDs (sub-agents spawned by this member) */
+  childMemberIds: string[];
 }
 
 /** Get all members as dashboard entries for the Team HUD */
@@ -580,6 +597,7 @@ export function jcGetDashboardMembers(): DashboardMember[] {
     if (!pos) continue;
     const runtime = memberRuntimes.get(member.id);
     const state = runtime?.jcState ?? 'absent';
+    const activitySummary = memberActivitySummaries.get(member.id) ?? null;
     members.push({
       memberId: member.id,
       name: member.name,
@@ -593,7 +611,11 @@ export function jcGetDashboardMembers(): DashboardMember[] {
       deptColor: DEPT_COLORS[member.department] ?? '#888888',
       deskCol: pos.col,
       deskRow: pos.row,
-      activitySummary: memberActivitySummaries.get(member.id) ?? null,
+      activitySummary,
+      stateSince: runtime?.stateSince ?? Date.now(),
+      currentTask: activitySummary,
+      parentMemberId: null, // [PHASE-B] resolve via subagentCharacters
+      childMemberIds: [], // [PHASE-B] resolve via subagentCharacters
     });
   }
   return members;

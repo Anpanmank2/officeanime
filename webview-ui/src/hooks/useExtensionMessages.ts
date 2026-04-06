@@ -654,10 +654,25 @@ export function useExtensionMessages(
             }, 15000);
           }
         }
+      } else if (msg.type === 'jcDashboardSync') {
+        // Restore stateSince for all members after Webview re-initialization
+        const members = msg.members as Array<{
+          memberId: string;
+          jcState: JCState;
+          stateSince: number;
+          activitySummary: string | null;
+        }>;
+        for (const m of members) {
+          jcMemberStateChange(m.memberId, m.jcState, m.stateSince);
+          if (m.activitySummary !== null) {
+            jcActivitySummaryUpdate(m.memberId, m.activitySummary);
+          }
+        }
       } else if (msg.type === 'jcMemberStateChange') {
         const agentId = msg.agentId as number;
         const jcState = msg.jcState as JCState;
-        jcMemberStateChange(msg.memberId, jcState);
+        const stateSince = msg.stateSince as number | undefined;
+        jcMemberStateChange(msg.memberId, jcState, stateSince);
         jcRecordActivity(msg.memberId as string);
 
         // Sync character animation with JC state

@@ -106,7 +106,20 @@ export interface JCMemberState {
 export type JCMessageToWebview =
   | { type: 'jcMemberArriving'; memberId: string; deskId: string; hueShift: number }
   | { type: 'jcMemberLeaving'; memberId: string }
-  | { type: 'jcMemberStateChange'; memberId: string; jcState: JCState }
+  | { type: 'jcMemberStateChange'; memberId: string; jcState: JCState; stateSince?: number }
+  | {
+      type: 'jcDashboardSync';
+      members: Array<{
+        memberId: string;
+        jcState: JCState;
+        stateSince: number;
+        currentTaskSummary: string | null;
+        currentTaskId: string | null;
+        parentMemberId: string | null;
+        childMemberIds: string[];
+        activitySummary: string | null;
+      }>;
+    }
   | { type: 'jcConfigLoaded'; config: JCConfig }
   | { type: 'jcMappingUpdate'; mappings: Record<number, string> }
   | { type: 'jcAbsenceUpdate'; payload: AbsenceInfo }

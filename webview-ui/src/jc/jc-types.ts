@@ -75,6 +75,8 @@ export interface JCMemberRuntime {
   emotionUntil: number;
   /** Timestamp when member started coding/reading (for focus 🔥 after 3min) */
   workingSince: number | null;
+  /** Timestamp when member entered current state (for dashboard duration display) */
+  stateSince: number;
 }
 
 /** Bubble overlay types */
