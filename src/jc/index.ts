@@ -283,7 +283,7 @@ export function getTaskWatcher(): TaskWatcher | null {
 export function getPermanentResidents(): string[] {
   if (!jcConfig) return [];
   // v1.2: Secretary is no longer a permanent resident — uses CEO-linked departure instead
-  const permanentRoles = ['CEO', 'PM / Director', 'Research Lead (Owner兼務)'];
+  const permanentRoles = ['CEO', 'PM / Director'];
   return jcConfig.members.filter((m) => permanentRoles.includes(m.role)).map((m) => m.id);
 }
 

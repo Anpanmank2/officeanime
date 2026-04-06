@@ -40,7 +40,7 @@ function buildClientInitMessages(respond: (msg: unknown) => void): void {
     });
 
     // Auto-arrive permanent residents (CEO, PM / Director)
-    const permanentRoles = ['CEO', 'Secretary', 'PM / Director', 'Research Lead (Owner兼務)'];
+    const permanentRoles = ['CEO', 'Secretary', 'PM / Director'];
     const cfg = jcConfig as {
       members?: Array<{
         id: string;

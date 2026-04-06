@@ -536,6 +536,11 @@ function handleBrowserEvent(event: Record<string, unknown>): void {
           });
         }
       }
+      // Dispatch subagent thinking indicator on the delegator
+      dispatch({
+        type: 'jcSubagentThinking',
+        memberId: event.from as string,
+      });
       const delFrom = findMember(event.from as string);
       if (delFrom) {
         dispatch({
