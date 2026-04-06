@@ -43,6 +43,10 @@ const TRANSITIONS = {
     JCState.IDLE,
     JCState.ERROR,
     JCState.LEAVING,
+    JCState.BREAK,
+    JCState.MEETING,
+    JCState.REVIEWING,
+    JCState.HANDOFF,
   ],
   [JCState.THINKING]: [
     JCState.CODING,
@@ -50,6 +54,10 @@ const TRANSITIONS = {
     JCState.IDLE,
     JCState.ERROR,
     JCState.LEAVING,
+    JCState.BREAK,
+    JCState.MEETING,
+    JCState.REVIEWING,
+    JCState.HANDOFF,
   ],
   [JCState.READING]: [
     JCState.CODING,
@@ -57,15 +65,54 @@ const TRANSITIONS = {
     JCState.IDLE,
     JCState.ERROR,
     JCState.LEAVING,
+    JCState.BREAK,
+    JCState.MEETING,
+    JCState.REVIEWING,
+    JCState.HANDOFF,
   ],
-  [JCState.ERROR]: [JCState.CODING, JCState.IDLE, JCState.LEAVING],
-  [JCState.IDLE]: [JCState.CODING, JCState.THINKING, JCState.READING, JCState.LEAVING],
+  [JCState.ERROR]: [JCState.CODING, JCState.IDLE, JCState.LEAVING, JCState.BREAK],
+  [JCState.IDLE]: [
+    JCState.CODING,
+    JCState.THINKING,
+    JCState.READING,
+    JCState.LEAVING,
+    JCState.BREAK,
+    JCState.MEETING,
+    JCState.REVIEWING,
+    JCState.HANDOFF,
+  ],
   [JCState.LEAVING]: [JCState.ABSENT],
-  [JCState.REVIEWING]: [],
-  [JCState.PRESENTING]: [],
-  [JCState.MEETING]: [],
-  [JCState.BREAK]: [],
-  [JCState.HANDOFF]: [],
+  [JCState.BREAK]: [
+    JCState.IDLE,
+    JCState.CODING,
+    JCState.THINKING,
+    JCState.READING,
+    JCState.LEAVING,
+  ],
+  [JCState.MEETING]: [
+    JCState.IDLE,
+    JCState.CODING,
+    JCState.THINKING,
+    JCState.READING,
+    JCState.LEAVING,
+    JCState.PRESENTING,
+  ],
+  [JCState.HANDOFF]: [
+    JCState.IDLE,
+    JCState.CODING,
+    JCState.THINKING,
+    JCState.READING,
+    JCState.LEAVING,
+  ],
+  [JCState.REVIEWING]: [
+    JCState.IDLE,
+    JCState.CODING,
+    JCState.THINKING,
+    JCState.READING,
+    JCState.LEAVING,
+    JCState.MEETING,
+  ],
+  [JCState.PRESENTING]: [JCState.IDLE, JCState.MEETING, JCState.LEAVING],
 };
 
 function canTransition(from, to) {
@@ -138,13 +185,32 @@ assert(canTransition('idle', 'reading'), 'idle -> reading');
 assert(canTransition('idle', 'leaving'), 'idle -> leaving');
 assert(canTransition('leaving', 'absent'), 'leaving -> absent');
 
-// ── canTransition() v2 transitions (should be INVALID) ──
-console.log('\n3. canTransition() — v2 states have NO outgoing transitions:');
-assert(!canTransition('reviewing', 'coding'), 'reviewing -> coding is INVALID');
-assert(!canTransition('presenting', 'idle'), 'presenting -> idle is INVALID');
-assert(!canTransition('meeting', 'leaving'), 'meeting -> leaving is INVALID');
-assert(!canTransition('break', 'idle'), 'break -> idle is INVALID');
+// ── canTransition() v2 transitions (now connected) ──
+console.log('\n3. canTransition() — v2 states have valid transitions:');
+assert(canTransition('break', 'idle'), 'break -> idle');
+assert(canTransition('break', 'coding'), 'break -> coding');
+assert(canTransition('break', 'leaving'), 'break -> leaving');
+assert(canTransition('meeting', 'idle'), 'meeting -> idle');
+assert(canTransition('meeting', 'leaving'), 'meeting -> leaving');
+assert(canTransition('meeting', 'presenting'), 'meeting -> presenting');
+assert(canTransition('handoff', 'idle'), 'handoff -> idle');
+assert(canTransition('handoff', 'coding'), 'handoff -> coding');
+assert(canTransition('reviewing', 'idle'), 'reviewing -> idle');
+assert(canTransition('reviewing', 'meeting'), 'reviewing -> meeting');
+assert(canTransition('presenting', 'idle'), 'presenting -> idle');
+assert(canTransition('presenting', 'meeting'), 'presenting -> meeting');
+// v1→v2 transitions
+assert(canTransition('idle', 'break'), 'idle -> break');
+assert(canTransition('idle', 'meeting'), 'idle -> meeting');
+assert(canTransition('coding', 'break'), 'coding -> break');
+assert(canTransition('coding', 'meeting'), 'coding -> meeting');
+// Still invalid
 assert(!canTransition('handoff', 'absent'), 'handoff -> absent is INVALID');
+assert(
+  !canTransition('presenting', 'coding'),
+  'presenting -> coding is INVALID (must go via meeting/idle)',
+);
+assert(!canTransition('break', 'meeting'), 'break -> meeting is INVALID (must go via idle)');
 
 // ── canTransition() invalid v1 transitions ──
 console.log('\n4. canTransition() — invalid v1 transitions:');
