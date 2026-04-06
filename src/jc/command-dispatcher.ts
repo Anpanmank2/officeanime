@@ -21,6 +21,43 @@ export interface CommandContext {
   updateTask?: (taskId: string, updates: { status?: string; priority?: number }) => void;
   /** Reassign task to different member */
   reassignTask?: (taskId: string, newAssignee: string) => void;
+  /** Submit a new task from Command Center */
+  submitTask?: (
+    prompt: string,
+    priority: number,
+    assignee?: string,
+    workingDirectory?: string,
+  ) => void;
+  /** Reorder tasks via drag-and-drop */
+  reorderTasks?: (taskIds: string[]) => void;
+  /** Review a task (approve/reject) */
+  reviewTask?: (taskId: string, action: 'approve' | 'reject') => void;
+  /** Get task history (completed tasks) — legacy */
+  getTaskHistory?: (limit?: number, offset?: number) => { tasks: unknown[]; hasMore: boolean };
+  /** Query task history log (JSONL-based, with full filters) */
+  queryTaskHistory?: (options: {
+    startDate?: string;
+    endDate?: string;
+    status?: string[];
+    labels?: string[];
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) => { entries: unknown[]; hasMore: boolean; totalCount: number };
+  /** Update task label override */
+  updateTaskLabel?: (taskId: string, date: string, label: string) => boolean;
+  /** Query office log */
+  queryOfficeLog?: (options: {
+    startDate?: string;
+    endDate?: string;
+    department?: string;
+    type?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }) => { entries: unknown[]; hasMore: boolean };
+  /** Broadcast a message to all connected clients */
+  broadcast?: (data: unknown) => void;
 }
 
 export interface CommandDispatcher {
@@ -123,6 +160,114 @@ export function createCommandDispatcher(): CommandDispatcher {
         if (taskId && newAssignee && context.reassignTask) {
           context.reassignTask(taskId, newAssignee);
           respond?.({ type: 'command:ack', commandType: cmd.type, success: true });
+        }
+        break;
+      }
+      case 'task:submit': {
+        const { prompt, priority, assignee, workingDirectory } = cmd as {
+          type: string;
+          prompt: string;
+          priority: number;
+          assignee?: string;
+          workingDirectory?: string;
+        };
+        if (prompt && context.submitTask) {
+          context.submitTask(prompt, priority ?? 3, assignee, workingDirectory);
+          respond?.({ type: 'command:ack', commandType: cmd.type, success: true });
+        } else {
+          respond?.({
+            type: 'command:ack',
+            commandType: cmd.type,
+            success: false,
+            error: 'Missing prompt or submitTask unavailable',
+          });
+        }
+        break;
+      }
+      case 'task:reorder': {
+        const { taskIds } = cmd as { type: string; taskIds: string[] };
+        if (taskIds && Array.isArray(taskIds) && context.reorderTasks) {
+          context.reorderTasks(taskIds);
+          respond?.({ type: 'command:ack', commandType: cmd.type, success: true });
+        }
+        break;
+      }
+      case 'task:review': {
+        const { taskId, action } = cmd as {
+          type: string;
+          taskId: string;
+          action: 'approve' | 'reject';
+        };
+        if (taskId && action && context.reviewTask) {
+          context.reviewTask(taskId, action);
+          respond?.({ type: 'command:ack', commandType: cmd.type, success: true });
+        }
+        break;
+      }
+      case 'task:requestHistory': {
+        const { startDate, endDate, status, labels, search, limit, offset } = cmd as {
+          type: string;
+          startDate?: string;
+          endDate?: string;
+          status?: string[];
+          labels?: string[];
+          search?: string;
+          limit?: number;
+          offset?: number;
+        };
+        // Use JSONL-based query if available, fall back to legacy
+        if (context.queryTaskHistory) {
+          const result = context.queryTaskHistory({
+            startDate,
+            endDate,
+            status,
+            labels,
+            search,
+            limit,
+            offset,
+          });
+          respond?.({ type: 'jcTaskHistoryLog', ...result });
+        } else if (context.getTaskHistory) {
+          const result = context.getTaskHistory(limit, offset);
+          respond?.({ type: 'jcTaskHistory', ...result });
+        }
+        break;
+      }
+      case 'task:updateLabel': {
+        const { taskId, date, label } = cmd as {
+          type: string;
+          taskId: string;
+          date: string;
+          label: string;
+        };
+        if (taskId && date && label && context.updateTaskLabel) {
+          const success = context.updateTaskLabel(taskId, date, label);
+          respond?.({ type: 'command:ack', commandType: cmd.type, success });
+        }
+        break;
+      }
+      case 'officeLog:query': {
+        const opts = cmd as {
+          type: string;
+          startDate?: string;
+          endDate?: string;
+          department?: string;
+          logType?: string;
+          search?: string;
+          limit?: number;
+          offset?: number;
+        };
+        if (context.queryOfficeLog) {
+          const result = context.queryOfficeLog({
+            startDate: opts.startDate,
+            endDate: opts.endDate,
+            department: opts.department,
+            type: opts.logType,
+            search: opts.search,
+            limit: opts.limit,
+            offset: opts.offset,
+          });
+          respond?.({ type: 'officeLog:history', ...result });
         }
         break;
       }

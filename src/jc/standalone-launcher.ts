@@ -9,6 +9,9 @@ import { startBrowserServer } from './browser-server.js';
 import { createCommandDispatcher } from './command-dispatcher.js';
 import { EventWatcher } from './event-watcher.js';
 import { createMessageBridge } from './message-bridge.js';
+import { OfficeLogWriter } from './office-log-writer.js';
+import { toolToJCState } from './state-machine.js';
+import { TaskWatcher } from './task-watcher.js';
 import type { JCConfig } from './types.js';
 
 const DEFAULT_PORT = 8432;
@@ -26,6 +29,8 @@ const assignedMembers = new Set<string>();
 const agentMemberMap: Record<number, string> = {};
 let jcMembers: JCMemberEntry[] = [];
 let jcConfig: unknown = null;
+let taskWatcher: TaskWatcher | null = null;
+const officeLogWriter = new OfficeLogWriter();
 
 /** Build messages to send when a browser client connects or signals ready */
 function buildClientInitMessages(respond: (msg: unknown) => void): void {
@@ -88,6 +93,11 @@ function buildClientInitMessages(respond: (msg: unknown) => void): void {
   if (Object.keys(agentMemberMap).length > 0) {
     respond({ type: 'jcMappingUpdate', mappings: { ...agentMemberMap } });
   }
+
+  // 4. Current task queue
+  if (taskWatcher) {
+    taskWatcher.syncToWebview();
+  }
 }
 
 async function main(): Promise<void> {
@@ -146,6 +156,225 @@ async function main(): Promise<void> {
     }
   }
 
+  // Create TaskWatcher if config is available
+  if (jcConfig) {
+    const emptyAgents = new Map();
+
+    // Resolve workspace root for claude CLI cwd (same logic as event watcher below)
+    const wsArg = args.find((a) => a.startsWith('--workspace='));
+    let claudeWorkspaceRoot = wsArg ? path.resolve(wsArg.split('=')[1]) : process.cwd();
+    // If cwd is inside pixel-agents, use parent directory (cc-company)
+    const parentDir = path.resolve(claudeWorkspaceRoot, '..');
+    const parentCompanyDir = path.join(parentDir, '.company');
+    if (fs.existsSync(parentCompanyDir)) {
+      claudeWorkspaceRoot = parentDir;
+    }
+
+    // Launch Claude Code CLI as a child process for each task
+    const spawnClaude = async (memberId: string, prompt: string, workDir?: string) => {
+      const { spawn } = await import('child_process');
+      const cwd = workDir ?? claudeWorkspaceRoot;
+      const sessionId = crypto.randomUUID();
+
+      console.log(
+        `[JC TaskWatcher] Launching claude for ${memberId} (session: ${sessionId.slice(0, 8)})`,
+      );
+      console.log(`[JC TaskWatcher]   cwd: ${cwd}`);
+      console.log(`[JC TaskWatcher]   prompt: ${prompt.slice(0, 80)}...`);
+
+      const child = spawn('claude', ['--session-id', sessionId, '--print', '-p', prompt], {
+        cwd,
+        stdio: ['ignore', 'pipe', 'pipe'],
+        env: { ...process.env },
+        detached: false,
+      });
+
+      // Collect output to store as task result and broadcast
+      let outputBuf = '';
+
+      child.stdout?.on('data', (data: Buffer) => {
+        const text = data.toString();
+        outputBuf += text;
+        if (text.trim()) console.log(`[JC ${memberId}] ${text.trim().slice(0, 200)}`);
+
+        // Stream activity summary to office UI
+        const summary = text.trim().slice(0, 100);
+        if (summary) {
+          server.broadcast({
+            type: 'jcActivitySummary',
+            agentId: -200,
+            memberId,
+            summary,
+          });
+        }
+      });
+
+      child.stderr?.on('data', (data: Buffer) => {
+        const text = data.toString().trim();
+        if (text) console.error(`[JC ${memberId} ERR] ${text.slice(0, 200)}`);
+      });
+
+      child.on('close', (code) => {
+        console.log(
+          `[JC TaskWatcher] ${memberId} session ${sessionId.slice(0, 8)} exited (code: ${code})`,
+        );
+
+        // Update task with result and mark as done
+        if (taskWatcher) {
+          const result = outputBuf.trim().slice(0, 2000) || `Exited with code ${code}`;
+          // Find the task and update it
+          const tasksFile = JSON.parse(
+            fs.readFileSync(path.join(os.homedir(), '.pixel-agents', 'tasks.json'), 'utf-8'),
+          );
+          const task = tasksFile.tasks?.find(
+            (t: { assignee: string; status: string }) =>
+              t.assignee === memberId && t.status === 'running',
+          );
+          if (task) {
+            task.status = code === 0 ? 'done' : 'error';
+            task.completedAt = new Date().toISOString();
+            task.result = result;
+            task.completionSummary = result.slice(0, 200);
+            const tmpPath = path.join(os.homedir(), '.pixel-agents', 'tasks.json.tmp');
+            fs.writeFileSync(tmpPath, JSON.stringify(tasksFile, null, 2), 'utf-8');
+            fs.renameSync(tmpPath, path.join(os.homedir(), '.pixel-agents', 'tasks.json'));
+            server.broadcast({ type: 'jcTaskUpdate', task });
+          }
+        }
+      });
+    };
+
+    taskWatcher = new TaskWatcher(jcConfig as JCConfig, emptyAgents, 5, spawnClaude, true);
+  }
+
+  // Helper: intercept broadcast messages to persist to office log
+  function writeToOfficeLog(msg: unknown): void {
+    const m = msg as { type?: string; [key: string]: unknown };
+    if (!m.type) return;
+
+    const findMemberName = (memberId: string): string => {
+      const cfg = jcConfig as { members?: Array<{ id: string; name: string; department: string }> };
+      const member = cfg?.members?.find((x) => x.id === memberId);
+      return member?.name ?? memberId;
+    };
+    const findMemberDept = (memberId: string): string => {
+      const cfg = jcConfig as { members?: Array<{ id: string; department: string }> };
+      return cfg?.members?.find((x) => x.id === memberId)?.department ?? 'exec';
+    };
+
+    switch (m.type) {
+      case 'jcMemberArriving': {
+        const memberId = m.memberId as string;
+        officeLogWriter.write({
+          timestamp: Date.now(),
+          memberId,
+          memberName: findMemberName(memberId),
+          department: findMemberDept(memberId),
+          type: 'arrival',
+          summary: `${findMemberName(memberId)} が出社しました`,
+          sourceEvent: 'jcMemberArriving',
+        });
+        break;
+      }
+      case 'jcMemberLeaving': {
+        const memberId = m.memberId as string;
+        officeLogWriter.write({
+          timestamp: Date.now(),
+          memberId,
+          memberName: findMemberName(memberId),
+          department: findMemberDept(memberId),
+          type: 'departure',
+          summary: `${findMemberName(memberId)} が退社しました`,
+          sourceEvent: 'jcMemberLeaving',
+        });
+        break;
+      }
+      case 'jcMemberStateChange': {
+        const memberId = m.memberId as string;
+        const jcState = m.jcState as string;
+        officeLogWriter.write({
+          timestamp: Date.now(),
+          memberId,
+          memberName: findMemberName(memberId),
+          department: findMemberDept(memberId),
+          type: 'state_change',
+          summary: `${findMemberName(memberId)}: → ${jcState}`,
+          sourceEvent: 'jcMemberStateChange',
+        });
+        break;
+      }
+      case 'jcActivitySummary': {
+        const memberId = m.memberId as string;
+        const summary = m.summary as string | null;
+        if (summary) {
+          officeLogWriter.write({
+            timestamp: Date.now(),
+            memberId,
+            memberName: findMemberName(memberId),
+            department: findMemberDept(memberId),
+            type: 'speech',
+            summary: `${findMemberName(memberId)}: ${summary}`,
+            sourceEvent: 'jcActivitySummary',
+          });
+        }
+        break;
+      }
+      case 'jcSpeechBubble': {
+        const bubble = m.bubble as { memberId: string; text: string; department: string };
+        if (bubble) {
+          officeLogWriter.write({
+            timestamp: Date.now(),
+            memberId: bubble.memberId,
+            memberName: findMemberName(bubble.memberId),
+            department: bubble.department,
+            type: 'speech',
+            summary: `${findMemberName(bubble.memberId)}: ${bubble.text}`,
+            sourceEvent: 'jcSpeechBubble',
+          });
+        }
+        break;
+      }
+      case 'jcOfficeEvent': {
+        const event = m.event as { event: string; [key: string]: unknown };
+        if (event) {
+          const evType = event.event;
+          let memberId = (event.agent ?? event.from ?? '') as string;
+          let summary = evType;
+          let logType: 'task_event' | 'delegation' | 'office_event' = 'office_event';
+
+          if (
+            evType === 'task_received' ||
+            evType === 'task_completed' ||
+            evType === 'work_started'
+          ) {
+            logType = 'task_event';
+            summary = `${evType}: ${(event.task as string) ?? ''}`;
+          } else if (evType === 'delegate' || evType === 'task_assigned') {
+            logType = 'delegation';
+            memberId = event.from as string;
+            const to = event.to as string | string[];
+            const toStr = Array.isArray(to) ? to.join(', ') : to;
+            summary = `${findMemberName(memberId)} → ${toStr}: ${(event.task as string) ?? ''}`;
+          } else if (evType === 'cross_dept_message') {
+            memberId = event.from as string;
+            summary = `${findMemberName(memberId)} → ${findMemberName(event.to as string)}: ${(event.message as string) ?? ''}`;
+          }
+
+          officeLogWriter.write({
+            timestamp: Date.now(),
+            memberId,
+            memberName: findMemberName(memberId),
+            department: findMemberDept(memberId),
+            type: logType,
+            summary,
+            sourceEvent: evType,
+          });
+        }
+        break;
+      }
+    }
+  }
+
   // Start browser server
   const server = await startBrowserServer(extensionPath, port, (data, respond) => {
     const msg = data as { type?: string };
@@ -159,6 +388,50 @@ async function main(): Promise<void> {
     // Forward other commands to dispatcher
     dispatcher.dispatch(data, respond);
   });
+
+  // Wire TaskWatcher into dispatcher and start it
+  if (taskWatcher) {
+    const pseudoWebview = {
+      postMessage: (msg: unknown) => {
+        server.broadcast(msg);
+        writeToOfficeLog(msg);
+      },
+    };
+    taskWatcher.start(pseudoWebview);
+
+    dispatcher.setContext({
+      submitTask: (prompt, priority, assignee, workingDirectory) => {
+        // Default assignee to first available member if not specified
+        const target = assignee ?? jcMembers[0]?.id ?? 'eng-01';
+        // Prefix with /company so Cursor's Claude Code invokes the company skill
+        const fullPrompt = `/company ${prompt}`;
+        taskWatcher!.submitTask(target, fullPrompt, priority, workingDirectory);
+      },
+      reorderTasks: (taskIds) => taskWatcher!.reorderTasks(taskIds),
+      reviewTask: (taskId, action) => taskWatcher!.reviewTask(taskId, action),
+      getTaskHistory: (limit, offset) => taskWatcher!.getTaskHistory(limit, offset),
+      cancelTask: (taskId) => taskWatcher!.cancelTask(taskId),
+      updateTask: (taskId, updates) => {
+        if (updates.status) {
+          taskWatcher!.updateTaskStatus(taskId, updates.status as any);
+        }
+      },
+      reassignTask: (taskId, newAssignee) => taskWatcher!.reassignTask(taskId, newAssignee),
+    });
+
+    // Wire history writer queries and office log into dispatcher
+    const historyWriter = taskWatcher.getHistoryWriter();
+    dispatcher.setContext({
+      queryTaskHistory: (opts) => historyWriter.query(opts),
+      updateTaskLabel: (taskId, date, label) =>
+        historyWriter.updateLabel(taskId, date, label as any),
+      queryOfficeLog: (opts) => officeLogWriter.query(opts),
+    });
+
+    console.log(`[JC] TaskWatcher started (watching ~/.pixel-agents/tasks.json)`);
+    console.log(`[JC] Task history: ~/.pixel-agents/task-history/`);
+    console.log(`[JC] Office log: ~/.pixel-agents/office-log/`);
+  }
 
   // Start event queue watcher (jc-events.json)
   // Resolve workspace root: --workspace= arg > parent dir with jc-events.json > cwd
@@ -185,8 +458,13 @@ async function main(): Promise<void> {
     }
 
     eventWatcher = new EventWatcher(jcConfig as JCConfig, workspaceRoot);
-    // Create a pseudo-webview that broadcasts to all browser clients
-    const pseudoWebview = { postMessage: (msg: unknown) => server.broadcast(msg) } as any;
+    // Create a pseudo-webview that broadcasts to all browser clients + writes to office log
+    const pseudoWebview = {
+      postMessage: (msg: unknown) => {
+        server.broadcast(msg);
+        writeToOfficeLog(msg);
+      },
+    } as any;
     eventWatcher.start(pseudoWebview);
     console.log(`[JC] Event watcher started (watching ${workspaceRoot}/jc-events.json)`);
   }
@@ -221,6 +499,7 @@ async function main(): Promise<void> {
   // Graceful shutdown
   const shutdown = () => {
     console.log('\n[JC] Shutting down...');
+    taskWatcher?.dispose();
     server.close();
     process.exit(0);
   };
@@ -231,6 +510,104 @@ async function main(): Promise<void> {
 // ── JSONL Watcher ────────────────────────────────────────────────
 
 let nextAgentId = 1;
+
+/** Per-file JSONL content tracking state */
+interface JsonlContentState {
+  fileOffset: number;
+  lineBuffer: string;
+  activeTools: Set<string>;
+  memberId: string;
+  agentId: number;
+}
+const jsonlContentStates = new Map<string, JsonlContentState>();
+
+/** Read new lines from a JSONL file and process tool_use/tool_result for animations */
+function readAndProcessJsonl(
+  filePath: string,
+  state: JsonlContentState,
+  broadcast: (data: unknown) => void,
+): void {
+  try {
+    const stat = fs.statSync(filePath);
+    if (stat.size <= state.fileOffset) return;
+
+    const readSize = Math.min(stat.size - state.fileOffset, 65536); // 64KB cap
+    const buf = Buffer.alloc(readSize);
+    const fd = fs.openSync(filePath, 'r');
+    fs.readSync(fd, buf, 0, readSize, state.fileOffset);
+    fs.closeSync(fd);
+    state.fileOffset += readSize;
+
+    const chunk = state.lineBuffer + buf.toString('utf-8');
+    const lines = chunk.split('\n');
+    state.lineBuffer = lines.pop() || ''; // Keep incomplete last line
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      processJsonlLine(line, state, broadcast);
+    }
+  } catch {
+    // File might be mid-write or deleted
+  }
+}
+
+/** Parse a single JSONL line and broadcast state changes */
+function processJsonlLine(
+  line: string,
+  state: JsonlContentState,
+  broadcast: (data: unknown) => void,
+): void {
+  try {
+    const record = JSON.parse(line);
+    const content = record.message?.content ?? record.content;
+
+    // assistant record with tool_use blocks → set active animation state
+    if (record.type === 'assistant' && Array.isArray(content)) {
+      for (const block of content as Array<{ type: string; id?: string; name?: string }>) {
+        if (block.type === 'tool_use' && block.id && block.name) {
+          state.activeTools.add(block.id);
+          const jcState = toolToJCState(block.name);
+          broadcast({
+            type: 'jcMemberStateChange',
+            agentId: state.agentId,
+            memberId: state.memberId,
+            jcState,
+          });
+        }
+      }
+    }
+
+    // user record with tool_result → mark tool done, idle when all tools complete
+    if (record.type === 'user' && Array.isArray(content)) {
+      for (const block of content as Array<{ type: string; tool_use_id?: string }>) {
+        if (block.type === 'tool_result' && block.tool_use_id) {
+          state.activeTools.delete(block.tool_use_id);
+        }
+      }
+      if (state.activeTools.size === 0) {
+        broadcast({
+          type: 'jcMemberStateChange',
+          agentId: state.agentId,
+          memberId: state.memberId,
+          jcState: 'idle',
+        });
+      }
+    }
+
+    // turn_duration system record → turn completed, clear all tools
+    if (record.type === 'system' && record.subtype === 'turn_duration') {
+      state.activeTools.clear();
+      broadcast({
+        type: 'jcMemberStateChange',
+        agentId: state.agentId,
+        memberId: state.memberId,
+        jcState: 'idle',
+      });
+    }
+  } catch {
+    // Invalid JSON line, skip
+  }
+}
 
 function startWatcher(claudeDir: string, broadcast: (data: unknown) => void): void {
   const scanProjects = (): void => {
@@ -278,6 +655,15 @@ function startWatcher(claudeDir: string, broadcast: (data: unknown) => void): vo
 
             broadcast({ type: 'jcMappingUpdate', mappings: { ...agentMemberMap } });
 
+            // Start JSONL content monitoring for this agent
+            jsonlContentStates.set(filePath, {
+              fileOffset: fstat.size, // Start from current end (only new activity)
+              lineBuffer: '',
+              activeTools: new Set(),
+              memberId: member.id,
+              agentId,
+            });
+
             console.log(`[JC] Agent ${agentId} → ${member.id} (desk: ${member.deskId})`);
           } else {
             console.log(`[JC] Agent ${agentId} detected (no JC member available)`);
@@ -288,6 +674,13 @@ function startWatcher(claudeDir: string, broadcast: (data: unknown) => void): vo
       // Ignore scan errors
     }
   };
+
+  // Content poll: read new JSONL lines and update animation states (500ms)
+  setInterval(() => {
+    for (const [filePath, state] of jsonlContentStates) {
+      readAndProcessJsonl(filePath, state, broadcast);
+    }
+  }, 500);
 
   scanProjects();
   setInterval(scanProjects, 5000);

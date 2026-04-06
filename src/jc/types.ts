@@ -126,6 +126,10 @@ export type JCMessageToWebview =
   | { type: 'jcAbsenceBulkSync'; payload: AbsenceInfo[] }
   | { type: 'jcTaskUpdate'; task: TaskDefinition }
   | { type: 'jcTasksBulkSync'; tasks: TaskDefinition[] }
+  | { type: 'jcTaskHistory'; tasks: TaskDefinition[]; hasMore: boolean }
+  | { type: 'jcTaskHistoryLog'; entries: unknown[]; hasMore: boolean; totalCount: number }
+  | { type: 'jcTaskReorder'; tasks: TaskDefinition[] }
+  | { type: 'officeLog:history'; entries: unknown[]; hasMore: boolean }
   | { type: 'jcSpeechBubble'; bubble: SpeechBubble }
   | { type: 'jcOfficeEvent'; event: OfficeEvent };
 
@@ -139,16 +143,61 @@ export type JCMessageToExtension =
       prompt: string;
       priority: number;
       workingDirectory?: string;
+    }
+  | {
+      type: 'task:submit';
+      prompt: string;
+      priority: number;
+      assignee?: string;
+      workingDirectory?: string;
+    }
+  | { type: 'task:reorder'; taskIds: string[] }
+  | { type: 'task:review'; taskId: string; action: 'approve' | 'reject' }
+  | {
+      type: 'task:requestHistory';
+      startDate?: string;
+      endDate?: string;
+      status?: string[];
+      labels?: string[];
+      search?: string;
+      limit?: number;
+      offset?: number;
+    }
+  | { type: 'task:updateLabel'; taskId: string; date: string; label: string }
+  | {
+      type: 'officeLog:query';
+      startDate?: string;
+      endDate?: string;
+      department?: string;
+      logType?: string;
+      search?: string;
+      limit?: number;
+      offset?: number;
     };
 
 /** Task status values */
 export const TaskStatus = {
   PENDING: 'pending',
   RUNNING: 'running',
+  REVIEWING: 'reviewing',
   DONE: 'done',
   ERROR: 'error',
+  CANCELLED: 'cancelled',
 } as const;
 export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
+
+/** Task label for auto-classification */
+export const TaskLabel = {
+  IMPLEMENTATION: 'implementation',
+  RESEARCH: 'research',
+  REVIEW: 'review',
+  BUGFIX: 'bugfix',
+  DESIGN: 'design',
+  OPS: 'ops',
+  INCIDENT: 'incident',
+  OTHER: 'other',
+} as const;
+export type TaskLabel = (typeof TaskLabel)[keyof typeof TaskLabel];
 
 /** Task definition for the orchestrator */
 export interface TaskDefinition {
@@ -158,11 +207,20 @@ export interface TaskDefinition {
   systemPrompt?: string;
   workingDirectory?: string;
   status: TaskStatus;
-  priority: number; // 1 = highest
+  priority: number; // 0 = P0 critical, 4 = P4 low
   createdAt: string; // ISO 8601
   startedAt?: string;
   completedAt?: string;
   result?: string;
+  // Phase A extensions (all optional for backward compat)
+  label?: TaskLabel;
+  delegationChain?: string[]; // ordered member IDs
+  reviewState?: 'pending' | 'approved' | 'rejected';
+  reviewedBy?: string;
+  outputFiles?: string[];
+  completionSummary?: string;
+  isIncident?: boolean;
+  sortOrder?: number; // manual DnD ordering
 }
 
 /** tasks.json file schema */
