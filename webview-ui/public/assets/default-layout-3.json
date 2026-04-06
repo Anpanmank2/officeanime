@@ -4213,6 +4213,84 @@
       "type": "BIN",
       "col": 24,
       "row": 20
+    },
+    {
+      "uid": "tbl-097",
+      "type": "SMALL_TABLE_FRONT",
+      "col": 5,
+      "row": 15
+    },
+    {
+      "uid": "res-desk-07",
+      "type": "CUSHIONED_BENCH",
+      "col": 5,
+      "row": 17
+    },
+    {
+      "uid": "pc-098",
+      "type": "PC_FRONT_OFF",
+      "col": 5,
+      "row": 15
+    },
+    {
+      "uid": "fur-099",
+      "type": "BOOK_STACK",
+      "col": 6,
+      "row": 16
+    },
+    {
+      "uid": "tbl-100",
+      "type": "SMALL_TABLE_FRONT",
+      "col": 10,
+      "row": 15
+    },
+    {
+      "uid": "res-desk-08",
+      "type": "CUSHIONED_BENCH",
+      "col": 10,
+      "row": 17
+    },
+    {
+      "uid": "pc-101",
+      "type": "PC_FRONT_ON_1",
+      "col": 10,
+      "row": 15
+    },
+    {
+      "uid": "fur-102",
+      "type": "BOOK_STACK",
+      "col": 11,
+      "row": 16
+    },
+    {
+      "uid": "fur-103",
+      "type": "BOOK_STACK",
+      "col": 9,
+      "row": 19
+    },
+    {
+      "uid": "fur-104",
+      "type": "COFFEE",
+      "col": 8,
+      "row": 18
+    },
+    {
+      "uid": "fur-105",
+      "type": "CACTUS",
+      "col": 1,
+      "row": 19
+    },
+    {
+      "uid": "fur-106",
+      "type": "HEADPHONE_STAND",
+      "col": 6,
+      "row": 19
+    },
+    {
+      "uid": "fur-107",
+      "type": "DESK_LAMP",
+      "col": 10,
+      "row": 18
     }
   ]
 }
