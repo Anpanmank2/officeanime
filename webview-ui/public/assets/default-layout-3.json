@@ -725,12 +725,6 @@
       "row": 3
     },
     {
-      "uid": "meet-whiteboard-01",
-      "type": "WHITEBOARD",
-      "col": 3,
-      "row": 0
-    },
-    {
       "uid": "break-coffee-01",
       "type": "COFFEE_TABLE",
       "col": 22,
@@ -1343,12 +1337,6 @@
       "row": 8
     },
     {
-      "uid": "meet-clock-01",
-      "type": "CLOCK",
-      "col": 1,
-      "row": 0
-    },
-    {
       "uid": "poker-dice-01",
       "type": "DICE_MONUMENT",
       "col": 17,
@@ -1401,12 +1389,6 @@
       "type": "GAMING_CHAIR",
       "col": 20,
       "row": 18
-    },
-    {
-      "uid": "exec-display-aqua",
-      "type": "LARGE_DISPLAY",
-      "col": 15,
-      "row": 1
     },
     {
       "uid": "meet-decor-01",
