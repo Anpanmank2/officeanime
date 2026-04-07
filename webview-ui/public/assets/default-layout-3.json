@@ -662,19 +662,6 @@
       "row": 2
     },
     {
-      "uid": "exec-bench-02",
-      "type": "GAMING_CHAIR",
-      "col": 10,
-      "row": 4,
-      "color": {
-        "h": 0,
-        "s": 40,
-        "b": 5,
-        "c": 0,
-        "colorize": true
-      }
-    },
-    {
       "uid": "exec-desk-02",
       "type": "SMALL_TABLE_FRONT",
       "col": 10,
@@ -1261,16 +1248,9 @@
     },
     {
       "uid": "poker-table-01",
-      "type": "TABLE_FRONT",
-      "col": 17,
-      "row": 17,
-      "color": {
-        "h": 25,
-        "s": 60,
-        "b": -15,
-        "c": 10,
-        "colorize": true
-      }
+      "type": "POKER_TABLE",
+      "col": 18,
+      "row": 18
     },
     {
       "uid": "poker-shelf-01",
