@@ -1,0 +1,16 @@
+{
+  "id": "AQUARIUM_WALL",
+  "name": "Aquarium Wall",
+  "label": "Aquarium Wall",
+  "category": "wall",
+  "type": "asset",
+  "canPlaceOnWalls": true,
+  "canPlaceOnSurfaces": false,
+  "backgroundTiles": 0,
+  "width": 48,
+  "height": 32,
+  "footprintW": 3,
+  "footprintH": 2,
+  "isDesk": false,
+  "groupId": "AQUARIUM_WALL"
+}

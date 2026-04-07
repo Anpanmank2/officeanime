@@ -1,0 +1,16 @@
+{
+  "id": "CARD_DISPLAY",
+  "name": "Card Display",
+  "label": "Card Display",
+  "category": "decor",
+  "type": "asset",
+  "canPlaceOnWalls": false,
+  "canPlaceOnSurfaces": false,
+  "backgroundTiles": 0,
+  "width": 16,
+  "height": 32,
+  "footprintW": 1,
+  "footprintH": 2,
+  "isDesk": false,
+  "groupId": "CARD_DISPLAY"
+}

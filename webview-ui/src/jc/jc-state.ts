@@ -81,10 +81,7 @@ const DESK_POSITIONS: Record<string, { col: number; row: number; facingDir: numb
 };
 
 /** Exec positions — icon-only (no character), shown in Exec Area */
-const EXEC_POSITIONS: Array<{ id: string; col: number; row: number; label: string }> = [
-  { id: 'exec-01', col: 10, row: 3, label: 'Owner/COO' },
-  { id: 'exec-pm', col: 12, row: 3, label: 'PM' },
-];
+const EXEC_POSITIONS: Array<{ id: string; col: number; row: number; label: string }> = [];
 
 /** Initialize from config message */
 export function jcLoadConfig(config: JCConfigData): void {

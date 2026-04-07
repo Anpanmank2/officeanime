@@ -53,19 +53,16 @@ const STATS_FALLBACK_FONT = '8px monospace';
 
 // ── Zone labels ──────────────────────────────────────────────────
 const ZONE_LABELS: Array<{ text: string; col: number; row: number; zone: string }> = [
-  { text: 'EXEC AREA', col: 3, row: 2, zone: 'exec' },
-  { text: 'DEV ZONE', col: 4, row: 7, zone: 'dev' },
-  { text: 'MARKETING', col: 17, row: 7, zone: 'marketing' },
-  { text: 'RESEARCH LAB', col: 4, row: 15, zone: 'research' },
+  { text: 'EXECUTIVE', col: 10, row: 2, zone: 'exec' },
+  { text: 'MARKETING', col: 4, row: 7, zone: 'marketing' },
+  { text: 'RESEARCH', col: 17, row: 7, zone: 'research' },
+  { text: 'DEV ZONE', col: 4, row: 15, zone: 'dev' },
   { text: 'POKER ROOM', col: 17, row: 15, zone: 'ops' },
 ];
 
 // ── Glass walls ──────────────────────────────────────────────────
 const GLASS_WALLS: Array<{ col: number; row: number; width: number; height: number }> = [
-  { col: 1, row: 6, width: 24, height: 1 },
-  { col: 12, row: 7, width: 1, height: 7 },
   { col: 1, row: 14, width: 24, height: 1 },
-  { col: 12, row: 15, width: 1, height: 7 },
 ];
 
 // ── Liaison beam effect ──────────────────────────────────────────
@@ -81,10 +78,10 @@ const ZONE_AREAS: Array<{
   width: number;
   height: number;
 }> = [
-  { zone: 'exec', col: 1, row: 2, width: 10, height: 4 },
-  { zone: 'dev', col: 1, row: 7, width: 11, height: 7 },
-  { zone: 'marketing', col: 13, row: 7, width: 12, height: 7 },
-  { zone: 'research', col: 1, row: 15, width: 11, height: 7 },
+  { zone: 'exec', col: 7, row: 2, width: 10, height: 4 },
+  { zone: 'marketing', col: 1, row: 6, width: 12, height: 8 },
+  { zone: 'research', col: 13, row: 6, width: 12, height: 8 },
+  { zone: 'dev', col: 1, row: 15, width: 12, height: 7 },
   { zone: 'ops', col: 13, row: 15, width: 12, height: 7 },
 ];
 
