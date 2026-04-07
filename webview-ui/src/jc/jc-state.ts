@@ -18,7 +18,7 @@ const memberRuntimes = new Map<string, JCMemberRuntime>();
 const agentToMember = new Map<number, string>();
 
 /** Entrance tile (spawn/despawn point) */
-export const JC_ENTRANCE = { col: 12, row: 2 };
+export const JC_ENTRANCE = { col: 12, row: 6 };
 
 /** Poker Table seats — meeting gathering point in Poker Room */
 export const POKER_TABLE_SEATS = [
@@ -30,11 +30,11 @@ export const POKER_TABLE_SEATS = [
 
 /** Break zone target positions by breakBehavior type */
 const BREAK_TARGETS: Record<string, { col: number; row: number }> = {
-  coffee: { col: 21, row: 4 },
-  sofa: { col: 19, row: 3 },
-  arcade: { col: 24, row: 3 },
-  bookshelf: { col: 20, row: 3 },
-  meeting: { col: 17, row: 17 },
+  coffee: { col: 22, row: 3 },
+  sofa: { col: 21, row: 4 },
+  arcade: { col: 20, row: 2 },
+  bookshelf: { col: 23, row: 2 },
+  meeting: { col: 3, row: 3 },
 };
 
 /**
@@ -43,50 +43,47 @@ const BREAK_TARGETS: Record<string, { col: number; row: number }> = {
  * Nameplate text is derived from jc-config.json at runtime via jcGetNameplates().
  */
 const DESK_POSITIONS: Record<string, { col: number; row: number; facingDir: number }> = {
-  // ── Engineering — Dev Zone (cols 1-11, rows 7-13) ──
-  // "テックオタクの洞窟" — クラスタ配置
-  'dev-desk-01': { col: 5, row: 9, facingDir: 2 }, // Kenta (TL) — ペアプロ、Ryo.Sに向かう（左向き）
-  'dev-desk-02': { col: 2, row: 9, facingDir: 1 }, // Ryo.S (BE) — Kentaに向かう（右向き）
-  'dev-desk-03': { col: 8, row: 9, facingDir: 0 }, // Hina (FE) — 壁向き集中席（北向き）
-  'dev-desk-04': { col: 2, row: 12, facingDir: 3 }, // Maho (PM) — チーム俯瞰（南向き）
-  'dev-desk-05': { col: 6, row: 12, facingDir: 3 }, // Ren (Designer) — 横並びペア（南向き）
-  'dev-desk-06': { col: 8, row: 12, facingDir: 3 }, // Shota (Game) — Renと画面共有（南向き）
+  // ── Executive — Exec Zone (cols 8-16, rows 2-5) ──
+  'exec-desk-sec': { col: 8, row: 4, facingDir: 3 }, // Secretary
+  'exec-desk-pm': { col: 12, row: 4, facingDir: 3 }, // PM Yamamoto
 
-  // ── Marketing — Creative Village (cols 13-24, rows 7-13) ──
-  // "カラフルなカオス" — Strategy島 + Execution列
-  'mkt-desk-01': { col: 14, row: 9, facingDir: 3 }, // Ryo.K (Dir) — 角のL字、全体を見渡す（南向き）
-  'mkt-desk-02': { col: 17, row: 9, facingDir: 1 }, // Natsuki — Strategy島（右向き→Tomásに向かう）
-  'mkt-desk-03': { col: 19, row: 9, facingDir: 2 }, // Tomás — Strategy島（左向き→Natsukiに向かう）
-  'mkt-desk-04': { col: 21, row: 9, facingDir: 1 }, // Sasha — Strategy島（右向き→Kenjiに向かう）
-  'mkt-desk-05': { col: 23, row: 9, facingDir: 2 }, // Kenji — Strategy島（左向き→Sashaに向かう）
-  'mkt-desk-06': { col: 14, row: 12, facingDir: 3 }, // Rina (Ops) — 情報ハブ（南向き）
-  'mkt-desk-07': { col: 16, row: 12, facingDir: 3 }, // Mei — Execution列（南向き）
-  'mkt-desk-08': { col: 18, row: 12, facingDir: 3 }, // Jake — Execution列（南向き）
-  'mkt-desk-09': { col: 20, row: 12, facingDir: 3 }, // Hana — Execution列（南向き）
-  'mkt-desk-10': { col: 22, row: 12, facingDir: 3 }, // Daichi — Execution列（南向き）
-  'mkt-desk-11': { col: 24, row: 12, facingDir: 3 }, // Lena — Execution列（南向き）
+  // ── Marketing — Marketing Zone (cols 1-12, rows 6-13) ──
+  'mkt-desk-01': { col: 2, row: 8, facingDir: 3 }, // Ryo.K (Dir)
+  'mkt-desk-02': { col: 4, row: 8, facingDir: 3 }, // Natsuki
+  'mkt-desk-03': { col: 6, row: 8, facingDir: 3 }, // Tomás
+  'mkt-desk-04': { col: 8, row: 8, facingDir: 3 }, // Sasha
+  'mkt-desk-05': { col: 10, row: 8, facingDir: 3 }, // Kenji
+  'mkt-desk-06': { col: 2, row: 12, facingDir: 3 }, // Rina
+  'mkt-desk-07': { col: 4, row: 12, facingDir: 3 }, // Mei
+  'mkt-desk-08': { col: 6, row: 12, facingDir: 3 }, // Jake
+  'mkt-desk-09': { col: 8, row: 12, facingDir: 3 }, // Hana
+  'mkt-desk-10': { col: 10, row: 12, facingDir: 3 }, // Daichi
+  'mkt-desk-11': { col: 2, row: 10, facingDir: 1 }, // Lena
+  'mkt-desk-12': { col: 11, row: 10, facingDir: 2 }, // Langley Aoi
 
-  // ── Research Lab — 学者の書斎 (cols 1-11, rows 15-21) ──
-  // ゼミ配置: 本棚を背にした上座 + 向かい合わせペア + 独立席
-  'res-desk-01': { col: 3, row: 17, facingDir: 3 }, // Haruki (Dir) — 本棚背、最奥の上座（南向き）
-  'res-desk-02': { col: 7, row: 17, facingDir: 3 }, // Sora — シニア研究員（南向き）
-  'res-desk-03': { col: 2, row: 20, facingDir: 1 }, // Marina — 向かい合わせペア（右向き→Kaiへ）
-  'res-desk-04': { col: 5, row: 20, facingDir: 2 }, // Kai — 向かい合わせペア（左向き→Marinaへ）
-  'res-desk-05': { col: 8, row: 20, facingDir: 2 }, // Priya — 独立席、壁向き（西向き）
-  'res-desk-06': { col: 10, row: 20, facingDir: 3 }, // Yuto — データ統合席（南向き）
-  'res-desk-07': { col: 5, row: 17, facingDir: 3 }, // Marcus (L2) — Director右隣、戦略参謀（南向き）
-  'res-desk-08': { col: 10, row: 17, facingDir: 3 }, // Ayane — 上段右端、SEO分析席（南向き）
+  // ── Research — Research Zone (cols 13-24, rows 6-13) ──
+  'res-desk-01': { col: 14, row: 9, facingDir: 3 }, // Haruki (Dir)
+  'res-desk-02': { col: 16, row: 9, facingDir: 3 }, // Sora
+  'res-desk-03': { col: 18, row: 9, facingDir: 3 }, // Marina
+  'res-desk-04': { col: 20, row: 9, facingDir: 3 }, // Kai
+  'res-desk-05': { col: 14, row: 12, facingDir: 3 }, // Priya
+  'res-desk-06': { col: 16, row: 12, facingDir: 3 }, // Yuto
+  'res-desk-07': { col: 18, row: 12, facingDir: 3 }, // Marcus
+  'res-desk-08': { col: 20, row: 12, facingDir: 3 }, // Ayane
+  'res-desk-09': { col: 22, row: 12, facingDir: 3 }, // Ren Fujisawa
 
-  // ── Executive — Exec Area (permanent residents) ──
-  // "静かな威圧感" — ミニマルで品格のある空間
-  'exec-desk-ceo': { col: 3, row: 4, facingDir: 3 }, // CEO Kamei
-  'exec-desk-sec': { col: 5, row: 4, facingDir: 3 }, // Secretary
+  // ── Engineering — Dev Zone (cols 1-12, rows 15-21) ──
+  'dev-desk-01': { col: 3, row: 17, facingDir: 3 }, // Kenta (TL)
+  'dev-desk-02': { col: 5, row: 17, facingDir: 3 }, // Ryo.S
+  'dev-desk-03': { col: 7, row: 17, facingDir: 3 }, // Hina
+  'dev-desk-05': { col: 3, row: 20, facingDir: 3 }, // Ren Fujii
+  'dev-desk-06': { col: 5, row: 20, facingDir: 3 }, // Shota
 };
 
 /** Exec positions — icon-only (no character), shown in Exec Area */
 const EXEC_POSITIONS: Array<{ id: string; col: number; row: number; label: string }> = [
-  { id: 'exec-01', col: 2, row: 3, label: 'Owner/COO' },
-  { id: 'exec-04', col: 5, row: 3, label: 'PM' },
+  { id: 'exec-01', col: 10, row: 3, label: 'Owner/COO' },
+  { id: 'exec-pm', col: 12, row: 3, label: 'PM' },
 ];
 
 /** Initialize from config message */
