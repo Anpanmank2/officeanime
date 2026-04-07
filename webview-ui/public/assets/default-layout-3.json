@@ -657,7 +657,7 @@
     },
     {
       "uid": "exec-pc-01",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 8,
       "row": 2
     },
@@ -689,7 +689,7 @@
     },
     {
       "uid": "exec-pc-02",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 10,
       "row": 2
     },
@@ -721,7 +721,7 @@
     },
     {
       "uid": "exec-pc-03",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 12,
       "row": 2
     },
@@ -793,7 +793,7 @@
     },
     {
       "uid": "mkt-pc-01",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 2,
       "row": 6
     },
@@ -811,7 +811,7 @@
     },
     {
       "uid": "mkt-pc-02",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 4,
       "row": 6
     },
@@ -829,7 +829,7 @@
     },
     {
       "uid": "mkt-pc-03",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 6,
       "row": 6
     },
@@ -847,7 +847,7 @@
     },
     {
       "uid": "mkt-pc-04",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 8,
       "row": 6
     },
@@ -865,7 +865,7 @@
     },
     {
       "uid": "mkt-pc-05",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 10,
       "row": 6
     },
@@ -883,7 +883,7 @@
     },
     {
       "uid": "mkt-pc-06",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 2,
       "row": 10
     },
@@ -901,7 +901,7 @@
     },
     {
       "uid": "mkt-pc-07",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 4,
       "row": 10
     },
@@ -919,7 +919,7 @@
     },
     {
       "uid": "mkt-pc-08",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 6,
       "row": 10
     },
@@ -937,7 +937,7 @@
     },
     {
       "uid": "mkt-pc-09",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 8,
       "row": 10
     },
@@ -955,7 +955,7 @@
     },
     {
       "uid": "mkt-pc-10",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 10,
       "row": 10
     },
@@ -991,7 +991,7 @@
     },
     {
       "uid": "res-pc-01",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 14,
       "row": 7
     },
@@ -1009,7 +1009,7 @@
     },
     {
       "uid": "res-pc-02",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 16,
       "row": 7
     },
@@ -1027,7 +1027,7 @@
     },
     {
       "uid": "res-pc-03",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 18,
       "row": 7
     },
@@ -1045,7 +1045,7 @@
     },
     {
       "uid": "res-pc-04",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 20,
       "row": 7
     },
@@ -1063,7 +1063,7 @@
     },
     {
       "uid": "res-pc-05",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 14,
       "row": 10
     },
@@ -1081,7 +1081,7 @@
     },
     {
       "uid": "res-pc-06",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 16,
       "row": 10
     },
@@ -1099,7 +1099,7 @@
     },
     {
       "uid": "res-pc-07",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 18,
       "row": 10
     },
@@ -1117,7 +1117,7 @@
     },
     {
       "uid": "res-pc-08",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 20,
       "row": 10
     },
@@ -1135,7 +1135,7 @@
     },
     {
       "uid": "res-pc-09",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 22,
       "row": 10
     },
@@ -1159,7 +1159,7 @@
     },
     {
       "uid": "eng-pc-01",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 3,
       "row": 15
     },
@@ -1177,7 +1177,7 @@
     },
     {
       "uid": "eng-pc-02",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 5,
       "row": 15
     },
@@ -1195,7 +1195,7 @@
     },
     {
       "uid": "eng-pc-03",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 7,
       "row": 15
     },
@@ -1213,7 +1213,7 @@
     },
     {
       "uid": "eng-pc-04",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 3,
       "row": 18
     },
@@ -1231,7 +1231,7 @@
     },
     {
       "uid": "eng-pc-05",
-      "type": "PC_FRONT_OFF",
+      "type": "ULTRAWIDE_MONITOR",
       "col": 5,
       "row": 18
     },
