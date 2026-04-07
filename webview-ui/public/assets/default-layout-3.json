@@ -725,28 +725,10 @@
       "row": 3
     },
     {
-      "uid": "meet-chair-01",
-      "type": "CUSHIONED_CHAIR_FRONT",
-      "col": 2,
-      "row": 5
-    },
-    {
-      "uid": "meet-chair-02",
-      "type": "CUSHIONED_CHAIR_FRONT",
-      "col": 4,
-      "row": 5
-    },
-    {
       "uid": "meet-whiteboard-01",
       "type": "WHITEBOARD",
       "col": 3,
       "row": 0
-    },
-    {
-      "uid": "break-sofa-01",
-      "type": "SOFA_FRONT",
-      "col": 21,
-      "row": 4
     },
     {
       "uid": "break-coffee-01",
@@ -1425,6 +1407,24 @@
       "type": "LARGE_DISPLAY",
       "col": 15,
       "row": 1
+    },
+    {
+      "uid": "meet-decor-01",
+      "type": "BEAN_CUSHION",
+      "col": 2,
+      "row": 5
+    },
+    {
+      "uid": "meet-decor-02",
+      "type": "BEAN_CUSHION",
+      "col": 4,
+      "row": 5
+    },
+    {
+      "uid": "break-plant-01",
+      "type": "PLANT",
+      "col": 21,
+      "row": 4
     }
   ],
   "tileColors": [
