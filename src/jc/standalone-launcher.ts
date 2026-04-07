@@ -44,8 +44,8 @@ function buildClientInitMessages(respond: (msg: unknown) => void): void {
       lastSeenVersion: '1.2',
     });
 
-    // Auto-arrive permanent residents (CEO, PM / Director)
-    const permanentRoles = ['CEO', 'Secretary', 'PM / Director'];
+    // Auto-arrive permanent residents (Secretary, PM / Director)
+    const permanentRoles = ['Secretary', 'PM / Director'];
     const cfg = jcConfig as {
       members?: Array<{
         id: string;
@@ -563,14 +563,49 @@ function processJsonlLine(
 
     // assistant record with tool_use blocks → set active animation state
     if (record.type === 'assistant' && Array.isArray(content)) {
-      for (const block of content as Array<{ type: string; id?: string; name?: string }>) {
+      for (const block of content as Array<{
+        type: string;
+        id?: string;
+        name?: string;
+        input?: Record<string, unknown>;
+      }>) {
         if (block.type === 'tool_use' && block.id && block.name) {
           state.activeTools.add(block.id);
           const jcState = toolToJCState(block.name);
+
+          // Infer which member should animate based on tool file paths
+          const inferredMember = block.input
+            ? inferMemberFromToolPath(block.name, block.input)
+            : null;
+          const targetMemberId = inferredMember ?? state.memberId;
+
+          // If inferred member differs, arrive them and broadcast their state
+          if (inferredMember && inferredMember !== state.memberId) {
+            const member = jcMembers.find((m) => m.id === inferredMember);
+            if (member && !assignedMembers.has(inferredMember)) {
+              const newAgentId = nextAgentId++;
+              assignedMembers.add(inferredMember);
+              agentMemberMap[newAgentId] = inferredMember;
+              broadcast({
+                type: 'jcMemberArriving',
+                agentId: newAgentId,
+                memberId: inferredMember,
+                deskId: member.deskId,
+                seatUid: member.deskId,
+                hueShift: member.hueShift,
+                palette: member.palette ?? 0,
+              });
+              broadcast({ type: 'jcMappingUpdate', mappings: { ...agentMemberMap } });
+              console.log(
+                `[JC] Tool path inferred → ${inferredMember} (${block.name}: ${(block.input?.file_path as string)?.slice(-40) ?? ''})`,
+              );
+            }
+          }
+
           broadcast({
             type: 'jcMemberStateChange',
             agentId: state.agentId,
-            memberId: state.memberId,
+            memberId: targetMemberId,
             jcState,
           });
         }
@@ -609,6 +644,109 @@ function processJsonlLine(
   }
 }
 
+/** Infer JC member from tool file paths in JSONL content */
+function inferMemberFromToolPath(toolName: string, input: Record<string, unknown>): string | null {
+  const filePath =
+    (input.file_path as string) || (input.path as string) || (input.command as string) || '';
+  if (!filePath) return null;
+
+  if (filePath.includes('.company/research') || filePath.includes('assets/shared/research'))
+    return 'res-01';
+  if (filePath.includes('.company/marketing') || filePath.includes('campaigns/')) return 'mkt-01';
+  if (filePath.includes('.company/engineering') || filePath.includes('pixel-agents/'))
+    return 'eng-01';
+  if (filePath.includes('.company/pm') || filePath.includes('tickets/')) return 'eng-04';
+  if (filePath.includes('.company/ceo') || filePath.includes('decisions/')) return 'exec-sec';
+  if (filePath.includes('.company/secretary') || filePath.includes('inbox/')) return 'exec-sec';
+  return null;
+}
+
+/** Register a JSONL file for content tracking and arrive its member */
+function registerJsonlAgent(
+  filePath: string,
+  sessionId: string,
+  member: JCMemberEntry,
+  broadcast: (data: unknown) => void,
+  startOffset: number,
+): number {
+  const agentId = nextAgentId++;
+  activeAgents.set(agentId, { sessionId, file: filePath, memberId: member.id });
+  broadcast({ type: 'agentCreated', id: agentId });
+
+  assignedMembers.add(member.id);
+  agentMemberMap[agentId] = member.id;
+
+  broadcast({
+    type: 'jcMemberArriving',
+    agentId,
+    memberId: member.id,
+    deskId: member.deskId,
+    seatUid: member.deskId,
+    hueShift: member.hueShift,
+    palette: member.palette ?? 0,
+  });
+
+  broadcast({ type: 'jcMappingUpdate', mappings: { ...agentMemberMap } });
+
+  jsonlContentStates.set(filePath, {
+    fileOffset: startOffset,
+    lineBuffer: '',
+    activeTools: new Set(),
+    memberId: member.id,
+    agentId,
+  });
+
+  console.log(`[JC] Agent ${agentId} → ${member.id} (desk: ${member.deskId})`);
+  return agentId;
+}
+
+/** Collect all JSONL files from a project directory, including subagents/ */
+function collectJsonlFiles(projectDir: string): string[] {
+  const files: string[] = [];
+  try {
+    for (const f of fs.readdirSync(projectDir)) {
+      if (f.endsWith('.jsonl')) {
+        files.push(path.join(projectDir, f));
+      }
+    }
+    // Scan subagents/ subdirectories recursively
+    const subagentsDir = path.join(projectDir, 'subagents');
+    if (fs.existsSync(subagentsDir) && fs.statSync(subagentsDir).isDirectory()) {
+      for (const f of fs.readdirSync(subagentsDir)) {
+        if (f.endsWith('.jsonl')) {
+          files.push(path.join(subagentsDir, f));
+        }
+      }
+    }
+    // Also check session subdirectories (e.g., sessionId/subagents/)
+    for (const d of fs.readdirSync(projectDir)) {
+      const subDir = path.join(projectDir, d);
+      try {
+        if (
+          !d.endsWith('.jsonl') &&
+          d !== 'subagents' &&
+          d !== 'memory' &&
+          fs.statSync(subDir).isDirectory()
+        ) {
+          const nestedSubagents = path.join(subDir, 'subagents');
+          if (fs.existsSync(nestedSubagents) && fs.statSync(nestedSubagents).isDirectory()) {
+            for (const f of fs.readdirSync(nestedSubagents)) {
+              if (f.endsWith('.jsonl')) {
+                files.push(path.join(nestedSubagents, f));
+              }
+            }
+          }
+        }
+      } catch {
+        // Skip inaccessible directories
+      }
+    }
+  } catch {
+    // Ignore read errors
+  }
+  return files;
+}
+
 function startWatcher(claudeDir: string, broadcast: (data: unknown) => void): void {
   const scanProjects = (): void => {
     try {
@@ -618,10 +756,9 @@ function startWatcher(claudeDir: string, broadcast: (data: unknown) => void): vo
         const stat = fs.statSync(projectDir);
         if (!stat.isDirectory()) continue;
 
-        const files = fs.readdirSync(projectDir).filter((f) => f.endsWith('.jsonl'));
-        for (const file of files) {
-          const filePath = path.join(projectDir, file);
-          const sessionId = file.replace('.jsonl', '');
+        const allFiles = collectJsonlFiles(projectDir);
+        for (const filePath of allFiles) {
+          const sessionId = path.basename(filePath).replace('.jsonl', '');
 
           // Skip already tracked
           const isTracked = [...activeAgents.values()].some((a) => a.file === filePath);
@@ -631,42 +768,13 @@ function startWatcher(claudeDir: string, broadcast: (data: unknown) => void): vo
           const fstat = fs.statSync(filePath);
           if (Date.now() - fstat.mtimeMs > 5 * 60 * 1000) continue;
 
-          const agentId = nextAgentId++;
           const member = jcMembers.find((m) => !assignedMembers.has(m.id));
-
-          activeAgents.set(agentId, { sessionId, file: filePath, memberId: member?.id });
-
-          // Broadcast to already-connected clients (for agents detected after browser opens)
-          broadcast({ type: 'agentCreated', id: agentId });
-
           if (member) {
-            assignedMembers.add(member.id);
-            agentMemberMap[agentId] = member.id;
-
-            broadcast({
-              type: 'jcMemberArriving',
-              agentId,
-              memberId: member.id,
-              deskId: member.deskId,
-              seatUid: member.deskId,
-              hueShift: member.hueShift,
-              palette: member.palette ?? 0,
-            });
-
-            broadcast({ type: 'jcMappingUpdate', mappings: { ...agentMemberMap } });
-
-            // Start JSONL content monitoring for this agent
-            jsonlContentStates.set(filePath, {
-              fileOffset: fstat.size, // Start from current end (only new activity)
-              lineBuffer: '',
-              activeTools: new Set(),
-              memberId: member.id,
-              agentId,
-            });
-
-            console.log(`[JC] Agent ${agentId} → ${member.id} (desk: ${member.deskId})`);
+            registerJsonlAgent(filePath, sessionId, member, broadcast, fstat.size);
           } else {
-            console.log(`[JC] Agent ${agentId} detected (no JC member available)`);
+            console.log(
+              `[JC] JSONL detected but no JC member available: ${path.basename(filePath)}`,
+            );
           }
         }
       }
@@ -676,6 +784,7 @@ function startWatcher(claudeDir: string, broadcast: (data: unknown) => void): vo
   };
 
   // Content poll: read new JSONL lines and update animation states (500ms)
+  // Also handles dynamic member re-mapping based on tool paths
   setInterval(() => {
     for (const [filePath, state] of jsonlContentStates) {
       readAndProcessJsonl(filePath, state, broadcast);

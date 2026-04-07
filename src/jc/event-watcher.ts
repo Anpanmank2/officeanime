@@ -193,12 +193,12 @@ export class EventWatcher {
   }
 
   private handleTaskReceived(event: TaskReceivedEvent): void {
-    // CEO receives task — show speech bubble on CEO
-    const ceo = this.config.members.find((m) => m.role === 'CEO');
-    if (ceo) {
+    // Secretary receives task — show speech bubble on Secretary
+    const secretary = this.config.members.find((m) => m.role === 'Secretary');
+    if (secretary) {
       const bubble: SpeechBubble = {
         id: `task-recv-${Date.now()}`,
-        memberId: ceo.id,
+        memberId: secretary.id,
         text: `受領: ${event.task.slice(0, 20)}`,
         department: 'exec',
         timestamp: Date.now(),
@@ -382,8 +382,7 @@ export class EventWatcher {
 
   /** Beam color presets for delegation types */
   private static readonly BEAM_COLORS: Record<string, { color: string; duration: number }> = {
-    secretary_to_ceo: { color: '#ffbf00', duration: 2000 },
-    ceo_to_lead: { color: '#39ff14', duration: 2000 },
+    secretary_to_lead: { color: '#39ff14', duration: 2000 },
     lead_to_agent: { color: '#00b4ff', duration: 1500 },
     cross_dept: { color: '#bf5fff', duration: 2000 },
     report_up: { color: '#00b4ff', duration: 1500 },
@@ -396,8 +395,7 @@ export class EventWatcher {
     const to = this.config.members.find((m) => m.id === toId);
     if (!from || !to) return { color: '#ffffff', duration: 2000 };
 
-    if (from.role === 'Secretary') return EventWatcher.BEAM_COLORS['secretary_to_ceo'];
-    if (from.role === 'CEO') return EventWatcher.BEAM_COLORS['ceo_to_lead'];
+    if (from.role === 'Secretary') return EventWatcher.BEAM_COLORS['secretary_to_lead'];
     if (from.department !== to.department) return EventWatcher.BEAM_COLORS['cross_dept'];
     // Lead → Agent or Agent → Lead based on layer
     if (from.layer < to.layer) return EventWatcher.BEAM_COLORS['lead_to_agent'];

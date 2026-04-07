@@ -305,7 +305,7 @@ export function dispatchMockMessages(): void {
   // Use setTimeout to ensure layoutReadyRef is true before arrivals are dispatched.
   if (jcConfigData?.members) {
     setTimeout(() => {
-      const permanentRoles = ['CEO', 'Secretary', 'PM / Director'];
+      const permanentRoles = ['Secretary', 'PM / Director'];
       const residents = jcConfigData!.members!.filter((m) => permanentRoles.includes(m.role));
       residents.forEach((member, idx) => {
         dispatch({
@@ -421,14 +421,14 @@ function handleBrowserEvent(event: Record<string, unknown>): void {
     }
 
     case 'task_received': {
-      // CEO gets speech bubble
-      const ceo = jcConfigData?.members?.find((m) => m.role === 'CEO');
-      if (ceo) {
+      // Secretary gets speech bubble
+      const secretary = jcConfigData?.members?.find((m) => m.role === 'Secretary');
+      if (secretary) {
         dispatch({
           type: 'jcSpeechBubble',
           bubble: {
             id: `recv-${Date.now()}`,
-            memberId: ceo.id,
+            memberId: secretary.id,
             text: `受領: ${(event.task as string)?.slice(0, 20) ?? ''}`,
             department: 'exec',
             timestamp: Date.now(),

@@ -37,7 +37,7 @@ const validEvents = {
       timestamp: new Date().toISOString(),
       from: 'sec-01',
       to: 'ceo-01',
-      role: 'CEO',
+      role: 'Secretary',
       message: 'New task from user',
     },
     {

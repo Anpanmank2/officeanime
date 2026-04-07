@@ -295,31 +295,9 @@ export function getTaskWatcher(): TaskWatcher | null {
 /** Get member IDs that should always be present in the office */
 export function getPermanentResidents(): string[] {
   if (!jcConfig) return [];
-  // v1.2: Secretary is no longer a permanent resident — uses CEO-linked departure instead
-  const permanentRoles = ['CEO', 'PM / Director'];
+  // v1.3: CEO removed — Secretary + PM are permanent residents
+  const permanentRoles = ['Secretary', 'PM / Director'];
   return jcConfig.members.filter((m) => permanentRoles.includes(m.role)).map((m) => m.id);
-}
-
-/** Get the secretary member ID */
-function getSecretaryId(): string | null {
-  if (!jcConfig) return null;
-  const sec = jcConfig.members.find((m) => m.role === 'Secretary');
-  return sec?.id ?? null;
-}
-
-/** Get the CEO member ID */
-function getCeoId(): string | null {
-  if (!jcConfig) return null;
-  const ceo = jcConfig.members.find((m) => m.role === 'CEO');
-  return ceo?.id ?? null;
-}
-
-/** Check if CEO is currently present in the office */
-function isCeoPresent(): boolean {
-  const ceoId = getCeoId();
-  if (!ceoId) return false;
-  const state = memberStates.get(ceoId);
-  return state !== undefined && state !== 'absent' && state !== 'leaving';
 }
 
 /** Send JC config to webview on initialization */
@@ -402,30 +380,9 @@ function checkIdleMembers(webview: vscode.Webview): void {
   if (!jcConfig) return;
   const now = Date.now();
   const permanentIds = new Set(getPermanentResidents());
-  const secretaryId = getSecretaryId();
-  const ceoPresent = isCeoPresent();
 
   for (const [memberId, lastActivity] of memberLastActivity) {
     if (permanentIds.has(memberId)) continue; // Never depart permanent residents
-
-    // v1.2: Secretary CEO-linked departure rule
-    if (memberId === secretaryId) {
-      if (ceoPresent) continue; // Secretary stays while CEO is present
-      // CEO has left — secretary should depart too
-      const secState = memberStates.get(memberId);
-      if (secState && secState !== 'absent' && secState !== 'leaving') {
-        console.log(`[JC] Secretary CEO-linked departure — CEO has left`);
-        memberStates.set(memberId, 'leaving');
-        const agentId = getAgentForMember(memberId);
-        webview.postMessage({
-          type: 'jcMemberLeaving',
-          agentId: agentId ?? -300 - Math.floor(Math.random() * 1000),
-          memberId,
-        });
-        memberLastActivity.delete(memberId);
-      }
-      continue;
-    }
 
     if (now - lastActivity < IDLE_TIMEOUT_MS) continue;
 
@@ -443,12 +400,13 @@ function checkIdleMembers(webview: vscode.Webview): void {
     }
   }
 
-  // v1.2: Secretary progress monitoring (every 2 minutes)
-  if (secretaryId && now - lastSecretaryMonitor >= SECRETARY_MONITOR_MS) {
+  // v1.3: Secretary progress monitoring (every 2 minutes)
+  const secretaryMember = jcConfig.members.find((m) => m.role === 'Secretary');
+  if (secretaryMember && now - lastSecretaryMonitor >= SECRETARY_MONITOR_MS) {
     lastSecretaryMonitor = now;
-    const secState = memberStates.get(secretaryId);
+    const secState = memberStates.get(secretaryMember.id);
     if (secState && secState !== 'absent' && secState !== 'leaving') {
-      secretaryProgressCheck(webview, secretaryId, now);
+      secretaryProgressCheck(webview, secretaryMember.id, now);
     }
   }
 }

@@ -129,7 +129,10 @@ async function run() {
     assert(!!residentsLog, 'Permanent residents dispatched');
 
     const arrivingLogs = logs.filter((l) => l.includes('Member arriving'));
-    assert(arrivingLogs.length >= 4, `At least 4 members arrived (got ${arrivingLogs.length})`);
+    assert(
+      arrivingLogs.length >= 2,
+      `At least 2 permanent members arrived (got ${arrivingLogs.length})`,
+    );
 
     // Test 5: Screenshot — characters visible (non-empty canvas)
     console.log('  [Test 5] Visual check');
@@ -166,7 +169,7 @@ async function run() {
           {
             event: 'delegate',
             timestamp: new Date().toISOString(),
-            from: 'exec-ceo',
+            from: 'exec-sec',
             to: ['eng-01'],
             task: 'e2e-test',
             department: 'engineering',

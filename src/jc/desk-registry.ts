@@ -205,6 +205,16 @@ export const DESK_REGISTRY: DeskEntry[] = [
     nameplate: 'レナ・パク',
     nameplateEn: 'L.Park',
   },
+  {
+    deskId: 'mkt-desk-12',
+    memberId: 'mkt-12',
+    zone: 'marketing',
+    seatCol: 14,
+    seatRow: 13,
+    facingDir: DOWN,
+    nameplate: 'ラングレー葵',
+    nameplateEn: 'A.Langley',
+  },
 
   // ═══════════════════════════════════════════════════
   // Research — Research Lab (cols 1-11, rows 15-21)
@@ -290,21 +300,21 @@ export const DESK_REGISTRY: DeskEntry[] = [
     nameplate: '望月 綾音',
     nameplateEn: 'A.Mochizuki',
   },
+  {
+    deskId: 'res-desk-09',
+    memberId: 'res-09',
+    zone: 'research',
+    seatCol: 3,
+    seatRow: 20,
+    facingDir: DOWN,
+    nameplate: '藤沢 蓮',
+    nameplateEn: 'R.Fujisawa',
+  },
 
   // ═══════════════════════════════════════════════════
   // Executive — Exec Area (cols 2-5, rows 2-5)
-  // "静かな威圧感" — Permanent residents: CEO and Secretary
+  // "静かな威圧感" — Permanent residents: Secretary and PM
   // ═══════════════════════════════════════════════════
-  {
-    deskId: 'exec-desk-ceo',
-    memberId: 'exec-ceo',
-    zone: 'exec',
-    seatCol: 3,
-    seatRow: 4,
-    facingDir: UP,
-    nameplate: '亀井',
-    nameplateEn: 'Kamei',
-  },
   {
     deskId: 'exec-desk-sec',
     memberId: 'exec-sec',

@@ -119,7 +119,6 @@ export const BUBBLE_EMOJIS: Record<string, string> = {
 // Displayed when a member has been idle for IDLE_EMOJI_TRIGGER_MS.
 export const MEMBER_IDLE_EMOJIS: Record<string, string> = {
   // ── Exec ──
-  'exec-ceo': '📋', // KPIダッシュボード確認 + ブラックコーヒー
   'exec-sec': '🖊️', // TODOリスト整理 + ペン回し
 
   // ── Engineering ──
@@ -142,6 +141,7 @@ export const MEMBER_IDLE_EMOJIS: Record<string, string> = {
   'mkt-09': '📱', // SNSフィードをスクロールしてトレンドチェック
   'mkt-10': '🗺️', // 会場のフロア図面に動線を書き込む
   'mkt-11': '📉', // 広告ダッシュボードのCACをリアルタイム監視
+  'mkt-12': '📄', // テンプレートライブラリを整理
 
   // ── Research ──
   'res-01': '📊', // ダッシュボード数値を眺めながら仮説メモ
@@ -152,6 +152,7 @@ export const MEMBER_IDLE_EMOJIS: Record<string, string> = {
   'res-06': '📈', // ダッシュボードのレイアウトを微調整
   'res-07': '🃏', // Bloomberg端末風画面 + ポーカーチップを回す
   'res-08': '🔎', // Search Consoleのクエリレポートをスクロール
+  'res-09': '🗂️', // 複数レポートを並べて構造マップ
 };
 
 // ── Idle Emoji Timing ───────────────────────────────────────────
@@ -169,7 +170,7 @@ export const TASK_STATUS_COLORS: Record<string, string> = {
 
 // ── Permanent Resident Roles ────────────────────────────────────
 // Members with these roles never auto-depart on idle timeout.
-export const PERMANENT_ROLES = new Set(['CEO', 'Secretary', 'PM / Director']);
+export const PERMANENT_ROLES = new Set(['Secretary', 'PM / Director']);
 
 // ── Timing ──────────────────────────────────────────────────────
 export const IDLE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes (v1 spec)
@@ -185,15 +186,53 @@ export const SPEECH_BUBBLE_COLORS: Record<string, string> = {
 // ── Delegation Beam Presets (v1.2) ─────────────────────────────
 // Color and duration for delegation chain liaison beams.
 export const DELEGATION_BEAM: Record<string, { color: string; duration: number }> = {
-  secretary_to_ceo: { color: '#ffbf00', duration: 2000 },
-  ceo_to_lead: { color: '#39ff14', duration: 2000 },
+  secretary_to_lead: { color: '#39ff14', duration: 2000 },
   lead_to_agent: { color: '#00b4ff', duration: 1500 },
   cross_dept_request: { color: '#bf5fff', duration: 2000 },
   cross_dept_return: { color: '#bf5fff', duration: 2000 },
   agent_to_lead: { color: '#00b4ff', duration: 1500 },
-  lead_to_ceo: { color: '#39ff14', duration: 2000 },
   progress_check: { color: '#666688', duration: 1000 },
 };
 
 // ── Secretary Monitoring Interval ──────────────────────────────
 export const SECRETARY_MONITOR_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+
+// ── Priority Colors (P0-P4) ────────────────────────────────────
+export const PRIORITY_COLORS: Record<number, string> = {
+  0: '#ff0000', // P0 Critical
+  1: '#ff4444', // P1 High
+  2: '#f0ad4e', // P2 Medium
+  3: '#58a6ff', // P3 Normal
+  4: '#8b949e', // P4 Low
+};
+
+export const PRIORITY_LABELS: Record<number, string> = {
+  0: 'P0',
+  1: 'P1',
+  2: 'P2',
+  3: 'P3',
+  4: 'P4',
+};
+
+// ── Task Label Colors ──────────────────────────────────────────
+export const TASK_LABEL_COLORS: Record<string, string> = {
+  implementation: '#39ff14',
+  research: '#00e676',
+  review: '#00b4ff',
+  bugfix: '#ff3d3d',
+  design: '#ff6b9d',
+  ops: '#b388ff',
+  incident: '#ff0000',
+  other: '#8b949e',
+};
+
+// ── Office Log Department Filters ──────────────────────────────
+export const LOG_DEPT_FILTERS = ['All', 'Eng', 'Mkt', 'Research', 'Secretary'] as const;
+
+// ── Log Dept Filter → department mapping ───────────────────────
+export const LOG_DEPT_FILTER_MAP: Record<string, string> = {
+  Eng: 'engineering',
+  Mkt: 'marketing',
+  Research: 'research',
+  Secretary: 'exec',
+};

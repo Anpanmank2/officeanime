@@ -241,6 +241,20 @@
       "breakBehavior": "sofa"
     },
     {
+      "id": "mkt-12",
+      "name": "ラングレー葵",
+      "nameEn": "Aoi Langley",
+      "role": "Template Librarian",
+      "department": "marketing",
+      "layer": "L4",
+      "zone": "marketing",
+      "hueShift": 195,
+      "palette": 5,
+      "deskId": "mkt-desk-12",
+      "accentColor": "#0F6E56",
+      "breakBehavior": "coffee"
+    },
+    {
       "id": "res-01",
       "name": "古賀 春樹",
       "nameEn": "Haruki Koga",
@@ -353,18 +367,18 @@
       "breakBehavior": "bookshelf"
     },
     {
-      "id": "exec-ceo",
-      "name": "亀井",
-      "nameEn": "Kamei",
-      "role": "CEO",
-      "department": "exec",
-      "layer": "L1",
-      "zone": "exec",
-      "hueShift": 30,
-      "palette": 0,
-      "deskId": "exec-desk-ceo",
-      "accentColor": "#FFD700",
-      "breakBehavior": "meeting"
+      "id": "res-09",
+      "name": "藤沢 蓮",
+      "nameEn": "Ren Fujisawa",
+      "role": "Structure Analyst",
+      "department": "research",
+      "layer": "L3",
+      "zone": "research",
+      "hueShift": 145,
+      "palette": 5,
+      "deskId": "res-desk-09",
+      "accentColor": "#2D6B4F",
+      "breakBehavior": "sofa"
     },
     {
       "id": "exec-sec",
@@ -383,7 +397,6 @@
   ],
   "exec": [
     { "id": "exec-01", "name": "Owner / COO", "role": "Owner", "zone": "exec" },
-    { "id": "exec-02", "name": "CEO", "role": "CEO", "zone": "exec" },
     { "id": "exec-03", "name": "秘書", "role": "Secretary", "zone": "exec" },
     { "id": "exec-04", "name": "PM", "role": "PM", "zone": "exec" }
   ],
