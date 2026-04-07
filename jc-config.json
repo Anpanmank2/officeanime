@@ -51,10 +51,10 @@
       "role": "PM / Director",
       "department": "engineering",
       "layer": "L2",
-      "zone": "dev",
+      "zone": "exec",
       "hueShift": 15,
       "palette": 3,
-      "deskId": "dev-desk-04",
+      "deskId": "exec-desk-pm",
       "accentColor": "#D85A30",
       "breakBehavior": "meeting"
     },
@@ -396,15 +396,39 @@
     }
   ],
   "exec": [
-    { "id": "exec-01", "name": "Owner / COO", "role": "Owner", "zone": "exec" },
-    { "id": "exec-03", "name": "秘書", "role": "Secretary", "zone": "exec" },
-    { "id": "exec-04", "name": "PM", "role": "PM", "zone": "exec" }
+    {
+      "id": "exec-01",
+      "name": "Owner / COO",
+      "role": "Owner",
+      "zone": "exec"
+    },
+    {
+      "id": "exec-03",
+      "name": "秘書",
+      "role": "Secretary",
+      "zone": "exec"
+    },
+    {
+      "id": "exec-04",
+      "name": "PM",
+      "role": "PM",
+      "zone": "exec"
+    }
   ],
   "mapping": {
     "rules": [
-      { "projectPattern": "**/cc-company/**", "memberId": "eng-01" },
-      { "keyword": "marketing", "memberId": "mkt-01" },
-      { "keyword": "research", "memberId": "res-01" }
+      {
+        "projectPattern": "**/cc-company/**",
+        "memberId": "eng-01"
+      },
+      {
+        "keyword": "marketing",
+        "memberId": "mkt-01"
+      },
+      {
+        "keyword": "research",
+        "memberId": "res-01"
+      }
     ],
     "fallback": "prompt"
   }
