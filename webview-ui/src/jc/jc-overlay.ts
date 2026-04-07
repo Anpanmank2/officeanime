@@ -61,9 +61,7 @@ const ZONE_LABELS: Array<{ text: string; col: number; row: number; zone: string 
 ];
 
 // ── Glass walls ──────────────────────────────────────────────────
-const GLASS_WALLS: Array<{ col: number; row: number; width: number; height: number }> = [
-  { col: 1, row: 14, width: 24, height: 1 },
-];
+const GLASS_WALLS: Array<{ col: number; row: number; width: number; height: number }> = [];
 
 // ── Liaison beam effect ──────────────────────────────────────────
 const LIAISON_LINE_WIDTH = 2;
