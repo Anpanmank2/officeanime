@@ -1,16 +1,60 @@
 {
   "id": "ULTRAWIDE_MONITOR",
   "name": "Ultrawide Monitor",
-  "label": "Ultrawide Monitor",
   "category": "electronics",
-  "type": "asset",
-  "width": 16,
-  "height": 32,
-  "footprintW": 1,
-  "footprintH": 2,
-  "isDesk": false,
+  "type": "group",
+  "groupType": "state",
+  "orientation": "front",
   "canPlaceOnWalls": false,
   "canPlaceOnSurfaces": true,
   "backgroundTiles": 0,
-  "groupId": "ULTRAWIDE_MONITOR"
+  "members": [
+    {
+      "type": "group",
+      "groupType": "animation",
+      "state": "on",
+      "members": [
+        {
+          "type": "asset",
+          "id": "ULTRAWIDE_MONITOR_ON_1",
+          "file": "ULTRAWIDE_MONITOR_ON_1.png",
+          "width": 16,
+          "height": 32,
+          "footprintW": 1,
+          "footprintH": 2,
+          "frame": 0
+        },
+        {
+          "type": "asset",
+          "id": "ULTRAWIDE_MONITOR_ON_2",
+          "file": "ULTRAWIDE_MONITOR_ON_2.png",
+          "width": 16,
+          "height": 32,
+          "footprintW": 1,
+          "footprintH": 2,
+          "frame": 1
+        },
+        {
+          "type": "asset",
+          "id": "ULTRAWIDE_MONITOR_ON_3",
+          "file": "ULTRAWIDE_MONITOR_ON_3.png",
+          "width": 16,
+          "height": 32,
+          "footprintW": 1,
+          "footprintH": 2,
+          "frame": 2
+        }
+      ]
+    },
+    {
+      "type": "asset",
+      "id": "ULTRAWIDE_MONITOR",
+      "file": "ULTRAWIDE_MONITOR.png",
+      "width": 16,
+      "height": 32,
+      "footprintW": 1,
+      "footprintH": 2,
+      "state": "off"
+    }
+  ]
 }
