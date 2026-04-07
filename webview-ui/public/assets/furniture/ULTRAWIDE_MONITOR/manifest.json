@@ -1,0 +1,16 @@
+{
+  "id": "ULTRAWIDE_MONITOR",
+  "name": "Ultrawide Monitor",
+  "label": "Ultrawide Monitor",
+  "category": "electronics",
+  "type": "asset",
+  "width": 16,
+  "height": 32,
+  "footprintW": 1,
+  "footprintH": 2,
+  "isDesk": false,
+  "canPlaceOnWalls": false,
+  "canPlaceOnSurfaces": true,
+  "backgroundTiles": 0,
+  "groupId": "ULTRAWIDE_MONITOR"
+}
