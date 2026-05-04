@@ -9,6 +9,7 @@ import type {
   JCState,
   NameplateInfo,
   SpeechBubble,
+  StateLogEntry,
   TaskDefinition,
 } from './jc-types.js';
 
@@ -98,6 +99,8 @@ export function jcLoadConfig(config: JCConfigData): void {
       emotionUntil: 0,
       workingSince: null,
       stateSince: Date.now(),
+      workingTotal: 0,
+      stateLog: [],
     });
   }
   console.log(`[JC-WV] Config loaded: ${config.members.length} members`);
@@ -134,6 +137,13 @@ export function jcMemberLeaving(memberId: string): void {
 export function jcMemberDeparted(memberId: string): void {
   const runtime = memberRuntimes.get(memberId);
   if (runtime) {
+    // Flush any in-progress working session before clearing
+    if (runtime.workingSince !== null) {
+      runtime.workingTotal += Date.now() - runtime.workingSince;
+    }
+    // Close out current entry; open 'absent' entry to mark the transition
+    appendStateLog(runtime, 'absent', Date.now());
+
     runtime.jcState = 'absent';
     runtime.isPresent = false;
     runtime.bubbleType = null;
@@ -172,8 +182,15 @@ export function jcMemberStateChange(
     if (newState === 'coding' || newState === 'reading') {
       if (!runtime.workingSince) runtime.workingSince = Date.now();
     } else {
+      if (runtime.workingSince !== null) {
+        runtime.workingTotal += Date.now() - runtime.workingSince;
+      }
       runtime.workingSince = null;
     }
+
+    // Update stateLog: close previous entry, open new one for newState
+    const now = Date.now();
+    appendStateLog(runtime, newState, now);
 
     // Emotion triggers
     if (newState === 'error' && prevState !== 'error') {
@@ -457,6 +474,37 @@ export function jcActivitySummaryUpdate(memberId: string, summary: string | null
 /** Get activity summary for a member */
 export function jcGetActivitySummary(memberId: string): string | null {
   return memberActivitySummaries.get(memberId) ?? null;
+}
+
+/**
+ * Get structured activity metrics for a member (BI aggregation).
+ * Does not mutate runtime state — computes stateBreakdown from the stateLog snapshot.
+ * Returns null if the member is not found.
+ */
+export function jcGetActivityMetrics(memberId: string): {
+  workingTotal: number;
+  workingSince: number | null;
+  stateBreakdown: Record<JCState, number>;
+  lastTransitionAt: number | null;
+} | null {
+  const runtime = memberRuntimes.get(memberId);
+  if (!runtime) return null;
+
+  const stateBreakdown = {} as Record<JCState, number>;
+  for (const entry of runtime.stateLog) {
+    const duration = (entry.exitedAt ?? Date.now()) - entry.enteredAt;
+    stateBreakdown[entry.state] = (stateBreakdown[entry.state] ?? 0) + duration;
+  }
+
+  const lastEntry = runtime.stateLog[runtime.stateLog.length - 1] ?? null;
+  const lastTransitionAt = lastEntry ? lastEntry.enteredAt : null;
+
+  return {
+    workingTotal: runtime.workingTotal,
+    workingSince: runtime.workingSince,
+    stateBreakdown,
+    lastTransitionAt,
+  };
 }
 
 // ── Task state management ─────────────────────────────────────
@@ -777,6 +825,26 @@ export function subscribeMembers(fn: () => void): () => void {
 }
 
 // ── Helpers ────────────────────────────────────────────────────
+
+const STATE_LOG_MAX = 100;
+
+/**
+ * Close the last open stateLog entry (set exitedAt) and push a new open entry
+ * for the incoming state. Ring-buffer: shifts oldest entry when length > STATE_LOG_MAX.
+ */
+function appendStateLog(runtime: JCMemberRuntime, incomingState: JCState, now: number): void {
+  // Close the last open entry
+  const last = runtime.stateLog[runtime.stateLog.length - 1];
+  if (last && last.exitedAt === null) {
+    last.exitedAt = now;
+  }
+  // Push new open entry for the state being entered
+  const entry: StateLogEntry = { state: incomingState, enteredAt: now, exitedAt: null };
+  runtime.stateLog.push(entry);
+  if (runtime.stateLog.length > STATE_LOG_MAX) {
+    runtime.stateLog.shift();
+  }
+}
 
 function stateToBubble(state: JCState, breakBehavior?: string): JCBubbleType {
   switch (state) {

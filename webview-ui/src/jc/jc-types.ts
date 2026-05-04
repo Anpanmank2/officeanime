@@ -59,6 +59,13 @@ export interface JCConfigData {
   exec: JCExecConfig[];
 }
 
+/** State log entry for BI aggregation */
+export interface StateLogEntry {
+  state: JCState;
+  enteredAt: number;
+  exitedAt: number | null;
+}
+
 /** Per-member runtime state in the webview */
 export interface JCMemberRuntime {
   memberId: string;
@@ -77,6 +84,10 @@ export interface JCMemberRuntime {
   workingSince: number | null;
   /** Timestamp when member entered current state (for dashboard duration display) */
   stateSince: number;
+  /** Cumulative working time in ms (coding + reading) */
+  workingTotal: number;
+  /** Recent state transition log for BI aggregation (ring buffer, max 100) */
+  stateLog: StateLogEntry[];
 }
 
 /** Bubble overlay types */
@@ -122,10 +133,25 @@ export interface AbsenceInfo {
 export const TaskStatus = {
   PENDING: 'pending',
   RUNNING: 'running',
+  REVIEWING: 'reviewing',
   DONE: 'done',
   ERROR: 'error',
+  CANCELLED: 'cancelled',
 } as const;
 export type TaskStatus = (typeof TaskStatus)[keyof typeof TaskStatus];
+
+/** Task label for auto-classification */
+export const TaskLabel = {
+  IMPLEMENTATION: 'implementation',
+  RESEARCH: 'research',
+  REVIEW: 'review',
+  BUGFIX: 'bugfix',
+  DESIGN: 'design',
+  OPS: 'ops',
+  INCIDENT: 'incident',
+  OTHER: 'other',
+} as const;
+export type TaskLabel = (typeof TaskLabel)[keyof typeof TaskLabel];
 
 /** Task definition (mirrors extension-side) */
 export interface TaskDefinition {
@@ -140,6 +166,34 @@ export interface TaskDefinition {
   startedAt?: string;
   completedAt?: string;
   result?: string;
+  // Phase A extensions
+  label?: TaskLabel;
+  delegationChain?: string[];
+  reviewState?: 'pending' | 'approved' | 'rejected';
+  reviewedBy?: string;
+  outputFiles?: string[];
+  completionSummary?: string;
+  isIncident?: boolean;
+  sortOrder?: number;
+}
+
+/** Office log entry for the right-panel chronological log */
+export interface OfficeLogEntry {
+  id: string;
+  timestamp: number;
+  memberId: string;
+  memberName: string;
+  department: string;
+  type: 'speech' | 'state_change' | 'task_event' | 'delegation' | 'arrival' | 'departure';
+  summary: string;
+  stateColor?: string;
+}
+
+/** Agent detail stats for the click popup */
+export interface AgentDetailStats {
+  tasksCompleted: number;
+  uptimeMs: number;
+  rejectionCount: number;
 }
 
 /** Command types sent from webview to extension */
