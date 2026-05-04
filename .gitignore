@@ -35,3 +35,12 @@ playwright-report/
 
 # Local notes (not for commit)
 /notes/
+
+# Development artifacts (2026-05-04 cleanup)
+screenshot-*.png
+gto-*.js
+gto-*.png
+gto-*.png.import
+jc-events.json
+.omc/
+webview-ui/.omc/
