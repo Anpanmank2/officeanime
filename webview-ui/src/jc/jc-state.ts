@@ -101,6 +101,7 @@ export function jcLoadConfig(config: JCConfigData): void {
     });
   }
   console.log(`[JC-WV] Config loaded: ${config.members.length} members`);
+  scheduleMemberNotify();
 }
 
 /** Check if JC mode is active */
@@ -115,6 +116,7 @@ export function jcMemberArriving(memberId: string): void {
     runtime.jcState = 'arriving';
     runtime.isPresent = true;
     console.log(`[JC-WV] Member arriving: ${memberId}`);
+    scheduleMemberNotify();
   }
 }
 
@@ -124,6 +126,7 @@ export function jcMemberLeaving(memberId: string): void {
   if (runtime) {
     runtime.jcState = 'leaving';
     console.log(`[JC-WV] Member leaving: ${memberId}`);
+    scheduleMemberNotify();
   }
 }
 
@@ -139,6 +142,7 @@ export function jcMemberDeparted(memberId: string): void {
     runtime.emotionUntil = 0;
     runtime.workingSince = null;
     runtime.stateSince = Date.now();
+    scheduleMemberNotify();
   }
 }
 
@@ -176,6 +180,7 @@ export function jcMemberStateChange(
       runtime.emotionEmoji = '😤';
       runtime.emotionUntil = Date.now() + 2000;
     }
+    scheduleMemberNotify();
   }
 }
 
@@ -185,6 +190,7 @@ export function jcTriggerTaskCompleted(memberId: string): void {
   if (runtime) {
     runtime.emotionEmoji = '🎉';
     runtime.emotionUntil = Date.now() + 2000;
+    scheduleMemberNotify();
   }
 }
 
@@ -194,6 +200,7 @@ export function jcTriggerWave(memberId: string): void {
   if (runtime) {
     runtime.emotionEmoji = '👋';
     runtime.emotionUntil = Date.now() + 2000;
+    scheduleMemberNotify();
   }
 }
 
@@ -203,6 +210,7 @@ export function jcTriggerSubagentThinking(memberId: string): void {
   if (runtime) {
     runtime.emotionEmoji = '🧠';
     runtime.emotionUntil = Date.now() + 3000;
+    scheduleMemberNotify();
   }
 }
 
@@ -212,6 +220,7 @@ export function jcUpdateMappings(mappings: Record<number, string>): void {
   for (const [agentId, memberId] of Object.entries(mappings)) {
     agentToMember.set(Number(agentId), memberId);
   }
+  scheduleMemberNotify();
 }
 
 /** Get member ID for an agent ID */
@@ -310,6 +319,7 @@ const memberAbsenceInfo = new Map<string, AbsenceInfo>();
 /** Handle individual absence update */
 export function jcAbsenceUpdate(info: AbsenceInfo): void {
   memberAbsenceInfo.set(info.memberId, info);
+  scheduleMemberNotify();
 }
 
 /** Handle bulk absence sync */
@@ -318,6 +328,7 @@ export function jcAbsenceBulkSync(infos: AbsenceInfo[]): void {
   for (const info of infos) {
     memberAbsenceInfo.set(info.memberId, info);
   }
+  scheduleMemberNotify();
 }
 
 /** Get absence info for a member */
@@ -440,6 +451,7 @@ export function jcActivitySummaryUpdate(memberId: string, summary: string | null
   } else {
     memberActivitySummaries.delete(memberId);
   }
+  scheduleMemberNotify();
 }
 
 /** Get activity summary for a member */
@@ -461,6 +473,7 @@ export function jcTaskUpdate(task: TaskDefinition): void {
     existing.push(task);
   }
   memberTasks.set(task.assignee, existing);
+  scheduleTaskNotify();
 }
 
 /** Handle bulk task sync */
@@ -471,6 +484,7 @@ export function jcTasksBulkSync(tasks: TaskDefinition[]): void {
     existing.push(task);
     memberTasks.set(task.assignee, existing);
   }
+  scheduleTaskNotify();
 }
 
 /** Get current task status for a member (most relevant active task) */
@@ -649,6 +663,7 @@ export function jcAddSpeechBubble(bubble: SpeechBubble): void {
   const idx = speechBubbles.findIndex((b) => b.memberId === bubble.memberId);
   if (idx >= 0) speechBubbles.splice(idx, 1);
   speechBubbles.push(bubble);
+  scheduleMemberNotify();
 }
 
 /** Get active speech bubbles (pruning expired ones) */
@@ -696,6 +711,69 @@ export function jcGetIdleMembers(): string[] {
     }
   }
   return idle;
+}
+
+// ── Subscribe API ─────────────────────────────────────────────────
+
+const taskListeners = new Set<() => void>();
+const memberListeners = new Set<() => void>();
+let pendingTaskNotify = false;
+let pendingMemberNotify = false;
+
+/** scheduleTaskNotify: rAF batch — prevents over-notification during bulk sync. */
+function scheduleTaskNotify(): void {
+  if (pendingTaskNotify) return;
+  pendingTaskNotify = true;
+  const raf =
+    typeof requestAnimationFrame !== 'undefined'
+      ? requestAnimationFrame
+      : (cb: () => void) => setTimeout(cb, 16);
+  raf(() => {
+    pendingTaskNotify = false;
+    for (const fn of taskListeners) {
+      try {
+        fn();
+      } catch (e) {
+        console.error('[jc-state] task listener error:', e);
+      }
+    }
+  });
+}
+
+/** scheduleMemberNotify: rAF batch for member store. */
+function scheduleMemberNotify(): void {
+  if (pendingMemberNotify) return;
+  pendingMemberNotify = true;
+  const raf =
+    typeof requestAnimationFrame !== 'undefined'
+      ? requestAnimationFrame
+      : (cb: () => void) => setTimeout(cb, 16);
+  raf(() => {
+    pendingMemberNotify = false;
+    for (const fn of memberListeners) {
+      try {
+        fn();
+      } catch (e) {
+        console.error('[jc-state] member listener error:', e);
+      }
+    }
+  });
+}
+
+/** Subscribe to task store changes. Returns an unsubscribe function for useEffect cleanup. */
+export function subscribeTasks(fn: () => void): () => void {
+  taskListeners.add(fn);
+  return () => {
+    taskListeners.delete(fn);
+  };
+}
+
+/** Subscribe to member store changes. Returns an unsubscribe function for useEffect cleanup. */
+export function subscribeMembers(fn: () => void): () => void {
+  memberListeners.add(fn);
+  return () => {
+    memberListeners.delete(fn);
+  };
 }
 
 // ── Helpers ────────────────────────────────────────────────────

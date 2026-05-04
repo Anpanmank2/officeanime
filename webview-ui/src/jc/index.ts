@@ -62,6 +62,7 @@ export {
   jcUpdateMappings,
   POKER_TABLE_SEATS,
 } from './jc-state.js';
+export { subscribeMembers, subscribeTasks } from './jc-state.js';
 export type {
   AbsenceInfo,
   JCBubbleType,
@@ -73,3 +74,4 @@ export type {
   TaskDefinition,
   TaskStatus,
 } from './jc-types.js';
+export { subscribeLog } from './office-log-state.js';
