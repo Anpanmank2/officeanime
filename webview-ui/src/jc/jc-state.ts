@@ -8,10 +8,12 @@ import type {
   JCMemberRuntime,
   JCState,
   NameplateInfo,
+  OwnerAvatarState,
   SpeechBubble,
   StateLogEntry,
   TaskDefinition,
 } from './jc-types.js';
+import { isPinned } from './pin-store.js';
 
 /** Global JC webview state */
 let jcConfig: JCConfigData | null = null;
@@ -714,11 +716,13 @@ export function jcAddSpeechBubble(bubble: SpeechBubble): void {
   scheduleMemberNotify();
 }
 
-/** Get active speech bubbles (pruning expired ones) */
+/** Get active speech bubbles (pruning expired ones; pinned member bubbles never expire) */
 export function jcGetSpeechBubbles(): SpeechBubble[] {
   const now = Date.now();
   for (let i = speechBubbles.length - 1; i >= 0; i--) {
-    if (now - speechBubbles[i].timestamp > speechBubbles[i].duration) {
+    const b = speechBubbles[i];
+    if (isPinned(b.memberId)) continue; // pinned: never expire
+    if (now - b.timestamp > b.duration) {
       speechBubbles.splice(i, 1);
     }
   }
@@ -821,6 +825,57 @@ export function subscribeMembers(fn: () => void): () => void {
   memberListeners.add(fn);
   return () => {
     memberListeners.delete(fn);
+  };
+}
+
+// ── Owner Avatar State ────────────────────────────────────────────
+
+const DEFAULT_OWNER_AVATAR_STATE: OwnerAvatarState = {
+  active: false,
+  position: 'entrance',
+  lastPosition: 'entrance',
+  conversationTarget: null,
+};
+
+let ownerAvatarState: OwnerAvatarState = { ...DEFAULT_OWNER_AVATAR_STATE };
+const ownerAvatarListeners = new Set<() => void>();
+let pendingOwnerAvatarNotify = false;
+
+function scheduleOwnerAvatarNotify(): void {
+  if (pendingOwnerAvatarNotify) return;
+  pendingOwnerAvatarNotify = true;
+  const raf =
+    typeof requestAnimationFrame !== 'undefined'
+      ? requestAnimationFrame
+      : (cb: () => void) => setTimeout(cb, 16);
+  raf(() => {
+    pendingOwnerAvatarNotify = false;
+    for (const fn of ownerAvatarListeners) {
+      try {
+        fn();
+      } catch (e) {
+        console.error('[jc-state] ownerAvatar listener error:', e);
+      }
+    }
+  });
+}
+
+/** Get current owner avatar state (imperative read). */
+export function jcGetOwnerAvatarState(): OwnerAvatarState {
+  return ownerAvatarState;
+}
+
+/** Set owner avatar state (partial update). */
+export function jcSetOwnerAvatarState(patch: Partial<OwnerAvatarState>): void {
+  ownerAvatarState = { ...ownerAvatarState, ...patch };
+  scheduleOwnerAvatarNotify();
+}
+
+/** Subscribe to owner avatar state changes. Returns an unsubscribe function. */
+export function subscribeOwnerAvatar(fn: () => void): () => void {
+  ownerAvatarListeners.add(fn);
+  return () => {
+    ownerAvatarListeners.delete(fn);
   };
 }
 

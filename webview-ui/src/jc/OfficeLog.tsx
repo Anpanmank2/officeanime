@@ -2,7 +2,11 @@
 // Replaces AgentDashboard. Shows chronological agent speech/actions.
 
 import { useEffect, useRef, useState } from 'react';
+import { useCallback } from 'react';
 
+import { ConfidenceBadge } from './ConfidenceBadge.js';
+import { filterByDept } from './dept-filter.js';
+import { DeptFilterChips } from './DeptFilterChips.js';
 import { DEPT_COLORS, LOG_DEPT_FILTER_MAP, LOG_DEPT_FILTERS } from './jc-constants.js';
 import type { OfficeLogEntry } from './jc-types.js';
 import { getLogEntries, subscribeLog } from './office-log-state.js';
@@ -16,7 +20,7 @@ function LogEntryRow({ entry }: { entry: OfficeLogEntry }) {
   const dotColor = DEPT_COLORS[entry.department] ?? '#666';
   return (
     <div style={{ padding: '4px 8px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
         <span style={{ fontSize: '12px', color: 'var(--pixel-text-dim)', minWidth: 36 }}>
           {formatTime(entry.timestamp)}
         </span>
@@ -32,6 +36,7 @@ function LogEntryRow({ entry }: { entry: OfficeLogEntry }) {
         <span style={{ fontSize: '14px', color: dotColor, fontWeight: 'bold' }}>
           {entry.memberName}
         </span>
+        {entry.confidence && <ConfidenceBadge level={entry.confidence} />}
       </div>
       <div style={{ fontSize: '13px', color: 'var(--pixel-text)', paddingLeft: 48, marginTop: 1 }}>
         {entry.summary}
@@ -40,10 +45,25 @@ function LogEntryRow({ entry }: { entry: OfficeLogEntry }) {
   );
 }
 
-export function OfficeLog({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+export function OfficeLog({
+  isOpen,
+  onClose,
+  expanded = false,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  expanded?: boolean;
+}) {
   const [activeFilter, setActiveFilter] = useState<string>('All');
   const [entries, setEntries] = useState<OfficeLogEntry[]>([]);
+  const [deptFilter, setDeptFilter] = useState<string[]>([
+    'exec',
+    'engineering',
+    'marketing',
+    'research',
+  ]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const handleDeptChange = useCallback((selected: string[]) => setDeptFilter(selected), []);
 
   // Subscribe to log changes
   useEffect(() => {
@@ -71,13 +91,14 @@ export function OfficeLog({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
         position: 'fixed',
         top: 0,
         right: 0,
-        width: 280,
+        width: expanded ? 400 : 280,
         height: '100%',
         background: 'rgba(8, 10, 25, 0.95)',
         borderLeft: '2px solid rgba(0, 180, 255, 0.3)',
         zIndex: 50,
         display: 'flex',
         flexDirection: 'column',
+        transition: 'width 0.2s ease',
       }}
     >
       {/* Header */}
@@ -128,6 +149,9 @@ export function OfficeLog({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
         ))}
       </div>
 
+      {/* Dept filter chips */}
+      <DeptFilterChips onChange={handleDeptChange} />
+
       {/* Log entries */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto' }}>
         {entries.length === 0 ? (
@@ -142,7 +166,9 @@ export function OfficeLog({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
             No activity yet
           </div>
         ) : (
-          entries.map((entry) => <LogEntryRow key={entry.id} entry={entry} />)
+          filterByDept(entries, deptFilter).map((entry) => (
+            <LogEntryRow key={entry.id} entry={entry} />
+          ))
         )}
       </div>
     </div>

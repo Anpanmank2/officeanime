@@ -173,6 +173,17 @@ export type JCMessageToExtension =
       search?: string;
       limit?: number;
       offset?: number;
+    }
+  | {
+      type: 'jcOwnerDelegate';
+      memberId: string;
+      memberName: string;
+      department: string;
+      task: string;
+      message: string;
+      priority: string;
+      deadline: string | null;
+      timestamp: string;
     };
 
 /** Task status values */

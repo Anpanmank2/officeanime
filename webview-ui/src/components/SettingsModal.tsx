@@ -1,11 +1,14 @@
+// ── Settings Modal — Unified settings (layout/zoom/sound/etc.) ──
+
 import { useState } from 'react';
 
 import { isSoundEnabled, setSoundEnabled } from '../notificationSound.js';
 import { vscode } from '../vscodeApi.js';
 
 interface SettingsModalProps {
-  isOpen: boolean;
   onClose: () => void;
+  isEditMode: boolean;
+  onToggleEditMode: () => void;
   isDebugMode: boolean;
   onToggleDebugMode: () => void;
   alwaysShowOverlay: boolean;
@@ -13,6 +16,9 @@ interface SettingsModalProps {
   externalAssetDirectories: string[];
   watchAllSessions: boolean;
   onToggleWatchAllSessions: () => void;
+  onOpenClaude: (folderPath?: string, bypassPermissions?: boolean) => void;
+  zoom: number;
+  onZoomChange: (z: number) => void;
 }
 
 const menuItemBase: React.CSSProperties = {
@@ -54,9 +60,17 @@ function PixelCheckbox({ checked }: { checked: boolean }) {
   );
 }
 
+const sectionLabel: React.CSSProperties = {
+  fontSize: '16px',
+  color: 'rgba(0, 240, 255, 0.6)',
+  padding: '8px 10px 2px',
+  fontWeight: 'bold',
+};
+
 export function SettingsModal({
-  isOpen,
   onClose,
+  isEditMode,
+  onToggleEditMode,
   isDebugMode,
   onToggleDebugMode,
   alwaysShowOverlay,
@@ -64,28 +78,21 @@ export function SettingsModal({
   externalAssetDirectories,
   watchAllSessions,
   onToggleWatchAllSessions,
+  onOpenClaude,
+  zoom,
+  onZoomChange,
 }: SettingsModalProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [soundLocal, setSoundLocal] = useState(isSoundEnabled);
 
-  if (!isOpen) return null;
-
   return (
     <>
-      {/* Dark backdrop — click to close */}
+      {/* Backdrop */}
       <div
         onClick={onClose}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-          background: 'rgba(0, 0, 0, 0.5)',
-          zIndex: 49,
-        }}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.5)', zIndex: 49 }}
       />
-      {/* Centered modal */}
+      {/* Modal */}
       <div
         style={{
           position: 'fixed',
@@ -98,11 +105,13 @@ export function SettingsModal({
           borderRadius: 0,
           padding: '4px',
           boxShadow: '0 0 16px rgba(0, 180, 255, 0.08), 2px 2px 0px #0a0a14',
-          minWidth: 200,
+          minWidth: 260,
+          maxHeight: '80vh',
+          overflowY: 'auto',
           borderTop: '1px solid rgba(0, 240, 255, 0.3)',
         }}
       >
-        {/* Header with title and X button */}
+        {/* Header */}
         <div
           style={{
             display: 'flex',
@@ -118,7 +127,6 @@ export function SettingsModal({
             onClick={onClose}
             onMouseEnter={() => setHovered('close')}
             onMouseLeave={() => setHovered(null)}
-            aria-label="Close settings"
             style={{
               background: hovered === 'close' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
               border: 'none',
@@ -127,26 +135,48 @@ export function SettingsModal({
               fontSize: '24px',
               cursor: 'pointer',
               padding: '0 4px',
-              lineHeight: 1,
             }}
           >
             X
           </button>
         </div>
-        {/* Menu items */}
+
+        {/* ── Agent ── */}
+        <div style={sectionLabel}>Agent</div>
         <button
           onClick={() => {
-            vscode.postMessage({ type: 'openSessionsFolder' });
+            onOpenClaude();
             onClose();
           }}
-          onMouseEnter={() => setHovered('sessions')}
+          onMouseEnter={() => setHovered('agent')}
           onMouseLeave={() => setHovered(null)}
           style={{
             ...menuItemBase,
-            background: hovered === 'sessions' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+            color: '#80ff60',
+            background: hovered === 'agent' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
           }}
         >
-          Open Sessions Folder
+          + New Agent
+        </button>
+
+        {/* ── Layout ── */}
+        <div style={sectionLabel}>Layout</div>
+        <button
+          role="switch"
+          aria-checked={isEditMode}
+          onClick={() => {
+            onToggleEditMode();
+            onClose();
+          }}
+          onMouseEnter={() => setHovered('edit')}
+          onMouseLeave={() => setHovered(null)}
+          style={{
+            ...menuItemBase,
+            background: hovered === 'edit' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+          }}
+        >
+          <span>Edit Layout</span>
+          <PixelCheckbox checked={isEditMode} />
         </button>
         <button
           onClick={() => {
@@ -176,66 +206,36 @@ export function SettingsModal({
         >
           Import Layout
         </button>
-        <button
-          onClick={() => {
-            vscode.postMessage({ type: 'addExternalAssetDirectory' });
-            onClose();
-          }}
-          onMouseEnter={() => setHovered('addAssets')}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            ...menuItemBase,
-            background: hovered === 'addAssets' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          Add Asset Directory
-        </button>
-        {externalAssetDirectories.map((dir) => (
-          <div
-            key={dir}
+
+        {/* ── Zoom ── */}
+        <div style={sectionLabel}>Zoom</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px' }}>
+          <button
+            onClick={() => onZoomChange(Math.max(1, zoom - 1))}
+            style={{ ...menuItemBase, width: 'auto', padding: '2px 10px', fontSize: '20px' }}
+          >
+            -
+          </button>
+          <span
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '4px 10px',
-              gap: 8,
+              fontSize: '20px',
+              color: 'var(--pixel-text)',
+              minWidth: 30,
+              textAlign: 'center',
             }}
           >
-            <span
-              style={{
-                fontSize: '18px',
-                color: 'rgba(255, 255, 255, 0.5)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                maxWidth: 180,
-              }}
-              title={dir}
-            >
-              {dir.split(/[/\\]/).pop() ?? dir}
-            </span>
-            <button
-              onClick={() =>
-                vscode.postMessage({ type: 'removeExternalAssetDirectory', path: dir })
-              }
-              onMouseEnter={() => setHovered(`remove-${dir}`)}
-              onMouseLeave={() => setHovered(null)}
-              aria-label={`Remove asset directory: ${dir.split(/[/\\]/).pop() ?? dir}`}
-              style={{
-                background: hovered === `remove-${dir}` ? 'rgba(255, 80, 80, 0.2)' : 'transparent',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                borderRadius: 0,
-                color: 'rgba(255, 255, 255, 0.5)',
-                fontSize: '18px',
-                cursor: 'pointer',
-                padding: '1px 6px',
-                flexShrink: 0,
-              }}
-            >
-              X
-            </button>
-          </div>
-        ))}
+            {zoom}x
+          </span>
+          <button
+            onClick={() => onZoomChange(Math.min(10, zoom + 1))}
+            style={{ ...menuItemBase, width: 'auto', padding: '2px 10px', fontSize: '20px' }}
+          >
+            +
+          </button>
+        </div>
+
+        {/* ── Display ── */}
+        <div style={sectionLabel}>Display</div>
         <button
           role="switch"
           aria-checked={soundLocal}
@@ -305,6 +305,82 @@ export function SettingsModal({
             />
           )}
         </button>
+
+        {/* ── Assets ── */}
+        <div style={sectionLabel}>Assets</div>
+        <button
+          onClick={() => {
+            vscode.postMessage({ type: 'openSessionsFolder' });
+            onClose();
+          }}
+          onMouseEnter={() => setHovered('sessions')}
+          onMouseLeave={() => setHovered(null)}
+          style={{
+            ...menuItemBase,
+            background: hovered === 'sessions' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+          }}
+        >
+          Open Sessions Folder
+        </button>
+        <button
+          onClick={() => {
+            vscode.postMessage({ type: 'addExternalAssetDirectory' });
+            onClose();
+          }}
+          onMouseEnter={() => setHovered('addAssets')}
+          onMouseLeave={() => setHovered(null)}
+          style={{
+            ...menuItemBase,
+            background: hovered === 'addAssets' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+          }}
+        >
+          Add Asset Directory
+        </button>
+        {externalAssetDirectories.map((dir) => (
+          <div
+            key={dir}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '4px 10px',
+              gap: 8,
+            }}
+          >
+            <span
+              style={{
+                fontSize: '18px',
+                color: 'rgba(255, 255, 255, 0.5)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                maxWidth: 180,
+              }}
+              title={dir}
+            >
+              {dir.split(/[/\\]/).pop() ?? dir}
+            </span>
+            <button
+              onClick={() =>
+                vscode.postMessage({ type: 'removeExternalAssetDirectory', path: dir })
+              }
+              onMouseEnter={() => setHovered(`remove-${dir}`)}
+              onMouseLeave={() => setHovered(null)}
+              style={{
+                background: hovered === `remove-${dir}` ? 'rgba(255, 80, 80, 0.2)' : 'transparent',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: 0,
+                color: 'rgba(255, 255, 255, 0.5)',
+                fontSize: '18px',
+                cursor: 'pointer',
+                padding: '1px 6px',
+                flexShrink: 0,
+              }}
+            >
+              X
+            </button>
+          </div>
+        ))}
       </div>
     </>
   );

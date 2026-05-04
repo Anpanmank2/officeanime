@@ -1,8 +1,18 @@
 // ── Just Curious Virtual Office — Webview Entry Point ────────────
 
 // Shared constants (single source of truth for colors, labels, etc.)
+export { ConfidenceBadge } from './ConfidenceBadge.js';
+export { filterByDept } from './dept-filter.js';
+export { DeptFilterChips } from './DeptFilterChips.js';
+export type { DeskCardProps } from './DeskCard.js';
+export { DeskCard } from './DeskCard.js';
+export type { DialogBoxProps } from './DialogBox.js';
+export { DialogBox } from './DialogBox.js';
+export { formatFreshness } from './freshness.js';
 export {
   BUBBLE_EMOJIS,
+  CONFIDENCE_BADGE_STYLES,
+  CONFIDENCE_COLORS,
   DEPT_COLORS,
   DEPT_LABELS,
   DEPT_NEON,
@@ -63,15 +73,25 @@ export {
   POKER_TABLE_SEATS,
 } from './jc-state.js';
 export { subscribeMembers, subscribeTasks } from './jc-state.js';
+export { jcGetOwnerAvatarState, jcSetOwnerAvatarState, subscribeOwnerAvatar } from './jc-state.js';
 export type {
   AbsenceInfo,
+  ConfidenceLevel,
   JCBubbleType,
   JCConfigData,
   JCMemberRuntime,
   JCState,
   NameplateInfo,
+  OwnerAvatarState,
   SpeechBubble,
   TaskDefinition,
   TaskStatus,
 } from './jc-types.js';
+export type { ViewMode } from './mode-store.js';
+export { getViewMode, setViewMode, subscribeMode, useViewMode } from './mode-store.js';
+export { ModeProvider } from './ModeContext.js';
+export { ModeSwitcher } from './ModeSwitcher.js';
 export { subscribeLog } from './office-log-state.js';
+export { dismissOwner, OWNER_AGENT_ID, summonOwner } from './owner-avatar-constants.js';
+export { OwnerAvatar } from './OwnerAvatar.js';
+export { addPin, isPinned, removePin, subscribe as subscribePins } from './pin-store.js';

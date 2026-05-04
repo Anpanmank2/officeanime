@@ -236,3 +236,32 @@ export const LOG_DEPT_FILTER_MAP: Record<string, string> = {
   Research: 'research',
   Secretary: 'exec',
 };
+
+// ── Confidence Badge Colors (eng-05 spec) ───────────────────────
+export const CONFIDENCE_COLORS: Record<string, string> = {
+  confirmed: '#5ac88c',
+  likely: '#f59e0b',
+  unverified: '#8888aa',
+};
+
+// ── Confidence Badge Styles ─────────────────────────────────────
+export const CONFIDENCE_BADGE_STYLES: Record<
+  string,
+  { background: string; color: string; border: string }
+> = {
+  confirmed: {
+    background: '#1a3a2a',
+    color: '#5ac88c',
+    border: '1px solid #5ac88c',
+  },
+  likely: {
+    background: '#3a2e10',
+    color: '#f59e0b',
+    border: '1px solid #f59e0b',
+  },
+  unverified: {
+    background: '#2a2a3a',
+    color: '#8888aa',
+    border: '1px solid #4a4a6a',
+  },
+};

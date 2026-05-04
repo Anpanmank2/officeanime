@@ -11,6 +11,7 @@ import {
 import { renderJCOverlay } from '../../jc/jc-overlay.js';
 import { jcGetAbsentMemberAtDesk, jcGetMemberAtDesk } from '../../jc/jc-state.js';
 import type { AbsenceInfo } from '../../jc/jc-types.js';
+import { isPinned } from '../../jc/pin-store.js';
 import { unlockAudio } from '../../notificationSound.js';
 import { vscode } from '../../vscodeApi.js';
 import { canPlaceFurniture, getWallPlacementRow } from '../editor/editorActions.js';
@@ -31,6 +32,7 @@ interface OfficeCanvasProps {
   officeState: OfficeState;
   onClick: (agentId: number) => void;
   onAbsentDeskClick?: (info: AbsenceInfo, screenPos: { x: number; y: number }) => void;
+  onDeskCardOpen?: (memberId: string, screenPos: { x: number; y: number }) => void;
   onDeskContextMenu?: (
     memberId: string,
     memberName: string,
@@ -54,6 +56,7 @@ export function OfficeCanvas({
   officeState,
   onClick,
   onAbsentDeskClick,
+  onDeskCardOpen,
   onDeskContextMenu,
   isEditMode,
   editorState,
@@ -750,9 +753,14 @@ export function OfficeCanvas({
             }
           }
         }
-        // Clicked empty space — deselect
-        officeState.selectedAgentId = null;
-        officeState.cameraFollowId = null;
+        // Clicked empty space — deselect (unless pinned)
+        if (
+          officeState.selectedAgentId === null ||
+          !isPinned(String(officeState.selectedAgentId))
+        ) {
+          officeState.selectedAgentId = null;
+          officeState.cameraFollowId = null;
+        }
       }
 
       // Check if clicked on an absent member's desk area (JC mode)
@@ -780,11 +788,37 @@ export function OfficeCanvas({
           }
         }
       }
+
+      // DeskCard: any desk tile click opens the card (unless owner avatar mode active)
+      if (onDeskCardOpen) {
+        const tile = screenToTile(e.clientX, e.clientY);
+        if (tile) {
+          const memberAtDesk = jcGetMemberAtDesk(tile.col, tile.row);
+          if (memberAtDesk) {
+            const el = containerRef.current;
+            if (el) {
+              const rect = el.getBoundingClientRect();
+              const dpr = window.devicePixelRatio || 1;
+              const canvasW = Math.round(rect.width * dpr);
+              const canvasH = Math.round(rect.height * dpr);
+              const layout = officeState.getLayout();
+              const mapW = layout.cols * TILE_SIZE * zoom;
+              const mapH = layout.rows * TILE_SIZE * zoom;
+              const deviceOffsetX = Math.floor((canvasW - mapW) / 2) + Math.round(panRef.current.x);
+              const deviceOffsetY = Math.floor((canvasH - mapH) / 2) + Math.round(panRef.current.y);
+              const screenX = (deviceOffsetX + (tile.col + 0.5) * TILE_SIZE * zoom) / dpr;
+              const screenY = (deviceOffsetY + tile.row * TILE_SIZE * zoom) / dpr;
+              onDeskCardOpen(memberAtDesk.memberId, { x: screenX, y: screenY });
+            }
+          }
+        }
+      }
     },
     [
       officeState,
       onClick,
       onAbsentDeskClick,
+      onDeskCardOpen,
       screenToWorld,
       screenToTile,
       isEditMode,

@@ -474,6 +474,65 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         if (memberId && prompt) {
           submitTask(memberId, prompt, priority, workingDirectory);
         }
+      } else if (message.type === 'jcOwnerDelegate') {
+        // JC: Owner delegation via DialogBox — write task_received + delegate events to jc-events.json
+        const {
+          memberId,
+          memberName,
+          department,
+          task,
+          message: msg,
+          priority,
+          deadline,
+          timestamp,
+        } = message as {
+          memberId: string;
+          memberName: string;
+          department: string;
+          task: string;
+          message: string;
+          priority: string;
+          deadline: string | null;
+          timestamp: string;
+        };
+        if (memberId && task) {
+          const eventsFile = path.join(
+            vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '',
+            'jc-events.json',
+          );
+          try {
+            let data: { version: number; events: unknown[] } = { version: 1, events: [] };
+            if (fs.existsSync(eventsFile)) {
+              data = JSON.parse(fs.readFileSync(eventsFile, 'utf-8')) as typeof data;
+            }
+            data.events.push({
+              event: 'task_received',
+              timestamp,
+              task,
+              from: 'user',
+            });
+            data.events.push({
+              event: 'delegate',
+              timestamp: new Date().toISOString(),
+              from: 'exec-sec',
+              to: [memberId],
+              task,
+              department,
+              message: msg,
+              priority,
+              deadline,
+            });
+            const tmp = eventsFile + '.tmp';
+            fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+            fs.renameSync(tmp, eventsFile);
+          } catch (e) {
+            console.error('[pixel-agents] jcOwnerDelegate write error:', e);
+          }
+          // Also submit as a task to the orchestrator
+          const priorityNum = parseInt(priority.replace('P', ''), 10) || 3;
+          submitTask(memberId, task, priorityNum);
+          void memberName; // used in events above
+        }
       } else if (
         message.type === 'agent:instruct' ||
         message.type === 'agent:directive' ||

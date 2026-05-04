@@ -4,9 +4,75 @@ import { CHARACTER_SITTING_OFFSET_PX } from '../constants.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import { isSittingState, TILE_SIZE } from '../office/types.js';
 import { vscode } from '../vscodeApi.js';
+import { ConfidenceBadge } from './ConfidenceBadge.js';
+import { formatFreshness } from './freshness.js';
 import { DEPT_COLORS, DEPT_LABELS, STATE_COLORS, STATE_LABELS } from './jc-constants.js';
 import { jcGetActivitySummary, jcGetMemberInfo, jcGetMemberTaskStatus } from './jc-state.js';
 import type { InstructionMode } from './jc-types.js';
+import { addPin, isPinned, removePin, subscribe as subscribePins } from './pin-store.js';
+
+const PROMPT_PREVIEW_LEN = 200;
+
+function ExpandablePrompt({ prompt }: { prompt: string }) {
+  const [expanded, setExpanded] = useState(false);
+  if (prompt.length <= PROMPT_PREVIEW_LEN) {
+    return <div style={{ color: '#c0c0e0' }}>{prompt}</div>;
+  }
+  if (expanded) {
+    return (
+      <div>
+        <textarea
+          readOnly
+          value={prompt}
+          style={{
+            width: '100%',
+            minHeight: 80,
+            background: 'rgba(0,0,0,0.3)',
+            color: '#c0c0e0',
+            border: '1px solid var(--pixel-border)',
+            borderRadius: 0,
+            fontSize: '14px',
+            fontFamily: 'inherit',
+            resize: 'vertical',
+            boxSizing: 'border-box',
+            padding: '3px',
+          }}
+        />
+        <button
+          onClick={() => setExpanded(false)}
+          style={{
+            fontSize: '12px',
+            color: 'var(--pixel-text-dim)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 0,
+          }}
+        >
+          折りたたむ
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div style={{ color: '#c0c0e0' }}>
+      {prompt.slice(0, PROMPT_PREVIEW_LEN)}...{' '}
+      <button
+        onClick={() => setExpanded(true)}
+        style={{
+          fontSize: '12px',
+          color: 'var(--pixel-accent)',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          padding: 0,
+        }}
+      >
+        展開
+      </button>
+    </div>
+  );
+}
 
 interface JCMemberInfoPanelProps {
   officeState: OfficeState;
@@ -25,6 +91,10 @@ export function JCMemberInfoPanel({
   const [instructionText, setInstructionText] = useState('');
   const [instructionMode, setInstructionMode] = useState<InstructionMode>('instant');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [pinned, setPinned] = useState(() => {
+    const id = officeState.selectedAgentId;
+    return id !== null ? isPinned(String(id)) : false;
+  });
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -36,6 +106,13 @@ export function JCMemberInfoPanel({
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
   }, []);
+
+  useEffect(() => {
+    return subscribePins(() => {
+      const id = officeState.selectedAgentId;
+      if (id !== null) setPinned(isPinned(String(id)));
+    });
+  }, [officeState]);
 
   const selectedId = officeState.selectedAgentId;
   if (selectedId === null) return null;
@@ -156,6 +233,29 @@ export function JCMemberInfoPanel({
             >
               {deptLabel}
             </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                const id = String(selectedId);
+                if (pinned) {
+                  removePin(id);
+                } else {
+                  addPin(id);
+                }
+              }}
+              title={pinned ? 'ピン留め解除' : 'ピン留め'}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                padding: '0 2px',
+                color: pinned ? '#f59e0b' : 'var(--pixel-text-dim)',
+                lineHeight: 1,
+              }}
+            >
+              {pinned ? '📌' : '📍'}
+            </button>
             <span style={{ fontSize: '14px', color: 'var(--pixel-text-dim)' }}>
               {isExpanded ? '▲' : '▼'}
             </span>
@@ -203,14 +303,28 @@ export function JCMemberInfoPanel({
                 whiteSpace: 'normal',
               }}
             >
-              <div style={{ color: 'var(--pixel-text-dim)', marginBottom: 1 }}>
-                Task: {currentTask.status}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  marginBottom: 1,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span style={{ color: 'var(--pixel-text-dim)' }}>Task: {currentTask.status}</span>
+                {currentTask.confidence && <ConfidenceBadge level={currentTask.confidence} />}
+                {currentTask.extractedAt &&
+                  (() => {
+                    const { label, warn } = formatFreshness(currentTask.extractedAt);
+                    return (
+                      <span style={{ fontSize: '9px', color: warn ? '#f59e0b' : '#888899' }}>
+                        {label}
+                      </span>
+                    );
+                  })()}
               </div>
-              <div style={{ color: '#c0c0e0' }}>
-                {currentTask.prompt.length > 60
-                  ? currentTask.prompt.slice(0, 60) + '...'
-                  : currentTask.prompt}
-              </div>
+              <ExpandablePrompt prompt={currentTask.prompt} />
             </div>
           )}
         </div>

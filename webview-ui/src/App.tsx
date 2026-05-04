@@ -4,18 +4,32 @@ import { toMajorMinor } from './changelogData.js';
 import { BottomToolbar } from './components/BottomToolbar.js';
 import { ChangelogModal } from './components/ChangelogModal.js';
 import { DebugView } from './components/DebugView.js';
+import { SettingsModal } from './components/SettingsModal.js';
 import { TokenHPBar } from './components/TokenHPBar.js';
 import { VersionIndicator } from './components/VersionIndicator.js';
-import { ZoomControls } from './components/ZoomControls.js';
 import { PULSE_ANIMATION_DURATION_SEC } from './constants.js';
 import { useEditorActions } from './hooks/useEditorActions.js';
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js';
 import { useExtensionMessages } from './hooks/useExtensionMessages.js';
 import { AbsentStatusPopup } from './jc/AbsentStatusPopup.js';
-import { AgentDashboard } from './jc/AgentDashboard.js';
-import type { AbsenceInfo } from './jc/jc-types.js';
+import { DeskCard } from './jc/DeskCard.js';
+import { DialogBox } from './jc/DialogBox.js';
+import { DEPT_COLORS } from './jc/jc-constants.js';
+import {
+  jcGetMemberInfo,
+  jcGetOwnerAvatarState,
+  jcSetOwnerAvatarState,
+  subscribeOwnerAvatar,
+} from './jc/jc-state.js';
+import type { AbsenceInfo, OwnerAvatarState } from './jc/jc-types.js';
 import { JCMemberInfoPanel } from './jc/JCMemberInfoPanel.js';
-import { TaskInputForm } from './jc/TaskInputForm.js';
+import { useViewMode } from './jc/mode-store.js';
+import { ModeProvider } from './jc/ModeContext.js';
+import { getLogEntries, subscribeLog } from './jc/office-log-state.js';
+import { OfficeLog } from './jc/OfficeLog.js';
+import { OWNER_AGENT_ID } from './jc/owner-avatar-constants.js';
+import { OwnerAvatar } from './jc/OwnerAvatar.js';
+import { TaskHistoryPanel } from './jc/TaskHistoryPanel.js';
 import { OfficeCanvas } from './office/components/OfficeCanvas.js';
 import { ToolOverlay } from './office/components/ToolOverlay.js';
 import { EditorState } from './office/editor/editorState.js';
@@ -129,16 +143,96 @@ function EditActionBar({
   );
 }
 
-function App() {
+// ── Command Board — shown only in command mode ────────────────────
+// Ticker showing latest 5 OfficeLog entries + operation board placeholder.
+
+function CommandBoard() {
+  const [recentEntries, setRecentEntries] = useState(() => getLogEntries().slice(-5).reverse());
+
+  useEffect(() => {
+    const update = () => setRecentEntries(getLogEntries().slice(-5).reverse());
+    return subscribeLog(update);
+  }, []);
+
+  return (
+    <>
+      {/* Ticker: top bar showing latest 5 events */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 8,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 48,
+          display: 'flex',
+          gap: 8,
+          alignItems: 'center',
+          background: 'rgba(8, 10, 25, 0.88)',
+          border: '2px solid rgba(0, 180, 255, 0.2)',
+          padding: '4px 10px',
+          maxWidth: '60%',
+          overflow: 'hidden',
+        }}
+      >
+        {recentEntries.length === 0 ? (
+          <span style={{ fontSize: '12px', color: 'rgba(200,210,240,0.4)' }}>No activity</span>
+        ) : (
+          recentEntries.map((entry) => (
+            <span
+              key={entry.id}
+              style={{
+                fontSize: '12px',
+                color: DEPT_COLORS[entry.department] ?? '#aaa',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: 160,
+              }}
+              title={`${entry.memberName}: ${entry.summary}`}
+            >
+              [{entry.memberName}] {entry.summary}
+            </span>
+          ))
+        )}
+      </div>
+
+      {/* Operation board placeholder */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 45,
+          background: 'rgba(8, 10, 25, 0.75)',
+          border: '2px solid rgba(0, 180, 255, 0.25)',
+          padding: '16px 24px',
+          minWidth: 280,
+          textAlign: 'center',
+          pointerEvents: 'none',
+        }}
+      >
+        <div style={{ fontSize: '16px', color: '#00f0ff', fontWeight: 'bold', marginBottom: 8 }}>
+          🏛 COMMAND BOARD
+        </div>
+        <div style={{ fontSize: '12px', color: 'rgba(200,210,240,0.5)' }}>
+          Operation board — Phase 2
+        </div>
+      </div>
+    </>
+  );
+}
+
+function AppContent() {
   // Browser runtime (dev or static dist): dispatch mock messages after the
   // useExtensionMessages listener has been registered.
-  // Skip if WebSocket bridge is active (real extension data will arrive via WS).
   useEffect(() => {
     if (isBrowserRuntime) {
-      // Dispatch mock asset messages in browser mode (both standalone WS and plain browser).
       void import('./browserMock.js').then(({ dispatchMockMessages }) => dispatchMockMessages());
     }
   }, []);
+
+  const { viewMode } = useViewMode();
 
   const editor = useEditorActions(getOfficeState, editorState);
 
@@ -158,7 +252,6 @@ function App() {
     layoutReady,
     layoutWasReset,
     loadedAssets,
-    workspaceFolders,
     externalAssetDirectories,
     lastSeenVersion,
     extensionVersion,
@@ -174,8 +267,30 @@ function App() {
   const [isChangelogOpen, setIsChangelogOpen] = useState(false);
   const [isDebugMode, setIsDebugMode] = useState(false);
   const [alwaysShowOverlay, setAlwaysShowOverlay] = useState(false);
-  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
-  const handleToggleDashboard = useCallback(() => setIsDashboardOpen((prev) => !prev), []);
+
+  // ── New panel states ──
+  const [isTaskHistoryOpen, setIsTaskHistoryOpen] = useState(false);
+  const [isOfficeLogOpen, setIsOfficeLogOpen] = useState(true); // always open by default
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Owner avatar state (reactive sync from imperative store)
+  const [ownerAvatarState, setOwnerAvatarStateLocal] =
+    useState<OwnerAvatarState>(jcGetOwnerAvatarState);
+  useEffect(() => {
+    return subscribeOwnerAvatar(() => {
+      setOwnerAvatarStateLocal(jcGetOwnerAvatarState());
+    });
+  }, []);
+
+  // DialogBox state: opened when owner is active and clicks a member character
+  const [dialogTarget, setDialogTarget] = useState<{
+    memberId: string;
+    memberName: string;
+  } | null>(null);
+
+  const handleToggleTaskHistory = useCallback(() => {
+    setIsTaskHistoryOpen((prev) => !prev);
+  }, []);
 
   // Absent desk popup state
   const [absentPopup, setAbsentPopup] = useState<{
@@ -190,41 +305,27 @@ function App() {
     [],
   );
 
-  const handleAbsentPopupClose = useCallback(() => {
-    setAbsentPopup(null);
-  }, []);
+  // DeskCard state
+  const [deskCard, setDeskCard] = useState<{
+    memberId: string;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  const handleDeskCardOpen = useCallback(
+    (memberId: string, screenPos: { x: number; y: number }) => {
+      // In owner avatar mode, DialogBox takes priority — skip DeskCard
+      if (jcGetOwnerAvatarState().active) return;
+      setDeskCard({ memberId, position: screenPos });
+    },
+    [],
+  );
+
+  const handleAbsentPopupClose = useCallback(() => setAbsentPopup(null), []);
 
   const handleAbsentPopupLaunch = useCallback((memberId: string) => {
     vscode.postMessage({ type: 'jcLaunchAgent', memberId });
     setAbsentPopup(null);
   }, []);
-
-  // Task input form state
-  const [taskForm, setTaskForm] = useState<{
-    memberId: string;
-    memberName: string;
-    position: { x: number; y: number };
-  } | null>(null);
-
-  const handleDeskContextMenu = useCallback(
-    (memberId: string, memberName: string, screenPos: { x: number; y: number }) => {
-      setTaskForm({ memberId, memberName, position: screenPos });
-      setAbsentPopup(null); // Close any open absent popup
-    },
-    [],
-  );
-
-  const handleTaskFormClose = useCallback(() => {
-    setTaskForm(null);
-  }, []);
-
-  const handleTaskFormSubmit = useCallback(
-    (memberId: string, prompt: string, priority: number, workingDirectory?: string) => {
-      vscode.postMessage({ type: 'jcSubmitTask', memberId, prompt, priority, workingDirectory });
-      setTaskForm(null);
-    },
-    [],
-  );
 
   const currentMajorMinor = toMajorMinor(extensionVersion);
 
@@ -237,7 +338,6 @@ function App() {
     vscode.postMessage({ type: 'setLastSeenVersion', version: currentMajorMinor });
   }, [currentMajorMinor]);
 
-  // Sync alwaysShowOverlay from persisted settings
   useEffect(() => {
     setAlwaysShowOverlay(alwaysShowLabels);
   }, [alwaysShowLabels]);
@@ -274,20 +374,36 @@ function App() {
     vscode.postMessage({ type: 'closeAgent', id });
   }, []);
 
+  // Character click → open DialogBox if owner active, otherwise focus agent
   const handleClick = useCallback((agentId: number) => {
-    // If clicked agent is a sub-agent, focus the parent's terminal instead
     const os = getOfficeState();
     const meta = os.subagentMeta.get(agentId);
     const focusId = meta ? meta.parentAgentId : agentId;
+
+    // Skip clicks on the owner avatar itself
+    if (focusId === OWNER_AGENT_ID) return;
+
+    const ownerState = jcGetOwnerAvatarState();
+    if (ownerState.active) {
+      // Owner mode: open DialogBox for the clicked member
+      const memberInfo = jcGetMemberInfo(focusId);
+      if (memberInfo) {
+        // Update owner avatar to walk toward this member
+        jcSetOwnerAvatarState({ conversationTarget: memberInfo.memberId });
+        setDialogTarget({
+          memberId: memberInfo.memberId,
+          memberName: memberInfo.config.name,
+        });
+      }
+      return;
+    }
+
     vscode.postMessage({ type: 'focusAgent', id: focusId });
   }, []);
 
   const officeState = getOfficeState();
-
-  // Force dependency on editorTickForKeyboard to propagate keyboard-triggered re-renders
   void editorTickForKeyboard;
 
-  // Show "Press R to rotate" hint when a rotatable item is selected or being placed
   const showRotateHint =
     editor.isEditMode &&
     (() => {
@@ -341,7 +457,7 @@ function App() {
         officeState={officeState}
         onClick={handleClick}
         onAbsentDeskClick={handleAbsentDeskClick}
-        onDeskContextMenu={handleDeskContextMenu}
+        onDeskCardOpen={handleDeskCardOpen}
         isEditMode={editor.isEditMode}
         editorState={editorState}
         onEditorTileAction={editor.handleEditorTileAction}
@@ -356,8 +472,6 @@ function App() {
         panRef={editor.panRef}
       />
 
-      {!isDebugMode && <ZoomControls zoom={editor.zoom} onZoomChange={editor.handleZoomChange} />}
-
       {/* Vignette overlay */}
       <div
         style={{
@@ -369,31 +483,62 @@ function App() {
         }}
       />
 
+      {/* ── Bottom Toolbar (Tasks + Settings + Owner summon) ── */}
       <BottomToolbar
-        isEditMode={editor.isEditMode}
-        onOpenClaude={editor.handleOpenClaude}
-        onToggleEditMode={editor.handleToggleEditMode}
-        isDebugMode={isDebugMode}
-        onToggleDebugMode={handleToggleDebugMode}
-        alwaysShowOverlay={alwaysShowOverlay}
-        onToggleAlwaysShowOverlay={handleToggleAlwaysShowOverlay}
-        workspaceFolders={workspaceFolders}
-        externalAssetDirectories={externalAssetDirectories}
-        watchAllSessions={watchAllSessions}
-        onToggleWatchAllSessions={() => {
-          const newVal = !watchAllSessions;
-          setWatchAllSessions(newVal);
-          vscode.postMessage({ type: 'setWatchAllSessions', enabled: newVal });
+        isTaskHistoryOpen={isTaskHistoryOpen}
+        onToggleTaskHistory={handleToggleTaskHistory}
+        onOpenSettings={() => setIsSettingsOpen(!isSettingsOpen)}
+        isSettingsOpen={isSettingsOpen}
+        ownerAvatarActive={ownerAvatarState.active}
+        onToggleOwner={() => {
+          if (ownerAvatarState.active) {
+            jcSetOwnerAvatarState({ active: false });
+          } else {
+            jcSetOwnerAvatarState({
+              active: true,
+              position: 'entrance',
+              lastPosition: ownerAvatarState.lastPosition,
+              conversationTarget: null,
+            });
+          }
         }}
-        isDashboardOpen={isDashboardOpen}
-        onToggleDashboard={handleToggleDashboard}
       />
 
-      <AgentDashboard
-        isOpen={isDashboardOpen}
-        onClose={() => setIsDashboardOpen(false)}
-        subagentCharacters={subagentCharacters}
+      {/* ── Settings Modal ── */}
+      {isSettingsOpen && (
+        <SettingsModal
+          onClose={() => setIsSettingsOpen(false)}
+          isEditMode={editor.isEditMode}
+          onToggleEditMode={editor.handleToggleEditMode}
+          isDebugMode={isDebugMode}
+          onToggleDebugMode={handleToggleDebugMode}
+          alwaysShowOverlay={alwaysShowOverlay}
+          onToggleAlwaysShowOverlay={handleToggleAlwaysShowOverlay}
+          externalAssetDirectories={externalAssetDirectories}
+          watchAllSessions={watchAllSessions}
+          onToggleWatchAllSessions={() => {
+            const newVal = !watchAllSessions;
+            setWatchAllSessions(newVal);
+            vscode.postMessage({ type: 'setWatchAllSessions', enabled: newVal });
+          }}
+          onOpenClaude={editor.handleOpenClaude}
+          zoom={editor.zoom}
+          onZoomChange={editor.handleZoomChange}
+        />
+      )}
+
+      {/* ── Office Log (right panel, always visible) ── */}
+      <OfficeLog
+        isOpen={isOfficeLogOpen}
+        onClose={() => setIsOfficeLogOpen(false)}
+        expanded={viewMode === 'serious'}
       />
+
+      {/* ── Command Mode: operation board placeholder + ticker ── */}
+      {viewMode === 'command' && <CommandBoard />}
+
+      {/* ── Task History (left slide-in) ── */}
+      <TaskHistoryPanel isOpen={isTaskHistoryOpen} onClose={() => setIsTaskHistoryOpen(false)} />
 
       <VersionIndicator
         currentVersion={extensionVersion}
@@ -437,7 +582,6 @@ function App() {
 
       {editor.isEditMode &&
         (() => {
-          // Compute selected furniture color from current layout
           const selUid = editorState.selectedFurnitureUid;
           const selColor = selUid
             ? (officeState.getLayout().furniture.find((f) => f.uid === selUid)?.color ?? null)
@@ -518,13 +662,26 @@ function App() {
         />
       )}
 
-      {taskForm && (
-        <TaskInputForm
-          memberId={taskForm.memberId}
-          memberName={taskForm.memberName}
-          position={taskForm.position}
-          onSubmit={handleTaskFormSubmit}
-          onClose={handleTaskFormClose}
+      {/* ── DeskCard (shown on desk tile click) ── */}
+      {deskCard && (
+        <DeskCard
+          memberId={deskCard.memberId}
+          position={deskCard.position}
+          onClose={() => setDeskCard(null)}
+        />
+      )}
+
+      {/* ── Owner Avatar (always mounted when active, renders via canvas) ── */}
+      {ownerAvatarState.active && (
+        <OwnerAvatar officeState={officeState} onExited={() => setDialogTarget(null)} />
+      )}
+
+      {/* ── DialogBox (shown when owner clicks a member character) ── */}
+      {dialogTarget && ownerAvatarState.active && (
+        <DialogBox
+          memberId={dialogTarget.memberId}
+          memberName={dialogTarget.memberName}
+          onClose={() => setDialogTarget(null)}
         />
       )}
 
@@ -591,6 +748,14 @@ function App() {
         </div>
       )}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <ModeProvider>
+      <AppContent />
+    </ModeProvider>
   );
 }
 

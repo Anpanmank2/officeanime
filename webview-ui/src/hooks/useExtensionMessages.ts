@@ -8,6 +8,7 @@ import {
   jcActivitySummaryUpdate,
   jcAddSpeechBubble,
   jcGetBreakTarget,
+  jcGetMemberRuntime,
   jcGetPokerSeat,
   jcLoadConfig,
   jcMemberArriving,
@@ -23,6 +24,7 @@ import {
   jcTriggerWave,
   jcUpdateMappings,
 } from '../jc/index.js';
+import { addLogEntry } from '../jc/office-log-state.js';
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import { setFloorSprites } from '../office/floorTiles.js';
@@ -555,6 +557,16 @@ export function useExtensionMessages(
         }
 
         jcMemberArriving(memberId);
+        // Log arrival
+        const arrRt = jcGetMemberRuntime(memberId);
+        addLogEntry({
+          timestamp: Date.now(),
+          memberId,
+          memberName: arrRt?.config.name ?? memberId,
+          department: arrRt?.config.department ?? 'exec',
+          type: 'arrival',
+          summary: `${arrRt?.config.name ?? memberId} が出社しました`,
+        });
 
         // If character already exists (from agentCreated), reassign to correct seat
         const existing = os.characters.get(agentId);
@@ -615,6 +627,16 @@ export function useExtensionMessages(
         const agentId = msg.agentId as number;
         const memberId = msg.memberId as string;
         jcMemberLeaving(memberId);
+        // Log departure
+        const depRt = jcGetMemberRuntime(memberId);
+        addLogEntry({
+          timestamp: Date.now(),
+          memberId,
+          memberName: depRt?.config.name ?? memberId,
+          department: depRt?.config.department ?? 'exec',
+          type: 'departure',
+          summary: `${depRt?.config.name ?? memberId} が退社しました`,
+        });
 
         // Walk character to entrance, then despawn
         const ch = os.characters.get(agentId);
@@ -674,6 +696,17 @@ export function useExtensionMessages(
         const stateSince = msg.stateSince as number | undefined;
         jcMemberStateChange(msg.memberId, jcState, stateSince);
         jcRecordActivity(msg.memberId as string);
+        // Log state change
+        const scMid = msg.memberId as string;
+        const scRt = jcGetMemberRuntime(scMid);
+        addLogEntry({
+          timestamp: Date.now(),
+          memberId: scMid,
+          memberName: scRt?.config.name ?? scMid,
+          department: scRt?.config.department ?? 'exec',
+          type: 'state_change',
+          summary: `${scRt?.config.name ?? scMid}: → ${jcState}`,
+        });
 
         // Sync character animation with JC state
         const ch = os.characters.get(agentId);
@@ -743,6 +776,19 @@ export function useExtensionMessages(
         jcAbsenceBulkSync(msg.payload as AbsenceInfo[]);
       } else if (msg.type === 'jcTaskUpdate') {
         jcTaskUpdate(msg.task as TaskDefinition);
+        // Log task status changes
+        const task = msg.task as TaskDefinition;
+        if (task.status === 'done' || task.status === 'error' || task.status === 'cancelled') {
+          const rt = jcGetMemberRuntime(task.assignee);
+          addLogEntry({
+            timestamp: Date.now(),
+            memberId: task.assignee,
+            memberName: rt?.config.name ?? task.assignee,
+            department: rt?.config.department ?? 'exec',
+            type: 'task_event',
+            summary: `Task ${task.status}: ${task.prompt.slice(0, 60)}${task.result ? ' → ' + task.result.slice(0, 80) : ''}`,
+          });
+        }
       } else if (msg.type === 'jcTasksBulkSync') {
         jcTasksBulkSync(msg.tasks as TaskDefinition[]);
       } else if (msg.type === 'jcActivitySummary') {
@@ -752,8 +798,29 @@ export function useExtensionMessages(
           type: string;
         };
         jcActivitySummaryUpdate(memberId, summary);
+        if (summary) {
+          const rt = jcGetMemberRuntime(memberId);
+          addLogEntry({
+            timestamp: Date.now(),
+            memberId,
+            memberName: rt?.config.name ?? memberId,
+            department: rt?.config.department ?? 'exec',
+            type: 'speech',
+            summary: `${rt?.config.name ?? memberId}: ${summary}`,
+          });
+        }
       } else if (msg.type === 'jcSpeechBubble') {
         jcAddSpeechBubble(msg.bubble as SpeechBubble);
+        const bubble = msg.bubble as SpeechBubble;
+        const rt = jcGetMemberRuntime(bubble.memberId);
+        addLogEntry({
+          timestamp: Date.now(),
+          memberId: bubble.memberId,
+          memberName: rt?.config.name ?? bubble.memberId,
+          department: bubble.department ?? rt?.config.department ?? 'exec',
+          type: 'speech',
+          summary: `${rt?.config.name ?? bubble.memberId}: ${bubble.text}`,
+        });
       }
     };
     window.addEventListener('message', handler);

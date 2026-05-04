@@ -1,5 +1,8 @@
 // ── Just Curious Virtual Office — Webview Type Definitions ──────
 
+/** Confidence level for task/report tiles */
+export type ConfidenceLevel = 'confirmed' | 'likely' | 'unverified';
+
 /** 13-state FSM (mirrors src/jc/types.ts) */
 export const JCState = {
   ABSENT: 'absent',
@@ -175,6 +178,8 @@ export interface TaskDefinition {
   completionSummary?: string;
   isIncident?: boolean;
   sortOrder?: number;
+  confidence?: ConfidenceLevel;
+  extractedAt?: number;
 }
 
 /** Office log entry for the right-panel chronological log */
@@ -187,6 +192,8 @@ export interface OfficeLogEntry {
   type: 'speech' | 'state_change' | 'task_event' | 'delegation' | 'arrival' | 'departure';
   summary: string;
   stateColor?: string;
+  confidence?: ConfidenceLevel;
+  extractedAt?: number;
 }
 
 /** Agent detail stats for the click popup */
@@ -218,6 +225,17 @@ export interface SpeechBubble {
   department: string;
   timestamp: number; // Date.now()
   duration: number; // ms (default 3000)
+}
+
+/** Owner avatar position type */
+export type OwnerAvatarPosition = 'entrance' | 'secretary_desk' | string;
+
+/** Owner avatar state */
+export interface OwnerAvatarState {
+  active: boolean;
+  position: OwnerAvatarPosition;
+  lastPosition: OwnerAvatarPosition;
+  conversationTarget: string | null;
 }
 
 /** Office event types for file-based event queue */
