@@ -46,6 +46,8 @@ export function BottomToolbar(props: BottomToolbarProps) {
           <button
             style={{
               ...btnBase,
+              fontSize: '9px',
+              fontFamily: "'FS Pixel Sans', sans-serif",
               color: props.ownerAvatarActive ? '#ffd740' : 'rgba(255, 215, 64, 0.6)',
               background: props.ownerAvatarActive
                 ? 'rgba(255, 215, 64, 0.15)'
@@ -53,9 +55,10 @@ export function BottomToolbar(props: BottomToolbarProps) {
               border: `2px solid ${props.ownerAvatarActive ? 'rgba(255, 215, 64, 0.7)' : 'rgba(255, 215, 64, 0.25)'}`,
             }}
             onClick={props.onToggleOwner}
-            title={props.ownerAvatarActive ? 'Owner を退場させる' : 'Owner を召喚する'}
+            title={props.ownerAvatarActive ? 'Owner を退場させる' : 'Summon Owner'}
+            aria-label="Summon Owner"
           >
-            👑
+            OWNER
           </button>
         )}
         {/* Tasks button */}
