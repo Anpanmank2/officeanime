@@ -277,18 +277,21 @@ export class EventWatcher {
   }
 
   private handleWorkStarted(event: WorkStartedEvent): void {
-    const member = this.config.members.find((m) => m.id === event.agent);
-    if (member) {
+    // Producer (jc-emit.mjs) emits the actor in `from`; consumer historically
+    // read `agent`. Accept either so emitter/consumer field names stay in sync.
+    const actorId = event.agent ?? event.from;
+    const member = this.config.members.find((m) => m.id === actorId);
+    if (member && actorId) {
       this.webview!.postMessage({
         type: 'jcMemberStateChange',
         agentId: -200 - Math.floor(Math.random() * 1000),
-        memberId: event.agent,
+        memberId: actorId,
         jcState: 'coding',
       });
       const bubble: SpeechBubble = {
-        id: `work-${event.agent}-${Date.now()}`,
-        memberId: event.agent,
-        text: event.task.slice(0, 20) + '...',
+        id: `work-${actorId}-${Date.now()}`,
+        memberId: actorId,
+        text: (event.task ?? '').slice(0, 20) + '...',
         department: member.department,
         timestamp: Date.now(),
         duration: 3000,
@@ -345,12 +348,15 @@ export class EventWatcher {
   }
 
   private handleTaskCompleted(event: TaskCompletedEvent): void {
-    const member = this.config.members.find((m) => m.id === event.agent);
-    if (member) {
+    // Producer (jc-emit.mjs) emits the actor in `from`; consumer historically
+    // read `agent`. Accept either so emitter/consumer field names stay in sync.
+    const actorId = event.agent ?? event.from;
+    const member = this.config.members.find((m) => m.id === actorId);
+    if (member && actorId) {
       // Show completion bubble
       const bubble: SpeechBubble = {
-        id: `done-${event.agent}-${Date.now()}`,
-        memberId: event.agent,
+        id: `done-${actorId}-${Date.now()}`,
+        memberId: actorId,
         text: '完了しました！✅',
         department: member.department,
         timestamp: Date.now(),
@@ -362,7 +368,7 @@ export class EventWatcher {
       this.webview!.postMessage({
         type: 'jcMemberStateChange',
         agentId: -200 - Math.floor(Math.random() * 1000),
-        memberId: event.agent,
+        memberId: actorId,
         jcState: 'idle',
       });
     }

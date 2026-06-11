@@ -299,9 +299,12 @@ export interface TaskAssignedEvent extends OfficeEventBase {
 /** Work started by a member */
 export interface WorkStartedEvent extends OfficeEventBase {
   event: 'work_started';
-  agent: string; // member ID
-  task: string;
-  department: string;
+  // jc-emit.mjs emits the actor in `from`; older emitters used `agent`.
+  // Consumer resolves `agent ?? from`, so both are optional.
+  agent?: string; // member ID
+  from?: string; // member ID (jc-emit.mjs producer field)
+  task?: string;
+  department?: string;
 }
 
 /** Cross-department message */
@@ -333,9 +336,12 @@ export interface ReviewCompletedEvent extends OfficeEventBase {
 /** Task completed */
 export interface TaskCompletedEvent extends OfficeEventBase {
   event: 'task_completed';
-  agent: string;
-  task: string;
-  department: string;
+  // jc-emit.mjs emits the actor in `from`; older emitters used `agent`.
+  // Consumer resolves `agent ?? from`, so both are optional.
+  agent?: string;
+  from?: string; // member ID (jc-emit.mjs producer field)
+  task?: string;
+  department?: string;
 }
 
 /** Agent leave */
