@@ -34,6 +34,7 @@ import {
   jcUpdateMappings,
 } from '../jc/index.js';
 import { addLogEntry } from '../jc/office-log-state.js';
+import { setResearchResult } from '../jc/research-result-state.js';
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import { setFloorSprites } from '../office/floorTiles.js';
@@ -799,6 +800,20 @@ export function useExtensionMessages(
             type: 'task_event',
             summary: `Task ${task.status}: ${task.prompt.slice(0, 60)}${task.result ? ' → ' + task.result.slice(0, 80) : ''}`,
           });
+          // Research completed → surface findings prominently in the office.
+          // Display-layer only: reuse the existing return path (task.result).
+          // Only research (not write-type cards) pops the 調査結果 panel.
+          if (task.label === 'research' && task.status === 'done' && task.result) {
+            const rrt = jcGetMemberRuntime(task.assignee);
+            setResearchResult({
+              id: task.id,
+              memberId: task.assignee,
+              memberName: rrt?.config.name ?? task.assignee,
+              department: rrt?.config.department ?? 'research',
+              subject: task.prompt,
+              findings: task.result,
+            });
+          }
         }
       } else if (msg.type === 'jcTasksBulkSync') {
         jcTasksBulkSync(msg.tasks as TaskDefinition[]);

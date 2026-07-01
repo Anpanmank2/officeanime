@@ -39,41 +39,56 @@ export function toEpochMs(iso?: string): number | undefined {
   return Number.isFinite(t) ? t : undefined;
 }
 
-/** Classify task prompt into a label. Exported for affinity.ts (DEV-SPEC R0). */
+/** Classify task prompt into a label. Exported for affinity.ts (DEV-SPEC R0).
+ *
+ * ⚠ CJK boundary fix (2026-07-01, eng-01): ASCII keywords keep `\b` word
+ * boundaries, but CJK keywords (調査/分析/… ) must NOT use `\b` — CJK code
+ * points are non-word chars, so `\b` never fires between two CJK chars and the
+ * Japanese keywords silently never matched (e.g. "調べてほしい" classified as
+ * 'other'). Split ascii/cjk per rule. This only ADDS CJK matches; it never
+ * removes existing ASCII matches, so classification is monotonic → AC-1 stays
+ * green and no affinity tiers flip for existing (ASCII-matching) prompts. */
 export function classifyLabel(prompt: string, isIncident?: boolean): TaskLabel {
   if (isIncident) return 'incident';
-  const rules: Array<{ label: TaskLabel; pattern: RegExp }> = [
+  const rules: Array<{ label: TaskLabel; ascii: RegExp; cjk: RegExp }> = [
     {
       label: 'incident',
-      pattern: /\b(incident|outage|down|hotfix|emergency|urgent\s*fix|revert|障害|緊急)\b/i,
+      ascii: /\b(incident|outage|down|hotfix|emergency|urgent\s*fix|revert)\b/i,
+      cjk: /(障害|緊急)/,
     },
     {
       label: 'bugfix',
-      pattern: /\b(bug|fix|error|crash|broken|regression|patch|バグ|修正|不具合)\b/i,
+      ascii: /\b(bug|fix|error|crash|broken|regression|patch)\b/i,
+      cjk: /(バグ|修正|不具合)/,
     },
     {
       label: 'review',
-      pattern: /\b(review|audit|check|inspect|approve|feedback|PR\s*review|レビュー|確認)\b/i,
+      ascii: /\b(review|audit|check|inspect|approve|feedback|PR\s*review)\b/i,
+      cjk: /(レビュー|確認)/,
     },
     {
       label: 'research',
-      pattern: /\b(research|investigate|analyze|study|survey|explore|調査|分析|リサーチ|調べ)\b/i,
+      ascii: /\b(research|investigate|analyze|study|survey|explore)\b/i,
+      cjk: /(調査|分析|リサーチ|調べ)/,
     },
     {
       label: 'design',
-      pattern: /\b(design|UI|UX|layout|wireframe|mockup|prototype|デザイン|設計)\b/i,
+      ascii: /\b(design|UI|UX|layout|wireframe|mockup|prototype)\b/i,
+      cjk: /(デザイン|設計)/,
     },
     {
       label: 'ops',
-      pattern: /\b(deploy|CI|CD|pipeline|infra|monitor|ops|config|migration|設定|デプロイ|運用)\b/i,
+      ascii: /\b(deploy|CI|CD|pipeline|infra|monitor|ops|config|migration)\b/i,
+      cjk: /(設定|デプロイ|運用)/,
     },
     {
       label: 'implementation',
-      pattern: /\b(implement|build|create|add|develop|feature|write|code|実装|開発|作成|追加)\b/i,
+      ascii: /\b(implement|build|create|add|develop|feature|write|code)\b/i,
+      cjk: /(実装|開発|作成|追加)/,
     },
   ];
-  for (const { label, pattern } of rules) {
-    if (pattern.test(prompt)) return label;
+  for (const { label, ascii, cjk } of rules) {
+    if (ascii.test(prompt) || cjk.test(prompt)) return label;
   }
   return 'other';
 }

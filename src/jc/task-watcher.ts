@@ -16,7 +16,7 @@ import type { AgentState } from '../types.js';
 import { getDeskByMemberId } from './desk-registry.js';
 import { getTaskHistory as getTaskHistoryFromFile } from './task-history.js';
 import { TaskHistoryWriter } from './task-history-writer.js';
-import type { JCConfig, TaskDefinition, TasksFile } from './types.js';
+import type { JCConfig, TaskDefinition, TaskLabel, TasksFile } from './types.js';
 import { TaskStatus } from './types.js';
 
 const TASKS_FILE_NAME = 'tasks.json';
@@ -148,6 +148,7 @@ export class TaskWatcher {
     prompt: string,
     priority: number,
     workingDirectory?: string,
+    label?: TaskLabel,
   ): TaskDefinition {
     let tasksFile = readTasksFile();
     if (!tasksFile) {
@@ -162,6 +163,9 @@ export class TaskWatcher {
       priority,
       createdAt: new Date().toISOString(),
       workingDirectory,
+      // Persist the classifier's label so the webview can identify e.g. research
+      // completions and surface the 調査結果 panel (display-layer routing).
+      label,
     };
 
     tasksFile.tasks.push(task);

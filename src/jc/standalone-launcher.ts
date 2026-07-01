@@ -11,10 +11,34 @@ import { EventWatcher } from './event-watcher.js';
 import { createMessageBridge } from './message-bridge.js';
 import { OfficeLogWriter } from './office-log-writer.js';
 import { toolToJCState } from './state-machine.js';
+import { classifyLabel } from './task-history-writer.js';
 import { TaskWatcher } from './task-watcher.js';
 import type { JCConfig } from './types.js';
 
 const DEFAULT_PORT = 8432;
+
+/**
+ * MVP Step1 — research active-run guard.
+ * Tracks memberIds that currently have a research task in flight so a double-click
+ * on the same card does not spawn a second `claude` child. Cleared on completion.
+ */
+const researchInFlight = new Set<string>();
+
+/**
+ * Build the direct read-only research prompt (Model 1 — shortest & safest).
+ * No `/company ` prefix (that would trigger the heavy orchestration that needs
+ * Edit/Write/Bash — auto-denied in headless). This is a plain read-only ask, so
+ * the headless `claude --print` auto-allow-read / auto-deny-write behavior keeps
+ * it purely investigative and returns findings as text.
+ */
+function buildResearchPrompt(task: string, criteria: string): string {
+  const scope = criteria ? `\n完了条件: ${criteria}` : '';
+  return (
+    `次を調べて要点を箇条書き(3〜7点)で返してください。` +
+    `ファイルの読み取り・検索のみで完結させ、書き込み・実行はしないでください。\n` +
+    `調査対象: ${task}${scope}`
+  );
+}
 
 // ── Shared state (accessible from both watcher and webviewReady handler) ──
 interface JCMemberEntry {
@@ -179,6 +203,10 @@ async function main(): Promise<void> {
   const portArg = args.find((a) => a.startsWith('--port='));
   const port = portArg ? parseInt(portArg.split('=')[1], 10) : DEFAULT_PORT;
   const shouldOpen = args.includes('--open');
+  // MVP Step1 safe guard: dock/board delegations only trigger a real `claude`
+  // child process (spawnClaude → /company) when this opt-in flag is present.
+  // Without it, delegations write animation events only (default = no destructive auto-spawn).
+  const liveSpawnEnabled = args.includes('--jc-live-spawn');
 
   const extensionPath = path.resolve(__dirname, '..');
 
@@ -288,10 +316,19 @@ async function main(): Promise<void> {
         if (text) console.error(`[JC ${memberId} ERR] ${text.slice(0, 200)}`);
       });
 
+      child.on('error', (err) => {
+        // spawn failure (e.g. `claude` not on PATH) — release the guard so retry works.
+        console.error(`[JC ${memberId}] spawn error: ${String(err)}`);
+        researchInFlight.delete(memberId);
+      });
+
       child.on('close', (code) => {
         console.log(
           `[JC TaskWatcher] ${memberId} session ${sessionId.slice(0, 8)} exited (code: ${code})`,
         );
+
+        // Release the research active-run guard so this member can be re-delegated.
+        researchInFlight.delete(memberId);
 
         // Update task with result and mark as done
         if (taskWatcher) {
@@ -478,7 +515,45 @@ async function main(): Promise<void> {
         deadline: string | null;
         timestamp: string;
       };
+      // Always write animation events (arrive → badge → seat → gauge). Default-safe.
       writeOwnerDelegate(ownerEventsFile, m);
+
+      if (m.memberId && m.task) {
+        // MVP Step1 — classify the card by TYPE. Reuse the existing deterministic
+        // classifier (classifyLabel, task-history-writer.ts) over task + criteria.
+        const label = classifyLabel(`${m.task} ${m.message ?? ''}`);
+        const priorityNum = parseInt((m.priority || 'P3').replace('P', ''), 10) || 3;
+
+        if (label === 'research') {
+          // ── RESEARCH = ACTIVE (Owner-confirmed): auto-run, NO approval gate. ──
+          // Read-only by construction: a direct plain prompt (no `/company` prefix),
+          // and no permission flags — the headless auto-deny-write safety valve holds.
+          // Findings return live via jcActivitySummary + completion jcTaskUpdate(result).
+          if (researchInFlight.has(m.memberId)) {
+            // Minimal guard: same card already investigating → do NOT re-spawn.
+            console.log(`[JC] research already in flight for ${m.memberId} — skip re-spawn`);
+          } else if (taskWatcher) {
+            researchInFlight.add(m.memberId);
+            const prompt = buildResearchPrompt(m.task, m.message ?? '');
+            console.log(`[JC] research ACTIVE auto-run → ${m.memberId}: ${m.task.slice(0, 40)}`);
+            // Submit directly to the TaskWatcher (bypasses the submitTask context
+            // that force-prefixes '/company ') so the raw read-only prompt is used.
+            // Pass the classified label so the completion broadcast carries
+            // label='research' → webview surfaces the 調査結果 panel.
+            taskWatcher.submitTask(m.memberId, prompt, priorityNum, undefined, label);
+          }
+        } else if (liveSpawnEnabled) {
+          // ── WRITE-type cards (implementation/design/bugfix/ops/…) = NOT auto-run. ──
+          // Only fire the heavy /company orchestration under the opt-in
+          // --jc-live-spawn guard (Step2 will add the proper approval tray). Without
+          // the flag this is a no-op → default standalone is animation-only for
+          // write-type cards (no destructive auto-spawn).
+          dispatcher.dispatch(
+            { type: 'task:submit', prompt: m.task, priority: priorityNum, assignee: m.memberId },
+            respond,
+          );
+        }
+      }
       return;
     }
 

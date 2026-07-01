@@ -27,6 +27,7 @@ import { getLogEntries, subscribeLog } from './jc/office-log-state.js';
 import { OfficeLog } from './jc/OfficeLog.js';
 import { OWNER_AGENT_ID } from './jc/owner-avatar-constants.js';
 import { OwnerAvatar } from './jc/OwnerAvatar.js';
+import { ResearchResultPanel } from './jc/ResearchResultPanel.js';
 import { TaskHistoryPanel } from './jc/TaskHistoryPanel.js';
 import { OfficeCanvas } from './office/components/OfficeCanvas.js';
 import { ToolOverlay } from './office/components/ToolOverlay.js';
@@ -488,6 +489,9 @@ function AppContent() {
 
       {/* Slice1: completion toast "本日N件目! 🎉" (screen-space DOM) */}
       <CompletionToast />
+
+      {/* Research findings panel: 調査完了 → prominent dismissible 調査結果 popup */}
+      <ResearchResultPanel />
 
       {/* Slice1 T10: delegation dock (bottom) — pick a card, click a member */}
       <DelegationDock />
