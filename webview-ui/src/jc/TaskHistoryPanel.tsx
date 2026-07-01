@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { vscode } from '../vscodeApi.js';
+import { previewFit } from './affinity-preview.js';
 import { DelegationChain } from './DelegationChain.js';
 import { DeptFilterChips } from './DeptFilterChips.js';
+import { type GameTier, TIER_GLYPH } from './game-state.js';
 import { TASK_LABEL_COLORS } from './jc-constants.js';
 import { PriorityBadge } from './PriorityBadge.js';
 
@@ -35,6 +37,22 @@ interface TaskLogEntry {
   outputs?: string[];
   summary?: string;
   prompt: string;
+}
+
+const TIER_COLOR: Record<GameTier, string> = {
+  great: '#39ff14',
+  ok: '#f0ad4e',
+  bad: '#ff3d3d',
+};
+
+/**
+ * T7: derive affinity tier for a past log entry (display consistency).
+ * Re-computes the ① department-path tier from the stored task + assignee so
+ * historical entries show a consistent ◎/△/✗ chip without a schema change.
+ */
+function entryTier(prompt: string, assignedTo?: string): GameTier | null {
+  if (!assignedTo) return null;
+  return previewFit(prompt, assignedTo).tier;
 }
 
 function formatDuration(ms?: number): string {
@@ -159,6 +177,24 @@ function HistoryEntry({ entry }: { entry: TaskLogEntry }) {
         >
           {label}
         </span>
+        {(() => {
+          const tier = entryTier(entry.prompt || entry.title, entry.assignedTo);
+          if (!tier) return null;
+          return (
+            <span
+              title="相性 (適材適所)"
+              style={{
+                padding: '0 4px',
+                fontSize: '11px',
+                color: TIER_COLOR[tier],
+                border: `1px solid ${TIER_COLOR[tier]}`,
+                borderRadius: 0,
+              }}
+            >
+              {TIER_GLYPH[tier]}
+            </span>
+          );
+        })()}
         <span
           style={{
             flex: 1,

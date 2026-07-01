@@ -13,6 +13,7 @@ import { useEditorKeyboard } from './hooks/useEditorKeyboard.js';
 import { useExtensionMessages } from './hooks/useExtensionMessages.js';
 import { AbsentStatusPopup } from './jc/AbsentStatusPopup.js';
 import { CompletionToast } from './jc/CompletionToast.js';
+import { DelegationDock } from './jc/DelegationDock.js';
 import { DeskCard } from './jc/DeskCard.js';
 import { DialogBox } from './jc/DialogBox.js';
 import { DEPT_COLORS } from './jc/jc-constants.js';
@@ -486,6 +487,9 @@ function AppContent() {
 
       {/* Slice1: completion toast "本日N件目! 🎉" (screen-space DOM) */}
       <CompletionToast />
+
+      {/* Slice1 T10: delegation dock (bottom) — pick a card, click a member */}
+      <DelegationDock />
 
       {/* ── Bottom Toolbar (Tasks + Settings + Owner summon) ── */}
       <BottomToolbar

@@ -26,6 +26,9 @@ export function gaugeRate(tier: GameTier): number {
   return BASE_RATE * SPEED_MUL[tier];
 }
 
+/** Seconds of no progress_check before the gauge auto-stalls (mirror STALL_SEC). */
+const STALL_SEC = 90;
+
 interface MemberGame {
   tier: GameTier;
   fit: number;
@@ -37,6 +40,8 @@ interface MemberGame {
   stuck: boolean;
   /** ms timestamp of last interpolation tick (for local fill). */
   lastTick: number;
+  /** ms timestamp of last poke (progress_check) or start; drives auto-stall. */
+  lastPokeAt: number;
 }
 
 const memberGame = new Map<string, MemberGame>();
@@ -44,6 +49,19 @@ const memberGame = new Map<string, MemberGame>();
 let companyScore = 0;
 let todayCount = 0;
 let lastDelta = 0;
+
+// ── T10: affinity preview (Owner hovers a picked card over a member) ──
+let previewMemberId: string | null = null;
+let previewTier: GameTier | null = null;
+export function gameSetPreview(memberId: string | null, tier: GameTier | null): void {
+  if (previewMemberId === memberId && previewTier === tier) return;
+  previewMemberId = memberId;
+  previewTier = tier;
+  // No notify: read by the canvas overlay each frame, not by React.
+}
+export function gameGetPreview(): { memberId: string; tier: GameTier } | null {
+  return previewMemberId && previewTier ? { memberId: previewMemberId, tier: previewTier } : null;
+}
 
 // ── Toast queue (React consumes) ──
 export interface ToastEntry {
@@ -105,6 +123,7 @@ export function gameSetFitBadge(
     running: g?.running ?? false,
     stuck: g?.stuck ?? false,
     lastTick: Date.now(),
+    lastPokeAt: g?.lastPokeAt ?? Date.now(),
   });
   scheduleGameNotify();
 }
@@ -120,6 +139,7 @@ export function gameStartGauge(memberId: string, tier: GameTier): void {
     running: true,
     stuck: false,
     lastTick: Date.now(),
+    lastPokeAt: Date.now(),
   });
   scheduleGameNotify();
 }
@@ -137,6 +157,7 @@ export function gameSetStuck(memberId: string, stuck: boolean): void {
   const g = memberGame.get(memberId);
   if (g) {
     g.stuck = stuck;
+    if (!stuck) g.lastPokeAt = Date.now(); // poke resets the stall timer
     scheduleGameNotify();
   }
 }
@@ -167,18 +188,18 @@ export function gameSetCompanyScore(
  */
 export function gameTickGauges(): void {
   const now = Date.now();
-  let changed = false;
   for (const g of memberGame.values()) {
     if (!g.running || g.gaugeValue >= 100) continue;
+    // T8: auto-stall after STALL_SEC with no poke (progress_check).
+    if (!g.stuck && now - g.lastPokeAt > STALL_SEC * 1000) {
+      g.stuck = true;
+    }
     const dt = (now - g.lastTick) / 1000;
     g.lastTick = now;
     const rate = g.stuck ? g.ratePerSec * 0.5 : g.ratePerSec;
     g.gaugeValue = Math.min(100, g.gaugeValue + dt * rate);
-    changed = true;
   }
-  if (changed) {
-    // No notify here — overlay reads directly; React HUD does not need per-frame.
-  }
+  // No notify here — overlay reads directly; React HUD does not need per-frame.
 }
 
 export function gameGetMember(memberId: string): Readonly<MemberGame> | undefined {

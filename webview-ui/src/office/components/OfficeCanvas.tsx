@@ -8,8 +8,15 @@ import {
   ZOOM_MIN,
   ZOOM_SCROLL_THRESHOLD,
 } from '../../constants.js';
+import { previewFit } from '../../jc/affinity-preview.js';
+import { dockConsumeCard, dockGetPickedCard } from '../../jc/dock-state.js';
+import { gameSetPreview } from '../../jc/game-state.js';
 import { renderJCOverlay } from '../../jc/jc-overlay.js';
-import { jcGetAbsentMemberAtDesk, jcGetMemberAtDesk } from '../../jc/jc-state.js';
+import {
+  jcGetAbsentMemberAtDesk,
+  jcGetMemberAtDesk,
+  jcGetMemberRuntime,
+} from '../../jc/jc-state.js';
 import type { AbsenceInfo } from '../../jc/jc-types.js';
 import { isPinned } from '../../jc/pin-store.js';
 import { unlockAudio } from '../../notificationSound.js';
@@ -27,6 +34,14 @@ import type {
 import { renderFrame } from '../engine/renderer.js';
 import { getCatalogEntry, isRotatable } from '../layout/furnitureCatalog.js';
 import { EditTool, TILE_SIZE } from '../types.js';
+
+/** Derive department from member ID prefix (fallback when runtime config absent). */
+function deptFromMemberId(id: string): string {
+  if (id.startsWith('eng-')) return 'engineering';
+  if (id.startsWith('mkt-')) return 'marketing';
+  if (id.startsWith('res-')) return 'research';
+  return 'exec';
+}
 
 interface OfficeCanvasProps {
   officeState: OfficeState;
@@ -489,6 +504,24 @@ export function OfficeCanvas({
       const tile = screenToTile(e.clientX, e.clientY);
       officeState.hoveredTile = tile;
       hoverTileRef.current = tile;
+
+      // ── Slice1 T10: affinity preview while a dock card is picked ──
+      const pickedCard = dockGetPickedCard();
+      if (pickedCard && tile) {
+        const member = jcGetMemberAtDesk(tile.col, tile.row);
+        if (member) {
+          const { tier } = previewFit(pickedCard.task, member.memberId);
+          gameSetPreview(member.memberId, tier);
+          const canvas = canvasRef.current;
+          if (canvas) canvas.style.cursor = 'copy';
+          officeState.hoveredAgentId = hitId;
+          return;
+        }
+        gameSetPreview(null, null);
+      } else if (!pickedCard) {
+        gameSetPreview(null, null);
+      }
+
       const canvas = canvasRef.current;
       if (canvas) {
         let cursor = 'default';
@@ -699,6 +732,36 @@ export function OfficeCanvas({
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
       if (isEditMode) return; // handled by mouseDown/mouseUp
+
+      // ── Slice1 T10: delegation via picked dock card ──
+      // If a card is picked, clicking a member delegates the task to them.
+      const picked = dockGetPickedCard();
+      if (picked) {
+        const tile = screenToTile(e.clientX, e.clientY);
+        if (tile) {
+          const member = jcGetMemberAtDesk(tile.col, tile.row);
+          if (member) {
+            const rt = jcGetMemberRuntime(member.memberId);
+            const department = rt?.config.department ?? deptFromMemberId(member.memberId);
+            vscode.postMessage({
+              type: 'jcOwnerDelegate',
+              memberId: member.memberId,
+              memberName: rt?.config.name ?? member.memberId,
+              department,
+              task: picked.task,
+              message: picked.task,
+              priority: `P${picked.priority}`,
+              deadline: null,
+              timestamp: new Date().toISOString(),
+            });
+            dockConsumeCard(picked.id);
+            gameSetPreview(null, null);
+            return;
+          }
+        }
+        // Clicked empty space with a card picked — keep the card, do nothing else.
+      }
+
       const pos = screenToWorld(e.clientX, e.clientY);
       if (!pos) return;
 
@@ -838,6 +901,7 @@ export function OfficeCanvas({
     officeState.hoveredAgentId = null;
     officeState.hoveredTile = null;
     hoverTileRef.current = null;
+    gameSetPreview(null, null); // clear T10 affinity preview
   }, [officeState, editorState]);
 
   const handleContextMenu = useCallback(

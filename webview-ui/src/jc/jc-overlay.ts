@@ -9,6 +9,7 @@ import { isSittingState, TILE_SIZE } from '../office/types.js';
 import {
   gameGetCompanyScore,
   gameGetMember,
+  gameGetPreview,
   gameGetTodayCount,
   gameTickGauges,
   type GameTier,
@@ -383,25 +384,43 @@ function renderAffinityBadges(
   const badgeFont = zoom >= 3 ? '9px "Press Start 2P", monospace' : '10px monospace';
   ctx.font = badgeFont;
 
+  const preview = gameGetPreview();
+  const now = Date.now();
+
   for (const m of members) {
     const g = gameGetMember(m.memberId);
-    if (!g) continue;
-    const glyph = TIER_GLYPH[g.tier];
+    const isPreview = !g && preview?.memberId === m.memberId;
+    if (!g && !isPreview) continue;
+    const tier = g ? g.tier : preview!.tier;
+    const glyph = TIER_GLYPH[tier];
     const cx = offsetX + (m.deskCol + 0.5) * s;
     // Above the character's head (one tile above the desk).
     const cy = offsetY + m.deskRow * s - 3 * zoom;
 
+    // Preview badge pulses (min 0.75 so it stays clearly visible) + dashed ring
+    // to read as "not yet assigned".
+    const pulse = isPreview ? 0.75 + 0.25 * ((Math.sin(now / 250) + 1) / 2) : 1;
     const r = Math.max(6, zoom * 3);
+    ctx.globalAlpha = pulse;
     ctx.fillStyle = 'rgba(10, 15, 35, 0.85)';
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.fill();
     ctx.lineWidth = Math.max(1, zoom * 0.4);
-    ctx.strokeStyle = TIER_COLOR[g.tier];
+    ctx.strokeStyle = TIER_COLOR[tier];
+    if (isPreview) ctx.setLineDash([Math.max(2, zoom), Math.max(2, zoom)]);
     ctx.stroke();
+    ctx.setLineDash([]);
 
-    ctx.fillStyle = TIER_COLOR[g.tier];
+    ctx.fillStyle = TIER_COLOR[tier];
     ctx.fillText(glyph, cx, cy + 1);
+    ctx.globalAlpha = 1;
+
+    // T8: stalled member shows a flashing red [!] beside the badge.
+    if (g && g.stuck && Math.floor(now / 400) % 2 === 0) {
+      ctx.fillStyle = '#ff3d3d';
+      ctx.fillText('[!]', cx + r + Math.max(6, zoom * 3), cy + 1);
+    }
   }
   ctx.restore();
 }

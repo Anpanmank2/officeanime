@@ -32,6 +32,80 @@ let jcConfig: unknown = null;
 let taskWatcher: TaskWatcher | null = null;
 const officeLogWriter = new OfficeLogWriter();
 
+/** Resolve the watched jc-events.json path (mirrors EventWatcher workspace resolution). */
+function resolveJcEventsPath(args: string[]): string {
+  const wsArg = args.find((a) => a.startsWith('--workspace='));
+  let workspaceRoot = wsArg ? path.resolve(wsArg.split('=')[1]) : process.cwd();
+  const parentDir = path.resolve(workspaceRoot, '..');
+  const parentEventsFile = path.join(parentDir, 'jc-events.json');
+  const cwdEventsFile = path.join(workspaceRoot, 'jc-events.json');
+  if (!fs.existsSync(cwdEventsFile) && fs.existsSync(parentEventsFile)) {
+    workspaceRoot = parentDir;
+  }
+  const parentCompanyDir = path.join(parentDir, '.company');
+  if (!wsArg && fs.existsSync(parentCompanyDir)) {
+    workspaceRoot = parentDir;
+  }
+  return path.join(workspaceRoot, 'jc-events.json');
+}
+
+/**
+ * Slice1: append an Owner delegation (task_received + delegate) to jc-events.json.
+ * The EventWatcher then drives arrive → affinity badge → seat → quality gauge.
+ * Same shape as PixelAgentsViewProvider.jcOwnerDelegate so both surfaces match.
+ */
+function writeOwnerDelegate(
+  eventsFile: string,
+  d: {
+    memberId: string;
+    department: string;
+    task: string;
+    message: string;
+    priority: string;
+    deadline: string | null;
+    timestamp: string;
+  },
+): void {
+  if (!d.memberId || !d.task) return;
+  try {
+    let data: { version: number; events: unknown[] } = { version: 1, events: [] };
+    if (fs.existsSync(eventsFile)) {
+      data = JSON.parse(fs.readFileSync(eventsFile, 'utf-8')) as typeof data;
+    }
+    data.events.push({
+      event: 'task_received',
+      timestamp: d.timestamp,
+      task: d.task,
+      from: 'user',
+    });
+    data.events.push({
+      event: 'delegate',
+      timestamp: new Date().toISOString(),
+      from: 'exec-sec',
+      to: [d.memberId],
+      task: d.task,
+      department: d.department,
+      message: d.message,
+      priority: d.priority,
+      deadline: d.deadline,
+    });
+    // work_started so the quality gauge begins immediately (Owner sees fill on click).
+    data.events.push({
+      event: 'work_started',
+      timestamp: new Date(Date.now() + 1).toISOString(),
+      from: d.memberId,
+      task: d.task,
+      department: d.department,
+    });
+    const tmp = eventsFile + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+    fs.renameSync(tmp, eventsFile);
+    console.log(`[JC] Owner delegate → ${d.memberId}: ${d.task.slice(0, 40)}`);
+  } catch (e) {
+    console.error('[JC] writeOwnerDelegate error:', e);
+  }
+}
+
 /** Build messages to send when a browser client connects or signals ready */
 function buildClientInitMessages(respond: (msg: unknown) => void): void {
   // 1. Config + settings
@@ -375,6 +449,9 @@ async function main(): Promise<void> {
     }
   }
 
+  // jc-events.json path for Owner delegations from the board (Slice1 T10).
+  const ownerEventsFile = resolveJcEventsPath(args);
+
   // Start browser server
   const server = await startBrowserServer(extensionPath, port, (data, respond) => {
     const msg = data as { type?: string };
@@ -382,6 +459,21 @@ async function main(): Promise<void> {
     // When browser signals ready, send ALL current state
     if (msg.type === 'webviewReady') {
       buildClientInitMessages(respond);
+      return;
+    }
+
+    // Slice1 T10: board-click / dock delegation → write to jc-events.json.
+    if (msg.type === 'jcOwnerDelegate') {
+      const m = data as {
+        memberId: string;
+        department: string;
+        task: string;
+        message: string;
+        priority: string;
+        deadline: string | null;
+        timestamp: string;
+      };
+      writeOwnerDelegate(ownerEventsFile, m);
       return;
     }
 
