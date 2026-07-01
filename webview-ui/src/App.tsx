@@ -16,6 +16,7 @@ import { CompletionToast } from './jc/CompletionToast.js';
 import { DelegationDock } from './jc/DelegationDock.js';
 import { DeskCard } from './jc/DeskCard.js';
 import { DialogBox } from './jc/DialogBox.js';
+import { gameGetCompanyScore, gameGetTodayCount, subscribeGame } from './jc/game-state.js';
 import { DEPT_COLORS } from './jc/jc-constants.js';
 import {
   jcGetMemberInfo,
@@ -149,16 +150,33 @@ function EditActionBar({
 // Ticker showing latest 5 OfficeLog entries + operation board placeholder.
 
 function CommandBoard() {
-  const [recentEntries, setRecentEntries] = useState(() => getLogEntries().slice(-5).reverse());
+  const [recentEntries, setRecentEntries] = useState(() => getLogEntries().slice(-6).reverse());
+  const [companyScore, setCompanyScore] = useState(() => gameGetCompanyScore());
+  const [todayCount, setTodayCount] = useState(() => gameGetTodayCount());
 
   useEffect(() => {
-    const update = () => setRecentEntries(getLogEntries().slice(-5).reverse());
+    const update = () => setRecentEntries(getLogEntries().slice(-6).reverse());
     return subscribeLog(update);
   }, []);
 
+  useEffect(() => {
+    const update = () => {
+      setCompanyScore(gameGetCompanyScore());
+      setTodayCount(gameGetTodayCount());
+    };
+    update();
+    return subscribeGame(update);
+  }, []);
+
+  // Drop entries with no resolved member (removes "[] undefined: → coding" glitch).
+  // The summary already contains the member name, so the [name] prefix was redundant.
+  const tickerEntries = recentEntries.filter(
+    (e) => e.memberName && e.memberName !== 'undefined' && e.summary,
+  );
+
   return (
     <>
-      {/* Ticker: top bar showing latest 5 events */}
+      {/* Ticker: top bar, one event at a time with clear spacing (no overlap) */}
       <div
         style={{
           position: 'absolute',
@@ -167,38 +185,42 @@ function CommandBoard() {
           transform: 'translateX(-50%)',
           zIndex: 48,
           display: 'flex',
-          gap: 8,
+          gap: 14,
           alignItems: 'center',
           background: 'rgba(8, 10, 25, 0.88)',
           border: '2px solid rgba(0, 180, 255, 0.2)',
-          padding: '4px 10px',
+          padding: '4px 12px',
           maxWidth: '60%',
-          overflow: 'hidden',
+          overflowX: 'auto',
+          overflowY: 'hidden',
+          scrollbarWidth: 'none',
         }}
       >
-        {recentEntries.length === 0 ? (
+        {tickerEntries.length === 0 ? (
           <span style={{ fontSize: '12px', color: 'rgba(200,210,240,0.4)' }}>No activity</span>
         ) : (
-          recentEntries.map((entry) => (
+          tickerEntries.map((entry, i) => (
             <span
               key={entry.id}
               style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 14,
                 fontSize: '12px',
                 color: DEPT_COLORS[entry.department] ?? '#aaa',
                 whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                maxWidth: 160,
+                flexShrink: 0,
               }}
               title={`${entry.memberName}: ${entry.summary}`}
             >
-              [{entry.memberName}] {entry.summary}
+              {i > 0 && <span style={{ color: 'rgba(0,180,255,0.35)' }}>•</span>}
+              {entry.summary}
             </span>
           ))
         )}
       </div>
 
-      {/* Operation board placeholder */}
+      {/* Command board — live company standings */}
       <div
         style={{
           position: 'absolute',
@@ -214,11 +236,23 @@ function CommandBoard() {
           pointerEvents: 'none',
         }}
       >
-        <div style={{ fontSize: '16px', color: '#00f0ff', fontWeight: 'bold', marginBottom: 8 }}>
+        <div style={{ fontSize: '16px', color: '#00f0ff', fontWeight: 'bold', marginBottom: 10 }}>
           🏛 COMMAND BOARD
         </div>
-        <div style={{ fontSize: '12px', color: 'rgba(200,210,240,0.5)' }}>
-          Operation board — Phase 2
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: 24,
+            fontSize: '13px',
+          }}
+        >
+          <span style={{ color: '#39ff14' }}>
+            会社スコア <b>{companyScore}</b>
+          </span>
+          <span style={{ color: '#f0d840' }}>
+            本日完了 <b>{todayCount}</b> 件
+          </span>
         </div>
       </div>
     </>

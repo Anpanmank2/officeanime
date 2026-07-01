@@ -705,17 +705,19 @@ export function useExtensionMessages(
         const stateSince = msg.stateSince as number | undefined;
         jcMemberStateChange(msg.memberId, jcState, stateSince);
         jcRecordActivity(msg.memberId as string);
-        // Log state change
+        // Log state change (skip empty/undefined IDs → no "undefined: → coding" ghost row)
         const scMid = msg.memberId as string;
         const scRt = jcGetMemberRuntime(scMid);
-        addLogEntry({
-          timestamp: Date.now(),
-          memberId: scMid,
-          memberName: scRt?.config.name ?? scMid,
-          department: scRt?.config.department ?? 'exec',
-          type: 'state_change',
-          summary: `${scRt?.config.name ?? scMid}: → ${jcState}`,
-        });
+        if (scMid && scMid !== 'undefined') {
+          addLogEntry({
+            timestamp: Date.now(),
+            memberId: scMid,
+            memberName: scRt?.config.name ?? scMid,
+            department: scRt?.config.department ?? 'exec',
+            type: 'state_change',
+            summary: `${scRt?.config.name ?? scMid}: → ${jcState}`,
+          });
+        }
 
         // Sync character animation with JC state
         const ch = os.characters.get(agentId);

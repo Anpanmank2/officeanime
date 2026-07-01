@@ -366,6 +366,11 @@ async function main(): Promise<void> {
       case 'jcMemberStateChange': {
         const memberId = m.memberId as string;
         const jcState = m.jcState as string;
+        // Skip unresolvable member IDs (prevents "undefined: → coding" ghost log rows).
+        const cfg = jcConfig as { members?: Array<{ id: string }> };
+        if (!memberId || !cfg?.members?.some((x) => x.id === memberId)) {
+          break;
+        }
         officeLogWriter.write({
           timestamp: Date.now(),
           memberId,

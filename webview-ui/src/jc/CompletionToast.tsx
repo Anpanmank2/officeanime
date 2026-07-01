@@ -66,13 +66,26 @@ export function CompletionToast() {
         fontSize: 12,
         whiteSpace: 'nowrap',
         textAlign: 'center',
-        lineHeight: 1.6,
+        lineHeight: 1.7,
       }}
     >
-      <div style={{ color, fontSize: 13 }}>本日{toast.todayCount}件目! 🎉</div>
-      <div>
-        {toast.memberName}
-        <span style={{ color }}>(相性{TIER_GLYPH[toast.tier]})</span> +{toast.delta}
+      <div style={{ color, fontSize: 13, marginBottom: 4 }}>本日 {toast.todayCount} 件目 🎉</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <span>{toast.memberName}</span>
+        {/* Affinity as a bordered chip — avoids half-width parens glitching in the pixel font */}
+        <span
+          style={{
+            display: 'inline-block',
+            padding: '1px 5px',
+            color,
+            border: `1px solid ${color}`,
+            borderRadius: 0,
+            fontSize: 11,
+          }}
+        >
+          相性 {TIER_GLYPH[toast.tier]}
+        </span>
+        <span style={{ color }}>+{toast.delta}</span>
       </div>
     </div>
   );

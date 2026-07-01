@@ -66,7 +66,7 @@ const ZONE_LABELS: Array<{ text: string; col: number; row: number; zone: string 
   { text: 'MARKETING', col: 4, row: 7, zone: 'marketing' },
   { text: 'RESEARCH', col: 17, row: 7, zone: 'research' },
   { text: 'DEV ZONE', col: 4, row: 15, zone: 'dev' },
-  { text: 'POKER ROOM', col: 17, row: 15, zone: 'ops' },
+  { text: 'LOUNGE', col: 17, row: 15, zone: 'ops' },
 ];
 
 // ── Glass walls ──────────────────────────────────────────────────
