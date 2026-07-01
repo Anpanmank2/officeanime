@@ -44,6 +44,8 @@ function formatDuration(ms?: number): string {
 }
 
 function formatDate(ts: number): string {
+  // B2 read-side guard: never render a broken year from a non-finite timestamp.
+  if (!Number.isFinite(ts)) return '日付不明';
   const d = new Date(ts);
   const today = new Date();
   const yesterday = new Date(today);

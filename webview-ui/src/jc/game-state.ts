@@ -1,0 +1,205 @@
+// ── Slice1 game state (webview volatile store, DEV-SPEC §4.2) ──────────
+// Holds affinity badges + quality gauge fill + company score for the office
+// game overlay. Imperative store with a subscribe API (Observer pattern) so the
+// React toast/HUD can react without polling. The canvas overlay reads synchronous
+// getters each frame and interpolates the gauge locally.
+//
+// Speed/score multipliers are NOT redefined here — they are imported from the
+// single source of truth in the extension-side constants, mirrored below.
+
+/** Affinity tier: great=◎ / ok=△ / bad=✗ (mirror of affinity-constants.ts). */
+export type GameTier = 'great' | 'ok' | 'bad';
+
+export const TIER_GLYPH: Record<GameTier, string> = {
+  great: '◎',
+  ok: '△',
+  bad: '✗',
+};
+
+// Mirror of src/jc/affinity-constants.ts (kept in sync — same numbers).
+const T0_SEC = 60;
+const BASE_RATE = 100 / T0_SEC;
+const SPEED_MUL: Record<GameTier, number> = { great: 1.5, ok: 1.0, bad: 0.6 };
+
+/** Gauge fill rate (units/sec) for a tier — the AC-1 visualization point. */
+export function gaugeRate(tier: GameTier): number {
+  return BASE_RATE * SPEED_MUL[tier];
+}
+
+interface MemberGame {
+  tier: GameTier;
+  fit: number;
+  label: string;
+  /** 0..100 gauge fill. Only meaningful while running. */
+  gaugeValue: number;
+  ratePerSec: number;
+  running: boolean;
+  stuck: boolean;
+  /** ms timestamp of last interpolation tick (for local fill). */
+  lastTick: number;
+}
+
+const memberGame = new Map<string, MemberGame>();
+
+let companyScore = 0;
+let todayCount = 0;
+let lastDelta = 0;
+
+// ── Toast queue (React consumes) ──
+export interface ToastEntry {
+  id: number;
+  memberName: string;
+  tier: GameTier;
+  delta: number;
+  todayCount: number;
+}
+let toastSeq = 0;
+let currentToast: ToastEntry | null = null;
+
+// ── Subscribe API (Observer, see imperative-store-subscribe-pattern skill) ──
+const listeners = new Set<() => void>();
+let pendingNotify = false;
+
+function scheduleGameNotify(): void {
+  if (pendingNotify) return;
+  pendingNotify = true;
+  const raf =
+    typeof requestAnimationFrame !== 'undefined'
+      ? requestAnimationFrame
+      : (cb: () => void) => setTimeout(cb, 16);
+  raf(() => {
+    pendingNotify = false;
+    for (const fn of listeners) {
+      try {
+        fn();
+      } catch (e) {
+        console.error('[game-state] listener error:', e);
+      }
+    }
+  });
+}
+
+/** Subscribe to game-state changes. Returns unsubscribe fn for useEffect cleanup. */
+export function subscribeGame(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
+// ── Mutators (called from useExtensionMessages dispatch) ──
+
+export function gameSetFitBadge(
+  memberId: string,
+  tier: GameTier,
+  fit: number,
+  label: string,
+): void {
+  const g = memberGame.get(memberId);
+  memberGame.set(memberId, {
+    tier,
+    fit,
+    label,
+    gaugeValue: g?.gaugeValue ?? 0,
+    ratePerSec: gaugeRate(tier),
+    running: g?.running ?? false,
+    stuck: g?.stuck ?? false,
+    lastTick: Date.now(),
+  });
+  scheduleGameNotify();
+}
+
+export function gameStartGauge(memberId: string, tier: GameTier): void {
+  const g = memberGame.get(memberId);
+  memberGame.set(memberId, {
+    tier,
+    fit: g?.fit ?? (tier === 'great' ? 2 : tier === 'bad' ? 0 : 1),
+    label: g?.label ?? '',
+    gaugeValue: 0,
+    ratePerSec: gaugeRate(tier),
+    running: true,
+    stuck: false,
+    lastTick: Date.now(),
+  });
+  scheduleGameNotify();
+}
+
+export function gameStopGauge(memberId: string): void {
+  const g = memberGame.get(memberId);
+  if (g) {
+    g.running = false;
+    g.gaugeValue = 100;
+    scheduleGameNotify();
+  }
+}
+
+export function gameSetStuck(memberId: string, stuck: boolean): void {
+  const g = memberGame.get(memberId);
+  if (g) {
+    g.stuck = stuck;
+    scheduleGameNotify();
+  }
+}
+
+export function gameClearMember(memberId: string): void {
+  if (memberGame.delete(memberId)) scheduleGameNotify();
+}
+
+export function gameSetCompanyScore(
+  total: number,
+  delta: number,
+  count: number,
+  memberName: string,
+  tier: GameTier,
+): void {
+  companyScore = total;
+  lastDelta = delta;
+  todayCount = count;
+  currentToast = { id: ++toastSeq, memberName, tier, delta, todayCount: count };
+  scheduleGameNotify();
+}
+
+// ── Getters (overlay reads synchronously per frame) ──
+
+/**
+ * Interpolate the gauge locally for smooth fill between backend ticks.
+ * Called each frame by the overlay. Advances running gauges by elapsed × rate.
+ */
+export function gameTickGauges(): void {
+  const now = Date.now();
+  let changed = false;
+  for (const g of memberGame.values()) {
+    if (!g.running || g.gaugeValue >= 100) continue;
+    const dt = (now - g.lastTick) / 1000;
+    g.lastTick = now;
+    const rate = g.stuck ? g.ratePerSec * 0.5 : g.ratePerSec;
+    g.gaugeValue = Math.min(100, g.gaugeValue + dt * rate);
+    changed = true;
+  }
+  if (changed) {
+    // No notify here — overlay reads directly; React HUD does not need per-frame.
+  }
+}
+
+export function gameGetMember(memberId: string): Readonly<MemberGame> | undefined {
+  return memberGame.get(memberId);
+}
+
+export function gameGetCompanyScore(): number {
+  return companyScore;
+}
+export function gameGetTodayCount(): number {
+  return todayCount;
+}
+export function gameGetLastDelta(): number {
+  return lastDelta;
+}
+export function gameGetCurrentToast(): ToastEntry | null {
+  return currentToast;
+}
+export function gameClearToast(id: number): void {
+  if (currentToast && currentToast.id === id) {
+    currentToast = null;
+    scheduleGameNotify();
+  }
+}

@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 
+import {
+  gameClearMember,
+  gameSetCompanyScore,
+  gameSetFitBadge,
+  gameSetStuck,
+  gameStartGauge,
+  gameStopGauge,
+  type GameTier,
+} from '../jc/game-state.js';
 import type { AbsenceInfo, JCState, SpeechBubble, TaskDefinition } from '../jc/index.js';
 import {
   JC_ENTRANCE,
@@ -821,6 +830,30 @@ export function useExtensionMessages(
           type: 'speech',
           summary: `${rt?.config.name ?? bubble.memberId}: ${bubble.text}`,
         });
+      } else if (msg.type === 'jcFitBadge') {
+        const m = msg as { memberId: string; tier: GameTier; fit: number; label: string };
+        gameSetFitBadge(m.memberId, m.tier, m.fit, m.label);
+      } else if (msg.type === 'jcGaugeStart') {
+        const m = msg as { memberId: string; tier: GameTier };
+        gameStartGauge(m.memberId, m.tier);
+      } else if (msg.type === 'jcGaugeStop') {
+        const m = msg as { memberId: string };
+        gameStopGauge(m.memberId);
+      } else if (msg.type === 'jcGaugeStuck') {
+        const m = msg as { memberId: string; stuck: boolean };
+        gameSetStuck(m.memberId, m.stuck);
+      } else if (msg.type === 'jcCompanyScore') {
+        const m = msg as {
+          total: number;
+          delta: number;
+          todayCount: number;
+          memberName: string;
+          tier: GameTier;
+          memberId: string;
+        };
+        gameSetCompanyScore(m.total, m.delta, m.todayCount, m.memberName, m.tier);
+        // Clear the finished member's gauge/badge shortly after completion.
+        gameClearMember(m.memberId);
       }
     };
     window.addEventListener('message', handler);

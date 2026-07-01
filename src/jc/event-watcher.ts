@@ -6,6 +6,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type * as vscode from 'vscode';
 
+import { type AffinityResult, computeFit } from './affinity.js';
+import { scoreGain, TIER_GLYPH } from './affinity-constants.js';
 import { getDeskByMemberId } from './desk-registry.js';
 import type {
   CrossDeptMessageEvent,
@@ -35,6 +37,14 @@ export class EventWatcher {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private lastProcessedIndex = 0;
   private fsWatcher: fs.FSWatcher | null = null;
+
+  // ── Slice1 game state (DEV-SPEC §5) ──
+  /** Affinity per member, fixed at delegate time, held until task_completed. */
+  private memberAffinity = new Map<string, AffinityResult & { priority: number }>();
+  /** Company score accumulator (core layer — volatile, no persistent store). */
+  private companyScore = 0;
+  private dailyDate = '';
+  private dailyCount = 0;
 
   constructor(config: JCConfig, workspaceRoot: string) {
     this.config = config;
@@ -276,6 +286,13 @@ export class EventWatcher {
     });
   }
 
+  /** Parse a P0..P4 hint from delegate text; default P3. */
+  private priorityFromEvent(event: DelegateEvent): number {
+    const text = `${event.message ?? ''} ${event.task ?? ''}`;
+    const m = text.match(/\bP([0-4])\b/);
+    return m ? Number(m[1]) : 3;
+  }
+
   private handleWorkStarted(event: WorkStartedEvent): void {
     // Producer (jc-emit.mjs) emits the actor in `from`; consumer historically
     // read `agent`. Accept either so emitter/consumer field names stay in sync.
@@ -297,6 +314,33 @@ export class EventWatcher {
         duration: 3000,
       };
       this.webview!.postMessage({ type: 'jcSpeechBubble', bubble });
+
+      // ── Slice1: start quality gauge at the member's affinity speed ──
+      // If no delegate preceded (actor emitted work_started directly), compute
+      // affinity from the task text now so the gauge still reflects fit.
+      let affinity = this.memberAffinity.get(actorId);
+      if (!affinity) {
+        const a = computeFit(
+          { prompt: event.task ?? '', assignee: actorId },
+          actorId,
+          this.config,
+          this.workspaceRoot,
+        );
+        affinity = { ...a, priority: 3 };
+        this.memberAffinity.set(actorId, affinity);
+        this.webview!.postMessage({
+          type: 'jcFitBadge',
+          memberId: actorId,
+          tier: a.tier,
+          fit: a.fit,
+          label: a.label,
+        });
+      }
+      this.webview!.postMessage({
+        type: 'jcGaugeStart',
+        memberId: actorId,
+        tier: affinity.tier,
+      });
     }
   }
 
@@ -371,6 +415,47 @@ export class EventWatcher {
         memberId: actorId,
         jcState: 'idle',
       });
+
+      // ── Slice1: stop gauge + company score gain (affinity-weighted) ──
+      this.webview!.postMessage({ type: 'jcGaugeStop', memberId: actorId });
+
+      const affinity = this.memberAffinity.get(actorId);
+      const tier = affinity?.tier ?? 'ok';
+      const priority = affinity?.priority ?? 3;
+      const delta = scoreGain(tier, priority);
+      this.companyScore += delta;
+
+      const today = new Date().toISOString().slice(0, 10);
+      if (this.dailyDate !== today) {
+        this.dailyDate = today;
+        this.dailyCount = 0;
+      }
+      this.dailyCount += 1;
+
+      this.webview!.postMessage({
+        type: 'jcCompanyScore',
+        total: this.companyScore,
+        delta,
+        todayCount: this.dailyCount,
+        memberId: actorId,
+        memberName: member.name,
+        tier,
+      });
+
+      // Timeline (OFFICE LOG) 1-line imprint with affinity + score (AC-4).
+      this.webview!.postMessage({
+        type: 'jcSpeechBubble',
+        bubble: {
+          id: `score-${actorId}-${Date.now()}`,
+          memberId: actorId,
+          text: `${member.name}(相性${TIER_GLYPH[tier]}) 完了 [+${delta}]`,
+          department: member.department,
+          timestamp: Date.now(),
+          duration: 1,
+        } as SpeechBubble,
+      });
+
+      this.memberAffinity.delete(actorId);
     }
   }
 
@@ -466,6 +551,25 @@ export class EventWatcher {
         });
       }
 
+      // ── Slice1: compute affinity ◎/△/✗ and fix it for this task ──
+      if (member) {
+        const priority = this.priorityFromEvent(event);
+        const affinity = computeFit(
+          { prompt: event.task ?? '', assignee: memberId },
+          memberId,
+          this.config,
+          this.workspaceRoot,
+        );
+        this.memberAffinity.set(memberId, { ...affinity, priority });
+        this.webview!.postMessage({
+          type: 'jcFitBadge',
+          memberId,
+          tier: affinity.tier,
+          fit: affinity.fit,
+          label: affinity.label,
+        });
+      }
+
       // Beam from delegator to each delegatee
       const beam = this.getBeamType(event.from, memberId);
       this.webview!.postMessage({
@@ -552,5 +656,18 @@ export class EventWatcher {
       };
       this.webview!.postMessage({ type: 'jcSpeechBubble', bubble });
     }
+
+    // ── Slice1: poke un-stalls the checked member's quality gauge (DEV-SPEC §5.3) ──
+    if (this.memberAffinity.has(event.to)) {
+      this.webview!.postMessage({ type: 'jcGaugeStuck', memberId: event.to, stuck: false });
+    }
+  }
+
+  /** Test/introspection helpers for the Slice1 game state. */
+  getCompanyScore(): number {
+    return this.companyScore;
+  }
+  getAffinityTier(memberId: string): string | undefined {
+    return this.memberAffinity.get(memberId)?.tier;
   }
 }

@@ -131,7 +131,27 @@ export type JCMessageToWebview =
   | { type: 'jcTaskReorder'; tasks: TaskDefinition[] }
   | { type: 'officeLog:history'; entries: unknown[]; hasMore: boolean }
   | { type: 'jcSpeechBubble'; bubble: SpeechBubble }
-  | { type: 'jcOfficeEvent'; event: OfficeEvent };
+  | { type: 'jcOfficeEvent'; event: OfficeEvent }
+  // ── Slice1 game overlay messages (DEV-SPEC §4.2) ──
+  | {
+      type: 'jcFitBadge';
+      memberId: string;
+      tier: 'great' | 'ok' | 'bad';
+      fit: number;
+      label: string;
+    }
+  | { type: 'jcGaugeStart'; memberId: string; tier: 'great' | 'ok' | 'bad' }
+  | { type: 'jcGaugeStop'; memberId: string }
+  | { type: 'jcGaugeStuck'; memberId: string; stuck: boolean }
+  | {
+      type: 'jcCompanyScore';
+      total: number;
+      delta: number;
+      todayCount: number;
+      memberId: string;
+      memberName: string;
+      tier: 'great' | 'ok' | 'bad';
+    };
 
 export type JCMessageToExtension =
   | { type: 'jcRequestMapping'; agentId: number }

@@ -7,6 +7,14 @@
 import type { Character } from '../office/types.js';
 import { isSittingState, TILE_SIZE } from '../office/types.js';
 import {
+  gameGetCompanyScore,
+  gameGetMember,
+  gameGetTodayCount,
+  gameTickGauges,
+  type GameTier,
+  TIER_GLYPH,
+} from './game-state.js';
+import {
   BUBBLE_EMOJIS,
   DEPT_LABELS,
   DEPT_NEON,
@@ -212,6 +220,12 @@ export function renderJCOverlay(
   // 4. Task status indicators on desks
   renderTaskIndicators(ctx, offsetX, offsetY, s, zoom);
 
+  // 4a. Slice1: quality gauge bars (speed reflects affinity — AC-1 visual)
+  renderQualityGauge(ctx, offsetX, offsetY, s, zoom);
+
+  // 4b. Slice1: affinity ◎/△/✗ badges above characters
+  renderAffinityBadges(ctx, offsetX, offsetY, s, zoom);
+
   // 5. Hover nameplate (detailed, shown on mouse hover)
   if (hoverTileCol !== undefined && hoverTileRow !== undefined) {
     renderHoverNameplate(ctx, offsetX, offsetY, s, zoom, hoverTileCol, hoverTileRow);
@@ -344,6 +358,93 @@ function renderAlwaysOnNameplates(
     ctx.fillText(label, cx - dotR, ty);
   }
 
+  ctx.restore();
+}
+
+// ── Slice1: affinity badge ◎/△/✗ above characters (DEV-SPEC §6-3) ─────
+const TIER_COLOR: Record<GameTier, string> = {
+  great: '#39ff14', // ◎ neon green
+  ok: '#f0ad4e', // △ amber
+  bad: '#ff3d3d', // ✗ red
+};
+
+function renderAffinityBadges(
+  ctx: CanvasRenderingContext2D,
+  offsetX: number,
+  offsetY: number,
+  s: number,
+  zoom: number,
+): void {
+  if (zoom < 2) return;
+  const members = jcGetDashboardMembers();
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const badgeFont = zoom >= 3 ? '9px "Press Start 2P", monospace' : '10px monospace';
+  ctx.font = badgeFont;
+
+  for (const m of members) {
+    const g = gameGetMember(m.memberId);
+    if (!g) continue;
+    const glyph = TIER_GLYPH[g.tier];
+    const cx = offsetX + (m.deskCol + 0.5) * s;
+    // Above the character's head (one tile above the desk).
+    const cy = offsetY + m.deskRow * s - 3 * zoom;
+
+    const r = Math.max(6, zoom * 3);
+    ctx.fillStyle = 'rgba(10, 15, 35, 0.85)';
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = Math.max(1, zoom * 0.4);
+    ctx.strokeStyle = TIER_COLOR[g.tier];
+    ctx.stroke();
+
+    ctx.fillStyle = TIER_COLOR[g.tier];
+    ctx.fillText(glyph, cx, cy + 1);
+  }
+  ctx.restore();
+}
+
+// ── Slice1: quality gauge bar below nameplate (DEV-SPEC §6-4) ──────────
+function renderQualityGauge(
+  ctx: CanvasRenderingContext2D,
+  offsetX: number,
+  offsetY: number,
+  s: number,
+  zoom: number,
+): void {
+  if (zoom < 2) return;
+  gameTickGauges(); // advance local interpolation each frame
+  const members = jcGetDashboardMembers();
+  const now = Date.now();
+  ctx.save();
+
+  for (const m of members) {
+    const g = gameGetMember(m.memberId);
+    if (!g) continue;
+    const cx = offsetX + (m.deskCol + 0.5) * s;
+    // Below the nameplate row (nameplate sits at deskRow+1).
+    const barY = offsetY + (m.deskRow + 1) * s + 9 * zoom;
+    const barW = s * 1.2;
+    const barH = Math.max(2, 3 * zoom);
+    const barX = cx - barW / 2;
+
+    // Track
+    ctx.fillStyle = 'rgba(10, 15, 35, 0.85)';
+    ctx.fillRect(barX, barY, barW, barH);
+
+    // Fill (width = gaugeValue%; color = tier). speedMul IS baked into gaugeValue.
+    const fillW = (barW * Math.max(0, Math.min(100, g.gaugeValue))) / 100;
+    ctx.fillStyle = TIER_COLOR[g.tier];
+    ctx.fillRect(barX, barY, fillW, barH);
+
+    // Border: red-flash when stalled, else tier color.
+    const stalledFlash = g.stuck && Math.floor(now / 400) % 2 === 0;
+    ctx.lineWidth = Math.max(1, zoom * 0.3);
+    ctx.strokeStyle = stalledFlash ? '#ff3d3d' : TIER_COLOR[g.tier];
+    ctx.strokeRect(barX, barY, barW, barH);
+  }
   ctx.restore();
 }
 
@@ -763,10 +864,19 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
     (m) => m.isPresent && m.state !== 'idle' && m.state !== 'arriving' && m.state !== 'leaving',
   );
 
+  // Slice1: company score rows (top of HUD, DEV-SPEC §6-8)
+  const companyScore = gameGetCompanyScore();
+  const todayCount = gameGetTodayCount();
+  const scoreText = `会社Score ▲${companyScore}`;
+  const todayText = `本日完了 ${todayCount}件 🎉`;
+
   // Calculate box dimensions
   const headerText = `TEAM ${stats.present}/${stats.total}`;
   const headerMetrics = ctx.measureText(headerText);
   let maxWidth = headerMetrics.width + 20;
+  // Grow for the wider company-score rows (ticker-overlap safe).
+  maxWidth = Math.max(maxWidth, ctx.measureText(scoreText).width + 20);
+  maxWidth = Math.max(maxWidth, ctx.measureText(todayText).width + 20);
 
   for (const m of activeMembers) {
     // Name + state + optional activity
@@ -786,6 +896,7 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
   const separatorLines = showActiveList ? 1 : 0;
   const boxHeight =
     lineHeight + // header
+    2 * lineHeight + // Slice1: company score + today count rows
     deptLines.length * lineHeight + // dept rows
     separatorLines * 8 + // separator
     (showActiveList ? activeMembers.length * lineHeight : 0) +
@@ -815,6 +926,14 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
   ctx.font = STATS_FALLBACK_FONT;
   ctx.fillStyle = '#00f0ff';
   ctx.fillText(headerText, textX, textY);
+  textY += lineHeight;
+
+  // Slice1: company score + today completed (bright accent, DEV-SPEC §6-8)
+  ctx.fillStyle = '#39ff14';
+  ctx.fillText(scoreText, textX, textY);
+  textY += lineHeight;
+  ctx.fillStyle = '#f0d840';
+  ctx.fillText(todayText, textX, textY);
   textY += lineHeight;
 
   // Department lines with status indicators (🟢/⚪/🔴)

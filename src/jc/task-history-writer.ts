@@ -28,8 +28,19 @@ function ensureDir(dir: string): void {
   }
 }
 
-/** Classify task prompt into a label */
-function classifyLabel(prompt: string, isIncident?: boolean): TaskLabel {
+/**
+ * toEpochMs: defensive timestamp parser (B2 preventive guard, DEV-SPEC §1 B2).
+ * Returns finite Unix-ms for a valid ISO/date string, else undefined.
+ * Never emits NaN as a timestamp. No schema/type change — wraps existing conversions.
+ */
+export function toEpochMs(iso?: string): number | undefined {
+  if (!iso) return undefined;
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t : undefined;
+}
+
+/** Classify task prompt into a label. Exported for affinity.ts (DEV-SPEC R0). */
+export function classifyLabel(prompt: string, isIncident?: boolean): TaskLabel {
   if (isIncident) return 'incident';
   const rules: Array<{ label: TaskLabel; pattern: RegExp }> = [
     {
@@ -90,11 +101,16 @@ export class TaskHistoryWriter {
 
   /** Write a completed task to the history log */
   writeEntry(task: TaskDefinition, config?: JCConfig): void {
-    const completedDate = task.completedAt
-      ? new Date(task.completedAt).toISOString().slice(0, 10)
-      : new Date().toISOString().slice(0, 10);
+    // B2 guard: use finite ms for the filename date; fall back to now on invalid.
+    const completedMs = toEpochMs(task.completedAt) ?? Date.now();
+    const completedDate = new Date(completedMs).toISOString().slice(0, 10);
 
     const filePath = path.join(this.dir, `${completedDate}.jsonl`);
+
+    // B2 guard: finite-ms conversions. createdAt falls back to now if invalid;
+    // startedAt/completedAt stay undefined/now rather than writing NaN.
+    const createdMs = toEpochMs(task.createdAt) ?? Date.now();
+    const startedMs = toEpochMs(task.startedAt);
 
     const entry: TaskLogEntry = {
       taskId: task.id,
@@ -102,13 +118,10 @@ export class TaskHistoryWriter {
       label: classifyLabel(task.prompt, task.isIncident),
       priority: task.priority,
       status: task.isIncident ? 'incident' : mapStatus(task.status),
-      createdAt: new Date(task.createdAt).getTime(),
-      startedAt: task.startedAt ? new Date(task.startedAt).getTime() : undefined,
-      completedAt: task.completedAt ? new Date(task.completedAt).getTime() : Date.now(),
-      durationMs:
-        task.startedAt && task.completedAt
-          ? new Date(task.completedAt).getTime() - new Date(task.startedAt).getTime()
-          : undefined,
+      createdAt: createdMs,
+      startedAt: startedMs,
+      completedAt: toEpochMs(task.completedAt) ?? Date.now(),
+      durationMs: startedMs !== undefined && task.completedAt ? completedMs - startedMs : undefined,
       delegationChain: task.delegationChain ?? [],
       assignedTo: task.assignee,
       pmReview:
