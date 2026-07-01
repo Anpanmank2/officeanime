@@ -1,4 +1,4 @@
-// ── Settings Modal — Unified settings (layout/zoom/sound/etc.) ──
+// ── Settings Modal — Unified settings (zoom/sound) ──
 
 import { useState } from 'react';
 
@@ -7,16 +7,6 @@ import { vscode } from '../vscodeApi.js';
 
 interface SettingsModalProps {
   onClose: () => void;
-  isEditMode: boolean;
-  onToggleEditMode: () => void;
-  isDebugMode: boolean;
-  onToggleDebugMode: () => void;
-  alwaysShowOverlay: boolean;
-  onToggleAlwaysShowOverlay: () => void;
-  externalAssetDirectories: string[];
-  watchAllSessions: boolean;
-  onToggleWatchAllSessions: () => void;
-  onOpenClaude: (folderPath?: string, bypassPermissions?: boolean) => void;
   zoom: number;
   onZoomChange: (z: number) => void;
 }
@@ -67,21 +57,7 @@ const sectionLabel: React.CSSProperties = {
   fontWeight: 'bold',
 };
 
-export function SettingsModal({
-  onClose,
-  isEditMode,
-  onToggleEditMode,
-  isDebugMode,
-  onToggleDebugMode,
-  alwaysShowOverlay,
-  onToggleAlwaysShowOverlay,
-  externalAssetDirectories,
-  watchAllSessions,
-  onToggleWatchAllSessions,
-  onOpenClaude,
-  zoom,
-  onZoomChange,
-}: SettingsModalProps) {
+export function SettingsModal({ onClose, zoom, onZoomChange }: SettingsModalProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [soundLocal, setSoundLocal] = useState(isSoundEnabled);
 
@@ -141,72 +117,6 @@ export function SettingsModal({
           </button>
         </div>
 
-        {/* ── Agent ── */}
-        <div style={sectionLabel}>Agent</div>
-        <button
-          onClick={() => {
-            onOpenClaude();
-            onClose();
-          }}
-          onMouseEnter={() => setHovered('agent')}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            ...menuItemBase,
-            color: '#80ff60',
-            background: hovered === 'agent' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          + New Agent
-        </button>
-
-        {/* ── Layout ── */}
-        <div style={sectionLabel}>Layout</div>
-        <button
-          role="switch"
-          aria-checked={isEditMode}
-          onClick={() => {
-            onToggleEditMode();
-            onClose();
-          }}
-          onMouseEnter={() => setHovered('edit')}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            ...menuItemBase,
-            background: hovered === 'edit' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          <span>Edit Layout</span>
-          <PixelCheckbox checked={isEditMode} />
-        </button>
-        <button
-          onClick={() => {
-            vscode.postMessage({ type: 'exportLayout' });
-            onClose();
-          }}
-          onMouseEnter={() => setHovered('export')}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            ...menuItemBase,
-            background: hovered === 'export' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          Export Layout
-        </button>
-        <button
-          onClick={() => {
-            vscode.postMessage({ type: 'importLayout' });
-            onClose();
-          }}
-          onMouseEnter={() => setHovered('import')}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            ...menuItemBase,
-            background: hovered === 'import' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          Import Layout
-        </button>
-
         {/* ── Zoom ── */}
         <div style={sectionLabel}>Zoom</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px' }}>
@@ -255,132 +165,6 @@ export function SettingsModal({
           <span>Sound Notifications</span>
           <PixelCheckbox checked={soundLocal} />
         </button>
-        <button
-          role="switch"
-          aria-checked={watchAllSessions}
-          onClick={onToggleWatchAllSessions}
-          onMouseEnter={() => setHovered('watchAll')}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            ...menuItemBase,
-            background: hovered === 'watchAll' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          <span>Watch All Sessions</span>
-          <PixelCheckbox checked={watchAllSessions} />
-        </button>
-        <button
-          role="switch"
-          aria-checked={alwaysShowOverlay}
-          onClick={onToggleAlwaysShowOverlay}
-          onMouseEnter={() => setHovered('overlay')}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            ...menuItemBase,
-            background: hovered === 'overlay' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          <span>Always Show Labels</span>
-          <PixelCheckbox checked={alwaysShowOverlay} />
-        </button>
-        <button
-          onClick={onToggleDebugMode}
-          onMouseEnter={() => setHovered('debug')}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            ...menuItemBase,
-            background: hovered === 'debug' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          <span>Debug View</span>
-          {isDebugMode && (
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: '50%',
-                background: 'rgba(90, 140, 255, 0.8)',
-                flexShrink: 0,
-              }}
-            />
-          )}
-        </button>
-
-        {/* ── Assets ── */}
-        <div style={sectionLabel}>Assets</div>
-        <button
-          onClick={() => {
-            vscode.postMessage({ type: 'openSessionsFolder' });
-            onClose();
-          }}
-          onMouseEnter={() => setHovered('sessions')}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            ...menuItemBase,
-            background: hovered === 'sessions' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          Open Sessions Folder
-        </button>
-        <button
-          onClick={() => {
-            vscode.postMessage({ type: 'addExternalAssetDirectory' });
-            onClose();
-          }}
-          onMouseEnter={() => setHovered('addAssets')}
-          onMouseLeave={() => setHovered(null)}
-          style={{
-            ...menuItemBase,
-            background: hovered === 'addAssets' ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
-          }}
-        >
-          Add Asset Directory
-        </button>
-        {externalAssetDirectories.map((dir) => (
-          <div
-            key={dir}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '4px 10px',
-              gap: 8,
-            }}
-          >
-            <span
-              style={{
-                fontSize: '18px',
-                color: 'rgba(255, 255, 255, 0.5)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                maxWidth: 180,
-              }}
-              title={dir}
-            >
-              {dir.split(/[/\\]/).pop() ?? dir}
-            </span>
-            <button
-              onClick={() =>
-                vscode.postMessage({ type: 'removeExternalAssetDirectory', path: dir })
-              }
-              onMouseEnter={() => setHovered(`remove-${dir}`)}
-              onMouseLeave={() => setHovered(null)}
-              style={{
-                background: hovered === `remove-${dir}` ? 'rgba(255, 80, 80, 0.2)' : 'transparent',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                borderRadius: 0,
-                color: 'rgba(255, 255, 255, 0.5)',
-                fontSize: '18px',
-                cursor: 'pointer',
-                padding: '1px 6px',
-                flexShrink: 0,
-              }}
-            >
-              X
-            </button>
-          </div>
-        ))}
       </div>
     </>
   );

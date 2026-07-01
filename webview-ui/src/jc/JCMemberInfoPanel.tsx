@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { CHARACTER_SITTING_OFFSET_PX } from '../constants.js';
 import type { OfficeState } from '../office/engine/officeState.js';
@@ -8,7 +8,6 @@ import { ConfidenceBadge } from './ConfidenceBadge.js';
 import { formatFreshness } from './freshness.js';
 import { DEPT_COLORS, DEPT_LABELS, STATE_COLORS, STATE_LABELS } from './jc-constants.js';
 import { jcGetActivitySummary, jcGetMemberInfo, jcGetMemberTaskStatus } from './jc-state.js';
-import type { InstructionMode } from './jc-types.js';
 import { addPin, isPinned, removePin, subscribe as subscribePins } from './pin-store.js';
 
 const PROMPT_PREVIEW_LEN = 200;
@@ -88,14 +87,11 @@ export function JCMemberInfoPanel({
   panRef,
 }: JCMemberInfoPanelProps) {
   const [, setTick] = useState(0);
-  const [instructionText, setInstructionText] = useState('');
-  const [instructionMode, setInstructionMode] = useState<InstructionMode>('instant');
   const [isExpanded, setIsExpanded] = useState(false);
   const [pinned, setPinned] = useState(() => {
     const id = officeState.selectedAgentId;
     return id !== null ? isPinned(String(id)) : false;
   });
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let rafId = 0;
@@ -149,30 +145,6 @@ export function JCMemberInfoPanel({
   // Get activity summary and task info
   const activitySummary = jcGetActivitySummary(memberInfo.memberId);
   const currentTask = jcGetMemberTaskStatus(memberInfo.memberId);
-
-  const handleSendInstruction = () => {
-    if (!instructionText.trim()) return;
-    if (instructionMode === 'directive') {
-      vscode.postMessage({
-        type: 'agent:directive',
-        text: instructionText.trim(),
-      });
-    } else {
-      vscode.postMessage({
-        type: 'agent:instruct',
-        agentId: selectedId,
-        text: instructionText.trim(),
-      });
-    }
-    setInstructionText('');
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendInstruction();
-    }
-  };
 
   const handleFocus = () => {
     vscode.postMessage({ type: 'focusAgent', id: selectedId });
@@ -354,83 +326,8 @@ export function JCMemberInfoPanel({
             >
               Focus Terminal
             </button>
-
-            {/* Mode toggle */}
-            <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-              <button
-                onClick={() => setInstructionMode('instant')}
-                style={{
-                  flex: 1,
-                  padding: '2px 4px',
-                  fontSize: '14px',
-                  color: instructionMode === 'instant' ? '#fff' : 'var(--pixel-text-dim)',
-                  background: instructionMode === 'instant' ? `${accentColor}44` : 'transparent',
-                  border: `1px solid ${instructionMode === 'instant' ? accentColor : 'var(--pixel-border)'}`,
-                  borderRadius: 0,
-                  cursor: 'pointer',
-                }}
-              >
-                Instant
-              </button>
-              <button
-                onClick={() => setInstructionMode('directive')}
-                style={{
-                  flex: 1,
-                  padding: '2px 4px',
-                  fontSize: '14px',
-                  color: instructionMode === 'directive' ? '#fff' : 'var(--pixel-text-dim)',
-                  background: instructionMode === 'directive' ? `${accentColor}44` : 'transparent',
-                  border: `1px solid ${instructionMode === 'directive' ? accentColor : 'var(--pixel-border)'}`,
-                  borderRadius: 0,
-                  cursor: 'pointer',
-                }}
-              >
-                Directive
-              </button>
-            </div>
-
-            {/* Instruction textarea */}
-            <textarea
-              ref={textareaRef}
-              value={instructionText}
-              onChange={(e) => setInstructionText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                instructionMode === 'instant' ? 'Send instruction...' : 'Set directive...'
-              }
-              style={{
-                width: '100%',
-                height: 48,
-                padding: '4px',
-                fontSize: '16px',
-                color: 'var(--pixel-text)',
-                background: 'rgba(0,0,0,0.3)',
-                border: '1px solid var(--pixel-border)',
-                borderRadius: 0,
-                resize: 'vertical',
-                fontFamily: 'inherit',
-                boxSizing: 'border-box',
-              }}
-            />
-
-            {/* Send button */}
-            <button
-              onClick={handleSendInstruction}
-              disabled={!instructionText.trim()}
-              style={{
-                width: '100%',
-                marginTop: 4,
-                padding: '4px 8px',
-                fontSize: '16px',
-                color: instructionText.trim() ? '#fff' : 'var(--pixel-text-dim)',
-                background: instructionText.trim() ? `${accentColor}66` : 'var(--pixel-btn-bg)',
-                border: `2px solid ${instructionText.trim() ? accentColor : 'var(--pixel-border)'}`,
-                borderRadius: 0,
-                cursor: instructionText.trim() ? 'pointer' : 'default',
-              }}
-            >
-              {instructionMode === 'instant' ? 'Send' : 'Set Directive'}
-            </button>
+            {/* DEFER: Instant/Directive instruction send removed — delegation is dock-only.
+                Viewing (Focus Terminal + member info) is kept. */}
           </div>
         )}
       </div>

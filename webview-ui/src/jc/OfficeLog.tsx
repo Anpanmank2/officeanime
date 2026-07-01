@@ -2,11 +2,8 @@
 // Replaces AgentDashboard. Shows chronological agent speech/actions.
 
 import { useEffect, useRef, useState } from 'react';
-import { useCallback } from 'react';
 
 import { ConfidenceBadge } from './ConfidenceBadge.js';
-import { filterByDept } from './dept-filter.js';
-import { DeptFilterChips } from './DeptFilterChips.js';
 import { DEPT_COLORS, LOG_DEPT_FILTER_MAP, LOG_DEPT_FILTERS } from './jc-constants.js';
 import type { OfficeLogEntry } from './jc-types.js';
 import { getLogEntries, subscribeLog } from './office-log-state.js';
@@ -56,14 +53,7 @@ export function OfficeLog({
 }) {
   const [activeFilter, setActiveFilter] = useState<string>('All');
   const [entries, setEntries] = useState<OfficeLogEntry[]>([]);
-  const [deptFilter, setDeptFilter] = useState<string[]>([
-    'exec',
-    'engineering',
-    'marketing',
-    'research',
-  ]);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const handleDeptChange = useCallback((selected: string[]) => setDeptFilter(selected), []);
 
   // Subscribe to log changes
   useEffect(() => {
@@ -149,8 +139,7 @@ export function OfficeLog({
         ))}
       </div>
 
-      {/* Dept filter chips */}
-      <DeptFilterChips onChange={handleDeptChange} />
+      {/* DEFER: dept filter chips (client multi-select) hidden — upper tabs one-source. */}
 
       {/* Log entries */}
       <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto' }}>
@@ -166,9 +155,7 @@ export function OfficeLog({
             No activity yet
           </div>
         ) : (
-          filterByDept(entries, deptFilter).map((entry) => (
-            <LogEntryRow key={entry.id} entry={entry} />
-          ))
+          entries.map((entry) => <LogEntryRow key={entry.id} entry={entry} />)
         )}
       </div>
     </div>

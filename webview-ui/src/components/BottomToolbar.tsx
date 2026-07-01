@@ -1,6 +1,4 @@
-// ── Bottom Toolbar — 3 buttons: + Command, Tasks, Settings ──────
-
-import { ModeSwitcher } from '../jc/ModeSwitcher.js';
+// ── Bottom Toolbar — Owner, Tasks, Settings ──────
 
 interface BottomToolbarProps {
   isTaskHistoryOpen: boolean;
@@ -88,8 +86,7 @@ export function BottomToolbar(props: BottomToolbarProps) {
         </button>
       </div>
 
-      {/* Right group: mode switcher */}
-      <ModeSwitcher />
+      {/* DEFER: mode switcher removed — view mode fixed to command */}
     </div>
   );
 }

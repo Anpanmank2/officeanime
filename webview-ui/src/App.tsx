@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { toMajorMinor } from './changelogData.js';
 import { BottomToolbar } from './components/BottomToolbar.js';
-import { ChangelogModal } from './components/ChangelogModal.js';
 import { DebugView } from './components/DebugView.js';
 import { SettingsModal } from './components/SettingsModal.js';
-import { TokenHPBar } from './components/TokenHPBar.js';
-import { VersionIndicator } from './components/VersionIndicator.js';
+// DEFER: TokenHPBar hidden (Slice後で復活) — import removed to satisfy noUnusedLocals
+// import { TokenHPBar } from './components/TokenHPBar.js';
 import { PULSE_ANIMATION_DURATION_SEC } from './constants.js';
 import { useEditorActions } from './hooks/useEditorActions.js';
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js';
@@ -15,18 +13,15 @@ import { AbsentStatusPopup } from './jc/AbsentStatusPopup.js';
 import { CompletionToast } from './jc/CompletionToast.js';
 import { DelegationDock } from './jc/DelegationDock.js';
 import { DeskCard } from './jc/DeskCard.js';
-import { DialogBox } from './jc/DialogBox.js';
 import { gameGetCompanyScore, gameGetTodayCount, subscribeGame } from './jc/game-state.js';
 import { DEPT_COLORS } from './jc/jc-constants.js';
 import {
-  jcGetMemberInfo,
   jcGetOwnerAvatarState,
   jcSetOwnerAvatarState,
   subscribeOwnerAvatar,
 } from './jc/jc-state.js';
 import type { AbsenceInfo, OwnerAvatarState } from './jc/jc-types.js';
 import { JCMemberInfoPanel } from './jc/JCMemberInfoPanel.js';
-import { useViewMode } from './jc/mode-store.js';
 import { ModeProvider } from './jc/ModeContext.js';
 import { getLogEntries, subscribeLog } from './jc/office-log-state.js';
 import { OfficeLog } from './jc/OfficeLog.js';
@@ -243,15 +238,40 @@ function CommandBoard() {
           style={{
             display: 'flex',
             justifyContent: 'center',
-            gap: 24,
+            alignItems: 'flex-end',
+            gap: 32,
             fontSize: '13px',
           }}
         >
-          <span style={{ color: '#39ff14' }}>
-            会社スコア <b>{companyScore}</b>
+          {/* Number is the hero: large + bold so a "0" reads as a digit, not a period.
+              The pixel font's small "0" glyph is near-identical to "。" at 13px. */}
+          <span
+            style={{
+              color: '#39ff14',
+              display: 'inline-flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 2,
+            }}
+          >
+            <span style={{ fontSize: '11px', opacity: 0.85 }}>会社スコア</span>
+            <b style={{ fontSize: '26px', fontWeight: 900, lineHeight: 1 }}>
+              {companyScore.toLocaleString()}
+            </b>
           </span>
-          <span style={{ color: '#f0d840' }}>
-            本日完了 <b>{todayCount}</b> 件
+          <span
+            style={{
+              color: '#f0d840',
+              display: 'inline-flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 2,
+            }}
+          >
+            <span style={{ fontSize: '11px', opacity: 0.85 }}>本日完了（件）</span>
+            <b style={{ fontSize: '26px', fontWeight: 900, lineHeight: 1 }}>
+              {todayCount.toLocaleString()}
+            </b>
           </span>
         </div>
       </div>
@@ -268,8 +288,6 @@ function AppContent() {
     }
   }, []);
 
-  const { viewMode } = useViewMode();
-
   const editor = useEditorActions(getOfficeState, editorState);
 
   const isEditDirty = useCallback(
@@ -282,26 +300,16 @@ function AppContent() {
     selectedAgent,
     agentTools,
     agentStatuses,
-    agentTokenUsage,
+    // DEFER: agentTokenUsage was TokenHPBar-only — omitted while bar is hidden (Slice後で復活)
     subagentTools,
     subagentCharacters,
     layoutReady,
-    layoutWasReset,
     loadedAssets,
-    externalAssetDirectories,
-    lastSeenVersion,
-    extensionVersion,
-    watchAllSessions,
-    setWatchAllSessions,
     alwaysShowLabels,
   } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty);
 
-  // Show migration notice once layout reset is detected
-  const [migrationNoticeDismissed, setMigrationNoticeDismissed] = useState(false);
-  const showMigrationNotice = layoutWasReset && !migrationNoticeDismissed;
-
-  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
-  const [isDebugMode, setIsDebugMode] = useState(false);
+  // DEFER: debug toggle UI removed — isDebugMode fixed to false (DebugView hidden, other overlays shown).
+  const [isDebugMode] = useState(false);
   const [alwaysShowOverlay, setAlwaysShowOverlay] = useState(false);
 
   // ── New panel states ──
@@ -317,12 +325,6 @@ function AppContent() {
       setOwnerAvatarStateLocal(jcGetOwnerAvatarState());
     });
   }, []);
-
-  // DialogBox state: opened when owner is active and clicks a member character
-  const [dialogTarget, setDialogTarget] = useState<{
-    memberId: string;
-    memberName: string;
-  } | null>(null);
 
   const handleToggleTaskHistory = useCallback(() => {
     setIsTaskHistoryOpen((prev) => !prev);
@@ -363,29 +365,9 @@ function AppContent() {
     setAbsentPopup(null);
   }, []);
 
-  const currentMajorMinor = toMajorMinor(extensionVersion);
-
-  const handleWhatsNewDismiss = useCallback(() => {
-    vscode.postMessage({ type: 'setLastSeenVersion', version: currentMajorMinor });
-  }, [currentMajorMinor]);
-
-  const handleOpenChangelog = useCallback(() => {
-    setIsChangelogOpen(true);
-    vscode.postMessage({ type: 'setLastSeenVersion', version: currentMajorMinor });
-  }, [currentMajorMinor]);
-
   useEffect(() => {
     setAlwaysShowOverlay(alwaysShowLabels);
   }, [alwaysShowLabels]);
-
-  const handleToggleDebugMode = useCallback(() => setIsDebugMode((prev) => !prev), []);
-  const handleToggleAlwaysShowOverlay = useCallback(() => {
-    setAlwaysShowOverlay((prev) => {
-      const newVal = !prev;
-      vscode.postMessage({ type: 'setAlwaysShowLabels', enabled: newVal });
-      return newVal;
-    });
-  }, []);
 
   const handleSelectAgent = useCallback((id: number) => {
     vscode.postMessage({ type: 'focusAgent', id });
@@ -410,7 +392,8 @@ function AppContent() {
     vscode.postMessage({ type: 'closeAgent', id });
   }, []);
 
-  // Character click → open DialogBox if owner active, otherwise focus agent
+  // Character click → focus agent (peek). DEFER: individual delegation form (DialogBox)
+  // removed — delegation is dock-only (Owner decision B).
   const handleClick = useCallback((agentId: number) => {
     const os = getOfficeState();
     const meta = os.subagentMeta.get(agentId);
@@ -418,21 +401,6 @@ function AppContent() {
 
     // Skip clicks on the owner avatar itself
     if (focusId === OWNER_AGENT_ID) return;
-
-    const ownerState = jcGetOwnerAvatarState();
-    if (ownerState.active) {
-      // Owner mode: open DialogBox for the clicked member
-      const memberInfo = jcGetMemberInfo(focusId);
-      if (memberInfo) {
-        // Update owner avatar to walk toward this member
-        jcSetOwnerAvatarState({ conversationTarget: memberInfo.memberId });
-        setDialogTarget({
-          memberId: memberInfo.memberId,
-          memberName: memberInfo.config.name,
-        });
-      }
-      return;
-    }
 
     vscode.postMessage({ type: 'focusAgent', id: focusId });
   }, []);
@@ -486,7 +454,6 @@ function AppContent() {
           50% { opacity: 0.3; }
         }
         .pixel-agents-pulse { animation: pixel-agents-pulse ${PULSE_ANIMATION_DURATION_SEC}s ease-in-out infinite; }
-        .pixel-agents-migration-btn:hover { filter: brightness(0.8); }
       `}</style>
 
       <OfficeCanvas
@@ -550,20 +517,6 @@ function AppContent() {
       {isSettingsOpen && (
         <SettingsModal
           onClose={() => setIsSettingsOpen(false)}
-          isEditMode={editor.isEditMode}
-          onToggleEditMode={editor.handleToggleEditMode}
-          isDebugMode={isDebugMode}
-          onToggleDebugMode={handleToggleDebugMode}
-          alwaysShowOverlay={alwaysShowOverlay}
-          onToggleAlwaysShowOverlay={handleToggleAlwaysShowOverlay}
-          externalAssetDirectories={externalAssetDirectories}
-          watchAllSessions={watchAllSessions}
-          onToggleWatchAllSessions={() => {
-            const newVal = !watchAllSessions;
-            setWatchAllSessions(newVal);
-            vscode.postMessage({ type: 'setWatchAllSessions', enabled: newVal });
-          }}
-          onOpenClaude={editor.handleOpenClaude}
           zoom={editor.zoom}
           onZoomChange={editor.handleZoomChange}
         />
@@ -573,27 +526,14 @@ function AppContent() {
       <OfficeLog
         isOpen={isOfficeLogOpen}
         onClose={() => setIsOfficeLogOpen(false)}
-        expanded={viewMode === 'serious'}
+        expanded={false}
       />
 
-      {/* ── Command Mode: operation board placeholder + ticker ── */}
-      {viewMode === 'command' && <CommandBoard />}
+      {/* ── Command Mode: operation board placeholder + ticker (DEFER: mode fixed to command) ── */}
+      <CommandBoard />
 
       {/* ── Task History (left slide-in) ── */}
       <TaskHistoryPanel isOpen={isTaskHistoryOpen} onClose={() => setIsTaskHistoryOpen(false)} />
-
-      <VersionIndicator
-        currentVersion={extensionVersion}
-        lastSeenVersion={lastSeenVersion}
-        onDismiss={handleWhatsNewDismiss}
-        onOpenChangelog={handleOpenChangelog}
-      />
-
-      <ChangelogModal
-        isOpen={isChangelogOpen}
-        onClose={() => setIsChangelogOpen(false)}
-        currentVersion={extensionVersion}
-      />
 
       {editor.isEditMode && editor.isDirty && (
         <EditActionBar editor={editor} editorState={editorState} />
@@ -650,6 +590,8 @@ function AppContent() {
           );
         })()}
 
+      {/* DEFER: TokenHPBar hidden (Slice後で復活) */}
+      {/*
       {!isDebugMode && (
         <TokenHPBar
           officeState={officeState}
@@ -660,6 +602,7 @@ function AppContent() {
           panRef={editor.panRef}
         />
       )}
+      */}
 
       {!isDebugMode && (
         <ToolOverlay
@@ -714,81 +657,7 @@ function AppContent() {
       )}
 
       {/* ── Owner Avatar (always mounted when active, renders via canvas) ── */}
-      {ownerAvatarState.active && (
-        <OwnerAvatar officeState={officeState} onExited={() => setDialogTarget(null)} />
-      )}
-
-      {/* ── DialogBox (shown when owner clicks a member character) ── */}
-      {dialogTarget && ownerAvatarState.active && (
-        <DialogBox
-          memberId={dialogTarget.memberId}
-          memberName={dialogTarget.memberName}
-          onClose={() => setDialogTarget(null)}
-        />
-      )}
-
-      {showMigrationNotice && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 100,
-          }}
-          onClick={() => setMigrationNoticeDismissed(true)}
-        >
-          <div
-            style={{
-              background: 'var(--pixel-bg)',
-              border: '2px solid var(--pixel-border)',
-              borderRadius: 0,
-              padding: '24px 32px',
-              maxWidth: 620,
-              boxShadow: 'var(--pixel-shadow)',
-              textAlign: 'center',
-              lineHeight: 1.3,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ fontSize: '40px', marginBottom: 12, color: 'var(--pixel-accent)' }}>
-              We owe you an apology!
-            </div>
-            <p style={{ fontSize: '26px', color: 'var(--pixel-text)', margin: '0 0 12px 0' }}>
-              We've just migrated to fully open-source assets, all built from scratch with love.
-              Unfortunately, this means your previous layout had to be reset.
-            </p>
-            <p style={{ fontSize: '26px', color: 'var(--pixel-text)', margin: '0 0 12px 0' }}>
-              We're really sorry about that.
-            </p>
-            <p style={{ fontSize: '26px', color: 'var(--pixel-text)', margin: '0 0 12px 0' }}>
-              The good news? This was a one-time thing, and it paves the way for some genuinely
-              exciting updates ahead.
-            </p>
-            <p style={{ fontSize: '26px', color: 'var(--pixel-text-dim)', margin: '0 0 20px 0' }}>
-              Stay tuned, and thanks for using Pixel Agents!
-            </p>
-            <button
-              className="pixel-agents-migration-btn"
-              style={{
-                padding: '6px 24px 8px',
-                fontSize: '30px',
-                background: 'var(--pixel-accent)',
-                color: '#fff',
-                border: '2px solid var(--pixel-accent)',
-                borderRadius: 0,
-                cursor: 'pointer',
-                boxShadow: 'var(--pixel-shadow)',
-              }}
-              onClick={() => setMigrationNoticeDismissed(true)}
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
+      {ownerAvatarState.active && <OwnerAvatar officeState={officeState} onExited={() => {}} />}
     </div>
   );
 }

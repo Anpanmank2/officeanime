@@ -67,7 +67,8 @@ export function useEditorActions(
   getOfficeState: () => OfficeState,
   editorState: EditorState,
 ): EditorActions {
-  const [isEditMode, setIsEditMode] = useState(false);
+  // DEFER: layout editor hidden — edit mode fixed to false (component kept for a future slice).
+  const [isEditMode] = useState(false);
   const [editorTick, setEditorTick] = useState(0);
   const [isDirty, setIsDirty] = useState(false);
   const [zoom, setZoom] = useState(defaultZoom);
@@ -108,30 +109,8 @@ export function useEditorActions(
   }, []);
 
   const handleToggleEditMode = useCallback(() => {
-    setIsEditMode((prev) => {
-      const next = !prev;
-      editorState.isEditMode = next;
-      if (next) {
-        // Initialize wallColor from existing wall tiles so new walls match
-        const os = getOfficeState();
-        const layout = os.getLayout();
-        if (layout.tileColors) {
-          for (let i = 0; i < layout.tiles.length; i++) {
-            if (layout.tiles[i] === TileType.WALL && layout.tileColors[i]) {
-              editorState.wallColor = { ...layout.tileColors[i]! };
-              break;
-            }
-          }
-        }
-      } else {
-        editorState.clearSelection();
-        editorState.clearGhost();
-        editorState.clearDrag();
-        wallColorEditActiveRef.current = false;
-      }
-      return next;
-    });
-  }, [editorState, getOfficeState]);
+    /* DEFER: layout editor hidden — toggle is a no-op (edit mode stays false). */
+  }, []);
 
   // Tool toggle: clicking already-active tool deselects it (returns to SELECT)
   const handleToolChange = useCallback(
