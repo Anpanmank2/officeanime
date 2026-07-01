@@ -59,7 +59,9 @@ export function DelegationDock() {
     >
       <span style={{ color: '#00f0ff', fontSize: 10, marginRight: 4 }}>
         委任ドック
-        {pickedId && <span style={{ color: '#39ff14' }}> ▶ 担当をクリック</span>}
+        {pickedId && (
+          <span style={{ color: '#39ff14' }}> ▶ 秘書か部署ゾーンへ (自動で最適担当)</span>
+        )}
       </span>
 
       {cards.map((c) => {

@@ -63,6 +63,18 @@ export function gameGetPreview(): { memberId: string; tier: GameTier } | null {
   return previewMemberId && previewTier ? { memberId: previewMemberId, tier: previewTier } : null;
 }
 
+// ── Living-loop routing: which target (秘書 / dept) the hovered card routes to ──
+let routePreviewLabel: string | null = null;
+export function gameSetRoutePreview(t: { label: string } | null): void {
+  const next = t?.label ?? null;
+  if (routePreviewLabel === next) return;
+  routePreviewLabel = next;
+  // No notify: read by the canvas overlay each frame, not by React.
+}
+export function gameGetRoutePreview(): string | null {
+  return routePreviewLabel;
+}
+
 // ── Toast queue (React consumes) ──
 export interface ToastEntry {
   id: number;

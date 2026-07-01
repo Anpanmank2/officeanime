@@ -9,6 +9,7 @@ import type * as vscode from 'vscode';
 import { type AffinityResult, computeFit } from './affinity.js';
 import { scoreGain, TIER_GLYPH } from './affinity-constants.js';
 import { getDeskByMemberId } from './desk-registry.js';
+import { completionLine, reactionLine, thoughtLine } from './persona-lines.js';
 import type {
   CrossDeptMessageEvent,
   DelegateEvent,
@@ -46,6 +47,16 @@ export class EventWatcher {
   private dailyDate = '';
   private dailyCount = 0;
 
+  // ── Living-loop: persona thought bubbles while working ──
+  /** Members currently working → their tier/dept/tick, drives periodic thoughts. */
+  private activeWork = new Map<
+    string,
+    { tier: AffinityResult['tier']; department: string; tick: number }
+  >();
+  private thoughtTimer: ReturnType<typeof setInterval> | null = null;
+  /** Interval between persona working-thought bubbles (ms). */
+  private static readonly THOUGHT_INTERVAL_MS = 12000;
+
   constructor(config: JCConfig, workspaceRoot: string) {
     this.config = config;
     this.workspaceRoot = workspaceRoot;
@@ -82,6 +93,12 @@ export class EventWatcher {
     // Polling backup
     this.pollTimer = setInterval(() => this.processEvents(), POLL_INTERVAL_MS);
 
+    // Living-loop: periodic persona thought bubbles for members at work.
+    this.thoughtTimer = setInterval(
+      () => this.emitWorkingThoughts(),
+      EventWatcher.THOUGHT_INTERVAL_MS,
+    );
+
     // Initial read
     this.processEvents();
     console.log(`[JC-Events] Watching ${eventFilePath}`);
@@ -93,11 +110,38 @@ export class EventWatcher {
       clearInterval(this.pollTimer);
       this.pollTimer = null;
     }
+    if (this.thoughtTimer) {
+      clearInterval(this.thoughtTimer);
+      this.thoughtTimer = null;
+    }
     if (this.fsWatcher) {
       this.fsWatcher.close();
       this.fsWatcher = null;
     }
     this.webview = null;
+  }
+
+  /**
+   * Living-loop: every member currently at work surfaces a persona-flavored
+   * thought ("このデータ面白いな" / "あと少し…"). Deterministic per (member,
+   * tick) so replays are reproducible. Skipped when nobody is working.
+   */
+  private emitWorkingThoughts(): void {
+    if (!this.webview || this.activeWork.size === 0) return;
+    for (const [memberId, w] of this.activeWork) {
+      w.tick += 1;
+      const text = thoughtLine(memberId, w.department, w.tick);
+      if (!text) continue;
+      const bubble: SpeechBubble = {
+        id: `think-${memberId}-${Date.now()}`,
+        memberId,
+        text,
+        department: w.department,
+        timestamp: Date.now(),
+        duration: 3000,
+      };
+      this.webview.postMessage({ type: 'jcSpeechBubble', bubble });
+    }
   }
 
   /** Write an event to the event file (for programmatic event emission) */
@@ -305,15 +349,6 @@ export class EventWatcher {
         memberId: actorId,
         jcState: 'coding',
       });
-      const bubble: SpeechBubble = {
-        id: `work-${actorId}-${Date.now()}`,
-        memberId: actorId,
-        text: (event.task ?? '').slice(0, 20) + '...',
-        department: member.department,
-        timestamp: Date.now(),
-        duration: 3000,
-      };
-      this.webview!.postMessage({ type: 'jcSpeechBubble', bubble });
 
       // ── Slice1: start quality gauge at the member's affinity speed ──
       // If no delegate preceded (actor emitted work_started directly), compute
@@ -336,6 +371,28 @@ export class EventWatcher {
           label: a.label,
         });
       }
+
+      // ── Living-loop: persona reaction the instant work starts (◎/△/✗). ──
+      // ◎ →「よし、任せろ！」系 / ✗ →「うーん畑違いだけど…」系。Persona-fit,
+      // pulled from the member's real voice (or dept×tier archetype).
+      const react = reactionLine(actorId, member.department, affinity.tier, Date.now());
+      const bubble: SpeechBubble = {
+        id: `work-${actorId}-${Date.now()}`,
+        memberId: actorId,
+        text: react || (event.task ?? '').slice(0, 20) + '...',
+        department: member.department,
+        timestamp: Date.now(),
+        duration: 3000,
+      };
+      this.webview!.postMessage({ type: 'jcSpeechBubble', bubble });
+
+      // Register as "at work" so periodic persona thoughts fire while running.
+      this.activeWork.set(actorId, {
+        tier: affinity.tier,
+        department: member.department,
+        tick: 0,
+      });
+
       this.webview!.postMessage({
         type: 'jcGaugeStart',
         memberId: actorId,
@@ -397,14 +454,24 @@ export class EventWatcher {
     const actorId = event.agent ?? event.from;
     const member = this.config.members.find((m) => m.id === actorId);
     if (member && actorId) {
-      // Show completion bubble
+      // No longer at work → stop periodic thoughts for this member.
+      this.activeWork.delete(actorId);
+
+      const affinity = this.memberAffinity.get(actorId);
+      const tier = affinity?.tier ?? 'ok';
+      const priority = affinity?.priority ?? 3;
+
+      // ── Living-loop: CLEAR completion reaction ("できた！" + 成果の一言). ──
+      // Persona-flavored, affinity-weighted so ◎ finishes proud / ✗ finishes
+      // "本領は別で". Prefixed with できた！ so "終わったか" is never ambiguous.
+      const result = completionLine(actorId, member.department, tier, Date.now());
       const bubble: SpeechBubble = {
         id: `done-${actorId}-${Date.now()}`,
         memberId: actorId,
-        text: '完了しました！✅',
+        text: `できた！${result ? ' ' + result : ''}`,
         department: member.department,
         timestamp: Date.now(),
-        duration: 3000,
+        duration: 3500,
       };
       this.webview!.postMessage({ type: 'jcSpeechBubble', bubble });
 
@@ -419,9 +486,6 @@ export class EventWatcher {
       // ── Slice1: stop gauge + company score gain (affinity-weighted) ──
       this.webview!.postMessage({ type: 'jcGaugeStop', memberId: actorId });
 
-      const affinity = this.memberAffinity.get(actorId);
-      const tier = affinity?.tier ?? 'ok';
-      const priority = affinity?.priority ?? 3;
       const delta = scoreGain(tier, priority);
       this.companyScore += delta;
 

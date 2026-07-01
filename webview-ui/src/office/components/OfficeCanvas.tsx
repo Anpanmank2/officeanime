@@ -8,9 +8,8 @@ import {
   ZOOM_MIN,
   ZOOM_SCROLL_THRESHOLD,
 } from '../../constants.js';
-import { previewFit } from '../../jc/affinity-preview.js';
 import { dockConsumeCard, dockGetPickedCard } from '../../jc/dock-state.js';
-import { gameSetPreview } from '../../jc/game-state.js';
+import { gameSetPreview, gameSetRoutePreview } from '../../jc/game-state.js';
 import { renderJCOverlay } from '../../jc/jc-overlay.js';
 import {
   jcGetAbsentMemberAtDesk,
@@ -19,6 +18,7 @@ import {
 } from '../../jc/jc-state.js';
 import type { AbsenceInfo } from '../../jc/jc-types.js';
 import { isPinned } from '../../jc/pin-store.js';
+import { pickBestMember, resolveRoutingTarget } from '../../jc/routing-target.js';
 import { unlockAudio } from '../../notificationSound.js';
 import { vscode } from '../../vscodeApi.js';
 import { canPlaceFurniture, getWallPlacementRow } from '../editor/editorActions.js';
@@ -505,21 +505,27 @@ export function OfficeCanvas({
       officeState.hoveredTile = tile;
       hoverTileRef.current = tile;
 
-      // ── Slice1 T10: affinity preview while a dock card is picked ──
+      // ── Living-loop routing preview while a dock card is picked ──
+      // Hover a zone → show which target (秘書 / dept) will take it AND preview
+      // the ◎/△/✗ badge on the member the secretary/dept would auto-select.
       const pickedCard = dockGetPickedCard();
       if (pickedCard && tile) {
-        const member = jcGetMemberAtDesk(tile.col, tile.row);
-        if (member) {
-          const { tier } = previewFit(pickedCard.task, member.memberId);
-          gameSetPreview(member.memberId, tier);
+        const target = resolveRoutingTarget(tile.col, tile.row);
+        if (target) {
+          const best = pickBestMember(pickedCard.task, target.scope);
+          gameSetRoutePreview({ label: target.label });
+          if (best) gameSetPreview(best.memberId, best.tier);
+          else gameSetPreview(null, null);
           const canvas = canvasRef.current;
           if (canvas) canvas.style.cursor = 'copy';
           officeState.hoveredAgentId = hitId;
           return;
         }
         gameSetPreview(null, null);
+        gameSetRoutePreview(null);
       } else if (!pickedCard) {
         gameSetPreview(null, null);
+        gameSetRoutePreview(null);
       }
 
       const canvas = canvasRef.current;
@@ -733,33 +739,40 @@ export function OfficeCanvas({
     (e: React.MouseEvent) => {
       if (isEditMode) return; // handled by mouseDown/mouseUp
 
-      // ── Slice1 T10: delegation via picked dock card ──
-      // If a card is picked, clicking a member delegates the task to them.
+      // ── Living-loop routing: delegate to SECRETARY or a DEPARTMENT ──
+      // Owner drops the picked card on the secretary desk (whole-company) or a
+      // department zone; the secretary/dept auto-selects the best-◎ member. The
+      // Owner never picks an individual — no need to remember who is who (§1).
       const picked = dockGetPickedCard();
       if (picked) {
         const tile = screenToTile(e.clientX, e.clientY);
         if (tile) {
-          const member = jcGetMemberAtDesk(tile.col, tile.row);
-          if (member) {
-            const rt = jcGetMemberRuntime(member.memberId);
-            const department = rt?.config.department ?? deptFromMemberId(member.memberId);
-            vscode.postMessage({
-              type: 'jcOwnerDelegate',
-              memberId: member.memberId,
-              memberName: rt?.config.name ?? member.memberId,
-              department,
-              task: picked.task,
-              message: picked.task,
-              priority: `P${picked.priority}`,
-              deadline: null,
-              timestamp: new Date().toISOString(),
-            });
-            dockConsumeCard(picked.id);
-            gameSetPreview(null, null);
-            return;
+          const target = resolveRoutingTarget(tile.col, tile.row);
+          if (target) {
+            const best = pickBestMember(picked.task, target.scope);
+            if (best) {
+              const rt = jcGetMemberRuntime(best.memberId);
+              const department = rt?.config.department ?? deptFromMemberId(best.memberId);
+              vscode.postMessage({
+                type: 'jcOwnerDelegate',
+                memberId: best.memberId,
+                memberName: rt?.config.name ?? best.memberId,
+                department,
+                task: picked.task,
+                message: picked.task,
+                priority: `P${picked.priority}`,
+                deadline: null,
+                timestamp: new Date().toISOString(),
+                // via: how the Owner routed it (drives the secretary→member beam).
+                via: target.scope,
+              });
+              dockConsumeCard(picked.id);
+              gameSetRoutePreview(null);
+              return;
+            }
           }
         }
-        // Clicked empty space with a card picked — keep the card, do nothing else.
+        // Clicked outside any drop target with a card picked — keep the card.
       }
 
       const pos = screenToWorld(e.clientX, e.clientY);
@@ -901,7 +914,8 @@ export function OfficeCanvas({
     officeState.hoveredAgentId = null;
     officeState.hoveredTile = null;
     hoverTileRef.current = null;
-    gameSetPreview(null, null); // clear T10 affinity preview
+    gameSetPreview(null, null); // clear affinity preview
+    gameSetRoutePreview(null); // clear routing-zone preview
   }, [officeState, editorState]);
 
   const handleContextMenu = useCallback(

@@ -10,6 +10,7 @@ import {
   gameGetCompanyScore,
   gameGetMember,
   gameGetPreview,
+  gameGetRoutePreview,
   gameGetTodayCount,
   gameTickGauges,
   type GameTier,
@@ -255,6 +256,36 @@ export function renderJCOverlay(
 
   // 11. Team HUD (top-right)
   renderTeamHUD(ctx, canvasWidth);
+
+  // 12. Routing hint (screen-space) while a card hovers over a target zone.
+  renderRouteHint(ctx, canvasWidth);
+}
+
+// ── Living-loop routing hint: "→ 秘書へ委任" / "→ Engineering へ委任" ──
+function renderRouteHint(ctx: CanvasRenderingContext2D, canvasWidth: number): void {
+  const label = gameGetRoutePreview();
+  if (!label) return;
+  const text = `→ ${label} へ委任`;
+  ctx.save();
+  ctx.font = '10px "Press Start 2P", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const padX = 10;
+  const w = ctx.measureText(text).width + padX * 2;
+  const h = 22;
+  const x = Math.round(canvasWidth / 2 - w / 2);
+  const y = 92; // clear the top command ticker band (DOM overlay sits at the very top)
+  // Hard pixel-art frame (sharp corners, hard shadow).
+  ctx.fillStyle = '#0a0a14';
+  ctx.fillRect(x + 2, y + 2, w, h);
+  ctx.fillStyle = 'rgba(8, 10, 25, 0.95)';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = '#39ff14';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x, y, w, h);
+  ctx.fillStyle = '#39ff14';
+  ctx.fillText(text, x + w / 2, y + h / 2 + 1);
+  ctx.restore();
 }
 
 // ── Active desk glow ─────────────────────────────────────────────

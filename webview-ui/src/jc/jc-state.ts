@@ -607,6 +607,11 @@ export function jcGetMemberNames(): Map<string, string> {
   return names;
 }
 
+/** All member configs (id/name/department/deskId/…). Empty until config loads. */
+export function jcGetAllMembers(): ReadonlyArray<import('./jc-types.js').JCMemberConfig> {
+  return jcConfig ? jcConfig.members : [];
+}
+
 // ── Dashboard helpers ─────────────────────────────────────────
 
 // State and department colors imported from jc-constants.ts
