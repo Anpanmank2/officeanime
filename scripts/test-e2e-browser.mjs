@@ -185,6 +185,121 @@ async function run() {
 
     const eng01Arrive = logs.find((l) => l.includes('Member arriving: eng-01'));
     assert(!!eng01Arrive, 'eng-01 arrived after delegate event');
+
+    // Test 7: Request-flow textarea keystroke regression (charloss guard)
+    // Regression for 2026-07-02: controlled textarea driven by a store whose
+    // notify is deferred via requestAnimationFrame dropped fast / IME input.
+    // The prior e2e never exercised typing, so it let the bug through. This
+    // test types with REAL keystrokes (fast ascii + Japanese) and asserts exact
+    // readback — a static screenshot / fill() would bypass onChange and hide it.
+    console.log('  [Test 7] Request-flow textarea keystroke (charloss guard)');
+    try {
+      const openBtn = page.locator('[data-request-open]').first();
+      if ((await openBtn.count()) === 0) {
+        assert(false, 'Request-flow open button present');
+      } else {
+        await openBtn.click();
+        await page.waitForTimeout(400);
+        const ta = page.locator('[data-request-flow] textarea').first();
+        await ta.waitFor({ timeout: 3000 });
+
+        // Fast ascii (no delay) — the exact case the bug dropped to 1 char.
+        const ASCII = 'fukuoka-hotel-123';
+        await ta.click();
+        await page.keyboard.type(ASCII);
+        await page.waitForTimeout(200);
+        const gotAscii = await ta.inputValue();
+        assert(gotAscii === ASCII, `Fast ascii keystroke exact (got "${gotAscii}")`);
+
+        // Clear (macOS Ctrl+A = move-to-line-start, so use platform select-all).
+        await ta.click();
+        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+        await page.keyboard.press('Delete');
+        await page.waitForTimeout(150);
+
+        // Japanese bulk insert (IME-commit equivalent).
+        const JP = '福岡の提携ホテルを決める';
+        await ta.click();
+        await page.keyboard.insertText(JP);
+        await page.waitForTimeout(200);
+        const gotJp = await ta.inputValue();
+        assert(gotJp === JP, `Japanese IME-commit exact (got "${gotJp}")`);
+
+        // ── Test 8: adaptive multi-choice confirm + その他 inline charloss guard ──
+        // Drive the flow to the confirm phase by simulating the backend's
+        // jcRequestQuestions message (webview listens on window 'message'). The
+        // requestId is exposed via data-request-id so we can target this flow.
+        console.log('  [Test 8] Confirm multi-choice + その他 inline keystroke (charloss guard)');
+        const reqId = await page
+          .locator('[data-request-flow]')
+          .first()
+          .getAttribute('data-request-id');
+        assert(!!reqId, 'Request flow exposes data-request-id');
+        await page.evaluate((requestId) => {
+          window.postMessage(
+            {
+              type: 'jcRequestQuestions',
+              requestId,
+              memberId: 'res-01',
+              department: 'research',
+              questions: [
+                {
+                  understanding: '福岡の提携ホテルを決める判断材料を集めると理解しました。',
+                  question: 'この目的で合っていますか?',
+                  options: ['はい、この目的で合っています', 'いえ、別の目的です'],
+                  field_ref: 'purpose',
+                },
+                {
+                  understanding: '各ホテルの評価・立地・価格帯を知りたいと理解しました。',
+                  question: '重視する軸はどれですか?',
+                  options: ['評価と口コミ中心', '立地中心', '価格帯中心'],
+                  field_ref: 'wants',
+                },
+              ],
+            },
+            '*',
+          );
+        }, reqId);
+        await page.waitForTimeout(400);
+
+        // Options + その他 render.
+        const optCount = await page.locator('[data-request-option]').count();
+        assert(optCount >= 2, `Confirm shows 2〜4 option buttons (got ${optCount})`);
+        const otherBtn = page.locator('[data-request-other]').first();
+        assert((await otherBtn.count()) === 1, 'その他 button present');
+
+        // Open その他 → the inline textarea appears.
+        await otherBtn.click();
+        await page.waitForTimeout(200);
+        const otherTa = page.locator('[data-request-other-input]').first();
+        await otherTa.waitFor({ timeout: 3000 });
+
+        // Fast ascii keystroke into その他 inline input (the exact charloss case).
+        const OTHER_ASCII = 'location-over-price-42';
+        await otherTa.click();
+        await page.keyboard.type(OTHER_ASCII);
+        await page.waitForTimeout(200);
+        const gotOtherAscii = await otherTa.inputValue();
+        assert(
+          gotOtherAscii === OTHER_ASCII,
+          `その他 fast ascii keystroke exact (got "${gotOtherAscii}")`,
+        );
+
+        // Clear then Japanese IME-commit into その他 input.
+        await otherTa.click();
+        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+        await page.keyboard.press('Delete');
+        await page.waitForTimeout(150);
+        const OTHER_JP = '目的は立地重視です';
+        await otherTa.click();
+        await page.keyboard.insertText(OTHER_JP);
+        await page.waitForTimeout(200);
+        const gotOtherJp = await otherTa.inputValue();
+        assert(gotOtherJp === OTHER_JP, `その他 Japanese IME-commit exact (got "${gotOtherJp}")`);
+      }
+    } catch (e) {
+      assert(false, `Request-flow keystroke test threw: ${e.message}`);
+    }
   } finally {
     await browser.close();
     stopServer();

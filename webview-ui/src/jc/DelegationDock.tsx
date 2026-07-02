@@ -12,6 +12,9 @@ import {
   dockPickCard,
   subscribeDock,
 } from './dock-state.js';
+import { jcGetMemberRuntime } from './jc-state.js';
+import { openRequestFlow } from './request-flow-state.js';
+import { pickBestMember } from './routing-target.js';
 
 const PRIORITY_COLOR: Record<number, string> = {
   0: '#ff3d3d',
@@ -63,6 +66,42 @@ export function DelegationDock() {
           <span style={{ color: '#39ff14' }}> ▶ 秘書か部署ゾーンへ (自動で最適担当)</span>
         )}
       </span>
+
+      {/* 依頼(request) pilot entry — opens the 3-field 調査 template routed to the
+          best-◎ Research member. Guided はい/いいえ flow replaces the ambiguous
+          〇✕✎ tray (2026-07-02 Owner FB). Research pilot only; other depts later. */}
+      <button
+        data-request-open
+        onClick={() => {
+          const best = pickBestMember('調査 research 分析', 'research');
+          const memberId = best?.memberId ?? 'res-01';
+          const rt = jcGetMemberRuntime(memberId);
+          openRequestFlow({
+            memberId,
+            memberName: rt?.config.name ?? memberId,
+            department: rt?.config.department ?? 'research',
+            priority: 3,
+          });
+        }}
+        title="調査を依頼（テンプレを開く → はい/いいえで確認 → 実行）"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          background: 'rgba(0,230,118,0.15)',
+          border: '2px solid #00e676',
+          boxShadow: '1px 1px 0px #0a0a14',
+          borderRadius: 0,
+          padding: '4px 10px',
+          color: '#8cf0b8',
+          fontFamily: 'inherit',
+          fontSize: 10,
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{ color: '#00e676' }}>📋</span>
+        <span>調査を依頼</span>
+      </button>
 
       {cards.map((c) => {
         const picked = c.id === pickedId;

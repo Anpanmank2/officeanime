@@ -6,6 +6,45 @@
   src: url('/fonts/FSPixelSansUnicode-Regular.ttf') format('truetype');
 }
 
+/*
+ * Digit-glyph override (2026-07-02 Owner FB「数字の表記がおかしい」).
+ *
+ * Root cause (fonttools inspection of FSPixelSansUnicode-Regular.ttf):
+ *   - The font's ASCII digits are OLD-STYLE FIGURES: '0/1/2' sit at x-height
+ *     (640/2048 units) and '3/4/7/8/9' even drop below the baseline
+ *     (yMin=-128). Uppercase caps reach 896. So digits render ~70% the height
+ *     of the surrounding text and look small / subscript-dropped.
+ *   - The font has NO CJK/kana glyphs at all → every Japanese char is already
+ *     rendered by the system `sans-serif` fallback at full cap height. That
+ *     makes the small OSF digits look even more mismatched beside 件/年/代/確認.
+ *   - GSUB is entirely ABSENT → there are NO lining-figure alternates, so
+ *     `font-feature-settings: 'lnum'/'tnum'` would be a no-op. CSS features
+ *     cannot fix this.
+ *
+ * Fix: route only the ASCII digits (U+0030–U+0039) to the SAME system
+ * fallback stack the CJK already uses, via a `unicode-range`-scoped
+ * @font-face aliased under the same 'FS Pixel Sans' family name. The pixel font
+ * still wins for all Latin letters and symbols; digits now match the height and
+ * baseline of the CJK/Latin text around them. Global, one place, no font-file
+ * swap, no per-component markup.
+ */
+@font-face {
+  font-family: 'FS Pixel Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  /* Resolve digits to the platform's default UI sans (all lining figures at
+     full cap height). Cross-platform local() chain — macOS/iOS, Windows,
+     Android/Linux. If none resolve, the glyph simply falls through to the
+     element's own `sans-serif` in the stack, which is the same result. */
+  src:
+    local('SF Pro Text'), local('-apple-system'), local('BlinkMacSystemFont'),
+    local('Helvetica Neue'), local('Segoe UI'), local('Roboto'), local('Noto Sans'), local('Arial');
+  /* ASCII digits only — punctuation (comma/period) is left on the pixel font
+     so the overall pixel look is untouched. */
+  unicode-range: U+0030-0039;
+}
+
 :root {
   --pixel-bg: #1e1e2e;
   --pixel-border: #4a4a6a;

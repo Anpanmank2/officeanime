@@ -10,6 +10,7 @@ import { useEditorActions } from './hooks/useEditorActions.js';
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js';
 import { useExtensionMessages } from './hooks/useExtensionMessages.js';
 import { AbsentStatusPopup } from './jc/AbsentStatusPopup.js';
+import { ApprovalTray } from './jc/ApprovalTray.js';
 import { CompletionToast } from './jc/CompletionToast.js';
 import { DelegationDock } from './jc/DelegationDock.js';
 import { DeskCard } from './jc/DeskCard.js';
@@ -27,6 +28,7 @@ import { getLogEntries, subscribeLog } from './jc/office-log-state.js';
 import { OfficeLog } from './jc/OfficeLog.js';
 import { OWNER_AGENT_ID } from './jc/owner-avatar-constants.js';
 import { OwnerAvatar } from './jc/OwnerAvatar.js';
+import { RequestFlowPanel } from './jc/RequestFlowPanel.js';
 import { ResearchResultPanel } from './jc/ResearchResultPanel.js';
 import { TaskHistoryPanel } from './jc/TaskHistoryPanel.js';
 import { OfficeCanvas } from './office/components/OfficeCanvas.js';
@@ -492,6 +494,14 @@ function AppContent() {
 
       {/* Research findings panel: 調査完了 → prominent dismissible 調査結果 popup */}
       <ResearchResultPanel />
+
+      {/* PARKED (2026-07-02 Owner FB pivot): 〇✕✎ tray kept for FUTURE 許可制
+          (AI-initiated) source only; NOT used by the 依頼(request) flow. Renders
+          nothing unless a permitted-source plan appears. */}
+      <ApprovalTray />
+
+      {/* 依頼(request) flow: 「調査を依頼」→ 3項目テンプレ → はい/いいえ確認 → 実行 */}
+      <RequestFlowPanel />
 
       {/* Slice1 T10: delegation dock (bottom) — pick a card, click a member */}
       <DelegationDock />

@@ -34,6 +34,8 @@ import {
   jcUpdateMappings,
 } from '../jc/index.js';
 import { addLogEntry } from '../jc/office-log-state.js';
+import { addPlan, type PlanOrigin } from '../jc/plan-state.js';
+import { type ConfirmQuestion, setRequestQuestions } from '../jc/request-flow-state.js';
 import { setResearchResult } from '../jc/research-result-state.js';
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js';
 import type { OfficeState } from '../office/engine/officeState.js';
@@ -815,6 +817,53 @@ export function useExtensionMessages(
             });
           }
         }
+      } else if (msg.type === 'jcPlanReady') {
+        // Step2 Fork B: a read-only plan spawn finished → add a card to the
+        // 承認まち tray. Display/intent only — the Owner's 〇/✕/✎ decision posts
+        // jcPlanDecision back to the extension, which is the ONLY place the
+        // scoped-write execute spawn fires.
+        const p = msg as {
+          planId: string;
+          memberId: string;
+          department: string;
+          origin: string;
+          task: string;
+          plan: string;
+          stagingDir: string;
+        };
+        const prt = jcGetMemberRuntime(p.memberId);
+        addPlan({
+          id: p.planId,
+          memberId: p.memberId,
+          memberName: prt?.config.name ?? p.memberId,
+          department: prt?.config.department ?? p.department ?? 'engineering',
+          origin: (p.origin === 'permitted' ? 'permitted' : 'requested') as PlanOrigin,
+          task: p.task,
+          plan: p.plan,
+          stagingDir: p.stagingDir,
+          status: 'awaiting',
+        });
+      } else if (msg.type === 'jcRequestQuestions') {
+        // 依頼(request) flow STEP 3: the read-only confirm-questions spawn
+        // finished → switch the request panel to the はい/いいえ loop. Display
+        // only; the Owner's はい answers post jcRequestConfirmed back to the
+        // extension, which runs the EXISTING research active path (no regression).
+        const rq = msg as {
+          requestId: string;
+          questions: Array<{
+            understanding: string;
+            question: string;
+            options?: string[];
+            field_ref: string;
+          }>;
+        };
+        const questions: ConfirmQuestion[] = (rq.questions ?? []).map((q) => ({
+          understanding: q.understanding,
+          question: q.question,
+          options: Array.isArray(q.options) ? q.options : [],
+          fieldRef: q.field_ref,
+        }));
+        setRequestQuestions(rq.requestId, questions);
       } else if (msg.type === 'jcTasksBulkSync') {
         jcTasksBulkSync(msg.tasks as TaskDefinition[]);
       } else if (msg.type === 'jcActivitySummary') {

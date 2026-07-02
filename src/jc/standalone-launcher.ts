@@ -40,6 +40,327 @@ function buildResearchPrompt(task: string, criteria: string): string {
   );
 }
 
+/**
+ * ── Request-UX (依頼制) template flow — 2026-07-02 Owner FB pivot ──────────
+ *
+ * Owner実機FB: 「〇実行/✕却下がわかりづらい・結構使いづらい」. The ambiguous
+ * 〇✕✎ tray is replaced (for the Research「調査」pilot) by a guided flow:
+ *   ① デフォルトタスク「調査を依頼」→ 3項目テンプレ〔目的 / 知りたいこと / 概要〕
+ *   ② 送信 → READ-ONLY spawn が はい/いいえ 確認質問(各"私の理解"付き)を生成
+ *   ③ 全部「はい」→ 既存の research 能動パス(read-only)で調査実行 → 調査結果パネル
+ *
+ * A pending request holds the 3-field template until the Owner has answered all
+ * confirm questions "はい"; then it runs the SAME read-only research path.
+ */
+interface PendingRequest {
+  memberId: string;
+  department: string;
+  /** 3-field template. */
+  purpose: string; // 目的
+  wants: string; // 知りたいこと
+  overview: string; // ざっくり概要
+  priority: number;
+}
+const pendingRequests = new Map<string, PendingRequest>();
+
+/** Compose the 3 template fields into a single research subject string. */
+function composeRequestTask(r: { purpose: string; wants: string; overview: string }): string {
+  const parts: string[] = [];
+  if (r.overview.trim()) parts.push(r.overview.trim());
+  if (r.wants.trim()) parts.push(`知りたいこと: ${r.wants.trim()}`);
+  if (r.purpose.trim()) parts.push(`目的: ${r.purpose.trim()}`);
+  return parts.join(' / ') || '(内容未記入)';
+}
+
+/** One recorded confirm answer sent up from the webview (mirror of RequestAnswer). */
+interface ConfirmAnswer {
+  question: string;
+  understanding: string;
+  fieldRef: string;
+  answer: string;
+  isOther: boolean;
+}
+
+/**
+ * Fold the Owner's confirm answers (picks + free-text corrections) into a compact
+ * "Owner の確定/補正" block that is appended to the research task. This is what
+ * makes the multi-choice confirm meaningful: the researcher runs with the Owner's
+ * pinpoint answers woven in, so a misread interpretation is corrected (取り違えが
+ * 消える). Returns '' when there are no answers (nothing to append).
+ */
+function composeAnswerContext(answers: ConfirmAnswer[]): string {
+  if (!Array.isArray(answers) || answers.length === 0) return '';
+  const lines = answers
+    .filter((a) => a && typeof a.answer === 'string' && a.answer.trim())
+    .map((a) => {
+      const tag = a.isOther ? '補正' : '確定';
+      const q = (a.question || '').trim();
+      const ans = a.answer.trim();
+      return q ? `- (${tag}) ${q} → ${ans}` : `- (${tag}) ${ans}`;
+    });
+  if (lines.length === 0) return '';
+  return `\n【Owner の確定/補正（この通りに解釈してください）】\n${lines.join('\n')}`;
+}
+
+/**
+ * CONFIRM-QUESTIONS prompt (STEP 2 of the 依頼 flow) — READ-ONLY by construction.
+ *
+ * Fired via a plain direct prompt with NO `/company` prefix and a spawn that
+ * carries NO permission flags → the headless auto-allow-read / auto-deny-write
+ * safety valve keeps it purely investigative (no writes). It asks the model to
+ * read the 3-field template and emit 3–4 ADAPTIVE MULTI-CHOICE confirmation
+ * questions (the same shape as the secretary's AskUserQuestion to the Owner),
+ * EACH prefixing the agent's own understanding ("私の理解") AND 2〜4 candidate
+ * answer options, as a strict JSON array so the frontend can render option
+ * cards. The UI always appends 「その他(自分で書く)」, so a simple binary question
+ * may return a minimal option set. We ask for ONLY the JSON to make the parse
+ * robust; a fenced/loose response still parses via extractJsonArray.
+ */
+function buildConfirmQuestionsPrompt(r: {
+  purpose: string;
+  wants: string;
+  overview: string;
+}): string {
+  return (
+    `あなたはこれから調査を依頼されます。まだ調査はしないでください。\n` +
+    `依頼者(Owner)の意図を取り違えないよう、着手前に すり合わせの確認 をします。\n` +
+    `以下の依頼内容を読み、あなたの「理解」を前に出した確認質問を 3〜4個 作ってください。\n` +
+    `各質問には「候補の答え」を2〜4個添えてください。Owner はその中から選ぶか、自分で一言補正できます。\n` +
+    `適応的に: 単純な確認は候補を最小(自然な肯定1つ)に、解釈が複数あり得る/概要を掴めた質問は ` +
+    `解釈の違いが分かる候補を2〜4個 出してください。候補には必ず自然な肯定(「はい、〜で合っています」)を1つ含めてください。\n\n` +
+    `【依頼内容】\n` +
+    `- 目的: ${r.purpose || '(未記入)'}\n` +
+    `- 知りたいこと: ${r.wants || '(未記入)'}\n` +
+    `- ざっくり概要: ${r.overview || '(未記入)'}\n\n` +
+    `【出力形式(厳守)】 次の JSON 配列だけを返してください。前後に説明文やコードフェンスを付けないでください。\n` +
+    `[\n` +
+    `  {"understanding": "私はこう理解しました: …", "question": "…で合っていますか?", "options": ["はい、…で合っています", "いえ、…です", …], "field_ref": "purpose|wants|overview"},\n` +
+    `  … (3〜4個)\n` +
+    `]\n` +
+    `- understanding = あなたの理解(具体的に・1〜2文)\n` +
+    `- question = Owner に確認したいこと\n` +
+    `- options = 候補の答え 2〜4個(必ず肯定を1つ含む・簡潔に)\n` +
+    `- field_ref = その確認がどの項目に関係するか(purpose=目的 / wants=知りたいこと / overview=概要)`
+  );
+}
+
+/** One confirm question surfaced to the frontend (私の理解 + 候補オプション). */
+interface ConfirmQuestion {
+  understanding: string;
+  question: string;
+  /** Candidate answer options (2〜4); UI always appends 「その他」. */
+  options: string[];
+  field_ref: 'purpose' | 'wants' | 'overview' | string;
+}
+
+/**
+ * Extract the first top-level JSON array from a possibly-noisy model response
+ * (code fences, leading prose, trailing text). Returns the substring or null.
+ */
+function extractJsonArray(text: string): string | null {
+  const start = text.indexOf('[');
+  if (start < 0) return null;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === '[') depth++;
+    else if (ch === ']') {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+/**
+ * Robustly parse the confirm-question spawn output into ConfirmQuestion[].
+ * NEVER throws: on any parse failure it returns a safe fallback set built from
+ * the template so the UI always has yes/no cards to show (AC-2 must not crash on
+ * broken JSON).
+ */
+function parseConfirmQuestions(
+  output: string,
+  r: { purpose: string; wants: string; overview: string },
+): ConfirmQuestion[] {
+  const fallback: ConfirmQuestion[] = [
+    {
+      understanding: `目的をこう理解しました: 「${r.purpose || '(未記入)'}」`,
+      question: 'この目的で合っていますか?',
+      options: ['はい、この目的で合っています'],
+      field_ref: 'purpose',
+    },
+    {
+      understanding: `知りたいことをこう理解しました: 「${r.wants || '(未記入)'}」`,
+      question: 'この内容を調べればよいですか?',
+      options: ['はい、この内容で合っています'],
+      field_ref: 'wants',
+    },
+    {
+      understanding: `概要をこう理解しました: 「${r.overview || '(未記入)'}」`,
+      question: 'この理解で進めてよいですか?',
+      options: ['はい、この理解で進めてください'],
+      field_ref: 'overview',
+    },
+  ];
+  try {
+    const json = extractJsonArray(output);
+    if (!json) return fallback;
+    const parsed = JSON.parse(json) as unknown;
+    if (!Array.isArray(parsed) || parsed.length === 0) return fallback;
+    const out: ConfirmQuestion[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object') continue;
+      const o = item as Record<string, unknown>;
+      const understanding = typeof o.understanding === 'string' ? o.understanding.trim() : '';
+      const question = typeof o.question === 'string' ? o.question.trim() : '';
+      const fieldRef = typeof o.field_ref === 'string' ? o.field_ref.trim() : 'overview';
+      if (!question) continue; // a card must at least ask something
+      // options: keep only non-empty strings, de-dupe, cap at 4. Empty/junk
+      // options are fine — the UI always appends 「その他」 and guarantees an
+      // affirmative, so a question with 0 valid options still renders safely.
+      const rawOptions = Array.isArray(o.options) ? o.options : [];
+      const options = Array.from(
+        new Set(
+          rawOptions
+            .filter((x): x is string => typeof x === 'string')
+            .map((x) => x.trim())
+            .filter(Boolean),
+        ),
+      ).slice(0, 4);
+      out.push({
+        understanding: understanding || '(理解を取得できませんでした)',
+        question,
+        options,
+        field_ref: fieldRef,
+      });
+      if (out.length >= 4) break; // cap at 4
+    }
+    return out.length > 0 ? out : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * MVP Step2 — Fork B (plan → approval → execute).
+ *
+ * A pending plan produced by a READ-ONLY plan spawn, held until the Owner
+ * decides 〇実行 / ✕却下 / ✎修正 in the 承認まち tray. Keyed by planId.
+ *
+ * ⚠ PARKED (2026-07-02 Owner FB pivot): the 依頼(request) flow no longer uses
+ * this 〇✕✎ tray. This machinery is kept intact for the FUTURE 許可制 (AI-initiated
+ * / permitted) source — see the honest-label note on the jcOwnerDelegate handler.
+ */
+interface PendingPlan {
+  memberId: string;
+  department: string;
+  origin: 'requested' | 'permitted';
+  task: string;
+  message: string;
+  priority: number;
+  stagingDir: string;
+}
+const pendingPlans = new Map<string, PendingPlan>();
+
+/**
+ * PLAN prompt (STEP 1 of Fork B) — READ-ONLY by construction.
+ *
+ * Like the research prompt, this is a plain direct prompt with NO `/company`
+ * prefix and the spawn carries NO permission flags → the headless
+ * auto-allow-read / auto-deny-write safety valve keeps it purely investigative.
+ * It asks the model to PLAN (steps / write-target / cost) WITHOUT doing the work
+ * (no writes). The returned text is surfaced in the approval tray.
+ */
+function buildPlanPrompt(task: string, criteria: string, stagingDir: string): string {
+  const scope = criteria ? `\n補足: ${criteria}` : '';
+  return (
+    `次のタスクを「どう実行するか」の計画だけを立ててください。` +
+    `実際の作業（ファイルの書き込み・作成・変更、コマンド実行）は一切しないでください。` +
+    `読み取り・検索だけで、以下を日本語で構造化して返してください。\n` +
+    `1. 手順（①②③… の箇条書き）\n` +
+    `2. 書き込み先（この下書き置き場のみ: ${stagingDir}）に作る想定のファイル名\n` +
+    `3. 推定コスト / 規模（S/M/L と 1 行の根拠）\n` +
+    `\nタスク: ${task}${scope}`
+  );
+}
+
+/**
+ * EXECUTE prompt (STEP 5 of Fork B) — runs ONLY after the Owner approves.
+ *
+ * Carries the approved plan and pins output to the staging dir. The scoped
+ * settings (buildScopedSettings) are what actually enforce the sandbox; this
+ * prompt reinforces the contract so the model doesn't even attempt out-of-scope
+ * writes, git, or external calls.
+ */
+function buildExecutePrompt(task: string, plan: string, stagingDir: string): string {
+  return (
+    `承認済みの計画に従ってタスクを実行してください。\n` +
+    `【絶対厳守】\n` +
+    `- 出力（ファイルの作成・書き込み）は下書き置き場のみ: ${stagingDir}\n` +
+    `- それ以外のファイル・リポジトリ・外部には一切触れないでください\n` +
+    `- git（add / commit / push）は実行しないでください\n` +
+    `- 本番反映は人が後で手で行います。あなたは下書きを作るだけです\n` +
+    `\n== タスク ==\n${task}\n` +
+    `\n== 承認済みの計画 ==\n${plan}`
+  );
+}
+
+/**
+ * Generate the SCOPED-WRITE settings JSON for an execute spawn (案1 contract).
+ *
+ * Enforcement (empirically verified, claude 2.1.126, 2026-07-02):
+ * - `allow: Write(//<abs-staging>/**), Edit(//<abs-staging>/**)` — the ONLY
+ *   writable paths. The `//` prefix means ABSOLUTE filesystem path and REPLACES
+ *   the leading `/` of the absolute path (so `/a/b` → `//a/b`, NOT `///a/b`).
+ *   A single `/` prefix would be interpreted as project-root-relative → wrong.
+ * - Everything else has NO allow rule → headless `--print` (default permission
+ *   mode) auto-DENIES it (no interactive prompt to grant it in headless), so
+ *   writes OUTSIDE staging fail. This default-deny is what confines writes.
+ * - `deny` is ONLY `Bash` (kills git add/commit/push and any shell) + network.
+ *   ⚠ We deliberately do NOT deny a parent dir of staging (e.g. the projects
+ *   root): deny ALWAYS wins over allow and cannot carry exceptions, so denying a
+ *   parent would ALSO block the staging write (staging is nested under it in
+ *   production: cc-company is under /Users/uno/Desktop/projects). Out-of-staging
+ *   writes are blocked by absence-of-allow (default-deny), not by an explicit
+ *   parent deny.
+ * - NO `--dangerously-skip-permissions`.
+ *
+ * The execute spawn also sets cwd = staging and passes `--add-dir <staging>`.
+ * `projectsRoot` is accepted for signature stability / logging but is NOT used
+ * as a deny target (see above).
+ */
+function toAbsRule(tool: string, absPath: string): string {
+  // `//` = absolute FS path; it replaces the leading slash of an absolute path.
+  const stripped = absPath.startsWith('/') ? absPath.slice(1) : absPath;
+  return `${tool}(//${stripped}/**)`;
+}
+
+function buildScopedSettings(stagingDir: string, _projectsRoot: string): string {
+  return JSON.stringify({
+    permissions: {
+      allow: [
+        'Read',
+        'Glob',
+        'Grep',
+        toAbsRule('Write', stagingDir),
+        toAbsRule('Edit', stagingDir),
+      ],
+      // Bash denied → git (add/commit/push) impossible. Network denied.
+      // Out-of-staging writes fall through to headless default-deny (no allow).
+      deny: ['Bash', 'WebFetch', 'WebSearch'],
+    },
+  });
+}
+
 // ── Shared state (accessible from both watcher and webviewReady handler) ──
 interface JCMemberEntry {
   id: string;
@@ -128,6 +449,82 @@ function writeOwnerDelegate(
   } catch (e) {
     console.error('[JC] writeOwnerDelegate error:', e);
   }
+}
+
+/**
+ * Step2 — spawn a headless `claude --print -p` for a PLAN (read-only) or an
+ * EXECUTE (scoped-write) and hand the full stdout to `onDone`.
+ *
+ * This is separate from TaskWatcher.spawnClaude (which force-prefixes `/company`
+ * and carries NO permission flags). Here:
+ * - PLAN mode: `extraArgs = []` → no permission flags → headless auto-deny-write
+ *   safety valve keeps the plan purely read-only.
+ * - EXECUTE mode: `extraArgs = ['--settings', <scoped-json>, '--add-dir', <staging>]`
+ *   and `cwd = <staging>` → writes confined to the staging dir; git/network denied.
+ *   NEVER `--dangerously-skip-permissions`.
+ *
+ * `spawnFn` is injected so tests / callers control the actual child spawn; the
+ * default uses child_process.spawn('claude', …).
+ */
+async function spawnScoped(opts: {
+  prompt: string;
+  cwd: string;
+  extraArgs: string[];
+  onData?: (text: string) => void;
+  onDone: (output: string, code: number | null) => void;
+}): Promise<void> {
+  const { spawn } = await import('child_process');
+  const sessionId = crypto.randomUUID();
+  console.log(`[JC Step2] spawnScoped (session: ${sessionId.slice(0, 8)}) cwd=${opts.cwd}`);
+  console.log(`[JC Step2]   args: ${opts.extraArgs.join(' ') || '(none — read-only plan)'}`);
+  const child = spawn(
+    'claude',
+    ['--session-id', sessionId, '--print', '-p', opts.prompt, ...opts.extraArgs],
+    { cwd: opts.cwd, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env }, detached: false },
+  );
+  let out = '';
+  child.stdout?.on('data', (d: Buffer) => {
+    const t = d.toString();
+    out += t;
+    if (t.trim()) console.log(`[JC Step2 out] ${t.trim().slice(0, 160)}`);
+    opts.onData?.(t);
+  });
+  child.stderr?.on('data', (d: Buffer) => {
+    const t = d.toString().trim();
+    if (t) console.error(`[JC Step2 ERR] ${t.slice(0, 160)}`);
+  });
+  child.on('error', (err) => {
+    console.error(`[JC Step2] spawn error: ${String(err)}`);
+    opts.onDone('', null);
+  });
+  child.on('close', (code) => {
+    console.log(`[JC Step2] session ${sessionId.slice(0, 8)} exited (code: ${code})`);
+    opts.onDone(out.trim(), code);
+  });
+}
+
+/**
+ * Resolve the workspace root used as the claude CLI cwd (mirrors the TaskWatcher
+ * / EventWatcher resolution): --workspace= arg, else parent dir if we're inside
+ * pixel-agents (cc-company has .company/), else cwd.
+ */
+function resolveClaudeWorkspaceRoot(args: string[]): string {
+  const wsArg = args.find((a) => a.startsWith('--workspace='));
+  let root = wsArg ? path.resolve(wsArg.split('=')[1]) : process.cwd();
+  const parentDir = path.resolve(root, '..');
+  if (fs.existsSync(path.join(parentDir, '.company'))) {
+    root = parentDir;
+  }
+  return root;
+}
+
+/**
+ * Step2 staging dir (下書き置き場) for a task: an in-workspace, discoverable,
+ * git-untracked-by-default dir. All execute-spawn writes are confined here; the
+ * human (PM → Owner) moves anything real to production by hand afterwards.
+ */
+function resolveStagingDir(workspaceRoot: string, taskId: string): string {
+  return path.join(workspaceRoot, '.company', 'secretary', 'inbox', 'office-tasks', taskId);
 }
 
 /** Build messages to send when a browser client connects or signals ready */
@@ -493,6 +890,10 @@ async function main(): Promise<void> {
 
   // jc-events.json path for Owner delegations from the board (Slice1 T10).
   const ownerEventsFile = resolveJcEventsPath(args);
+  // Step2: workspace root (claude cwd base) + protected projects root for the
+  // scoped-write execute-spawn contract.
+  const step2WorkspaceRoot = resolveClaudeWorkspaceRoot(args);
+  const step2ProjectsRoot = path.resolve(step2WorkspaceRoot, '..');
 
   // Start browser server
   const server = await startBrowserServer(extensionPath, port, (data, respond) => {
@@ -501,6 +902,124 @@ async function main(): Promise<void> {
     // When browser signals ready, send ALL current state
     if (msg.type === 'webviewReady') {
       buildClientInitMessages(respond);
+      return;
+    }
+
+    // ── 依頼(request) flow STEP 2 — template submitted → generate はい/いいえ ──
+    // The Owner filled the 3-field 調査 template (目的/知りたいこと/概要) and hit
+    // 送信. Fire a READ-ONLY spawn (no `/company`, no permission flags → headless
+    // auto-deny-write holds) that reads the template and returns yes/no confirm
+    // questions (each with 私の理解). We parse robustly (never crash on bad JSON)
+    // and push `jcRequestQuestions` back so the UI shows はい/いいえ cards.
+    if (msg.type === 'jcRequestSubmit') {
+      const m = data as {
+        requestId: string;
+        memberId: string;
+        department: string;
+        purpose: string;
+        wants: string;
+        overview: string;
+        priority: string;
+      };
+      const priorityNum = parseInt((m.priority || 'P3').replace('P', ''), 10) || 3;
+      const req = {
+        memberId: m.memberId,
+        department: m.department,
+        purpose: m.purpose ?? '',
+        wants: m.wants ?? '',
+        overview: m.overview ?? '',
+        priority: priorityNum,
+      };
+      pendingRequests.set(m.requestId, req);
+      const prompt = buildConfirmQuestionsPrompt(req);
+      console.log(
+        `[JC Request] confirm-questions spawn (read-only) → ${m.memberId}: ${req.purpose.slice(0, 40)}`,
+      );
+      // Show the researcher is "thinking" while it drafts confirm questions.
+      server.broadcast({
+        type: 'jcMemberStateChange',
+        agentId: -400,
+        memberId: m.memberId,
+        jcState: 'thinking',
+      });
+      void spawnScoped({
+        prompt,
+        cwd: step2WorkspaceRoot, // read-only: confirm-questions spawn carries no write perms
+        extraArgs: [], // NO permission flags → auto-deny-write safety valve
+        onDone: (output) => {
+          const pending = pendingRequests.get(m.requestId);
+          if (!pending) return;
+          const questions = parseConfirmQuestions(output, pending);
+          server.broadcast({
+            type: 'jcMemberStateChange',
+            agentId: -400,
+            memberId: pending.memberId,
+            jcState: 'idle',
+          });
+          server.broadcast({
+            type: 'jcRequestQuestions',
+            requestId: m.requestId,
+            memberId: pending.memberId,
+            department: pending.department,
+            questions,
+          });
+          console.log(`[JC Request] ${questions.length} confirm questions → ${pending.memberId}`);
+        },
+      });
+      return;
+    }
+
+    // ── 依頼(request) flow STEP 4 — all answered → run the RESEARCH active path ──
+    // The Owner answered every adaptive confirm question (picked an option or
+    // typed a 「その他」 correction). We bundle those answers into the research
+    // task (composeAnswerContext) and run the EXISTING read-only research path
+    // (buildResearchPrompt + TaskWatcher.submitTask with label='research') so
+    // findings surface in the 調査結果 panel — NO regression to research 能動.
+    // Nothing is written; no 〇✕✎ tray is involved.
+    if (msg.type === 'jcRequestConfirmed') {
+      const d = data as { requestId: string; answers?: ConfirmAnswer[] };
+      const pending = pendingRequests.get(d.requestId);
+      if (!pending) {
+        console.log(`[JC Request] request ${d.requestId?.slice(0, 8)} not found (already run?)`);
+        return;
+      }
+      pendingRequests.delete(d.requestId);
+      // Weave the Owner's picks/corrections into the task so the researcher runs
+      // with the confirmed interpretation (取り違え消える). Falls back to the plain
+      // composed task when no answers were provided.
+      const answerCtx = composeAnswerContext(d.answers ?? []);
+      const task = composeRequestTask(pending) + answerCtx;
+      // Write the arrive→badge→seat→gauge animation events (same as a delegation).
+      writeOwnerDelegate(ownerEventsFile, {
+        memberId: pending.memberId,
+        department: pending.department,
+        task: composeRequestTask(pending), // event label stays the bare subject (compact)
+        message: '',
+        priority: `P${pending.priority}`,
+        deadline: null,
+        timestamp: new Date().toISOString(),
+      });
+      if (researchInFlight.has(pending.memberId)) {
+        console.log(`[JC Request] research already in flight for ${pending.memberId} — skip`);
+      } else if (taskWatcher) {
+        researchInFlight.add(pending.memberId);
+        const prompt = buildResearchPrompt(task, '');
+        console.log(
+          `[JC Request] CONFIRMED (${(d.answers ?? []).length} answers) → research active-run → ${pending.memberId}: ${task.slice(0, 40)}`,
+        );
+        // Reuse the exact research active path: raw read-only prompt + label so
+        // completion surfaces the 調査結果 panel (research 能動 unchanged).
+        taskWatcher.submitTask(pending.memberId, prompt, pending.priority, undefined, 'research');
+      }
+      return;
+    }
+
+    // ── 依頼(request) flow — cancel a pending request (drop, nothing runs). ──
+    if (msg.type === 'jcRequestCancel') {
+      const d = data as { requestId: string };
+      if (pendingRequests.delete(d.requestId)) {
+        console.log(`[JC Request] cancel request ${d.requestId.slice(0, 8)}`);
+      }
       return;
     }
 
@@ -543,16 +1062,162 @@ async function main(): Promise<void> {
             taskWatcher.submitTask(m.memberId, prompt, priorityNum, undefined, label);
           }
         } else if (liveSpawnEnabled) {
-          // ── WRITE-type cards (implementation/design/bugfix/ops/…) = NOT auto-run. ──
-          // Only fire the heavy /company orchestration under the opt-in
-          // --jc-live-spawn guard (Step2 will add the proper approval tray). Without
-          // the flag this is a no-op → default standalone is animation-only for
-          // write-type cards (no destructive auto-spawn).
-          dispatcher.dispatch(
-            { type: 'task:submit', prompt: m.task, priority: priorityNum, assignee: m.memberId },
-            respond,
-          );
+          // ── WRITE-type cards = Fork B (plan → approval → execute). NOT auto-run. ──
+          // ⚠ PARKED for 許可制 (2026-07-02 Owner FB pivot): the ambiguous 〇✕✎
+          // 承認まち tray was found "わかりづらい/使いづらい" by the Owner and is NO
+          // LONGER the 依頼(request) entry. Requests now go through the guided
+          // template → はい/いいえ flow above (jcRequestSubmit). This 〇✕✎ machinery
+          // is kept intact ONLY for the FUTURE 許可制 (AI-initiated) source. Today
+          // the standalone board only ever produces Owner-clicked cards, so this
+          // branch is effectively dormant in normal operation.
+          // STEP 2 of the flow: fire a READ-ONLY *plan spawn* (no `/company`, no
+          // permission flags → headless auto-deny-write holds), then push the plan
+          // to the 承認まち tray. The scoped-write *execute spawn* fires ONLY after
+          // the Owner clicks 〇 (jcPlanDecision handler below). Under the opt-in
+          // --jc-live-spawn guard; without it, write-type cards stay animation-only.
+          const planId = crypto.randomUUID();
+          const stagingDir = resolveStagingDir(step2WorkspaceRoot, planId);
+          // Today every card is Owner-clicked = 依頼制 (requested). AI-initiated
+          // (許可制 permitted) is a future source; the field is carried through.
+          pendingPlans.set(planId, {
+            memberId: m.memberId,
+            department: m.department,
+            origin: 'requested',
+            task: m.task,
+            message: m.message ?? '',
+            priority: priorityNum,
+            stagingDir,
+          });
+          const planPrompt = buildPlanPrompt(m.task, m.message ?? '', stagingDir);
+          console.log(`[JC Step2] PLAN spawn (read-only) → ${m.memberId}: ${m.task.slice(0, 40)}`);
+          void spawnScoped({
+            prompt: planPrompt,
+            cwd: step2WorkspaceRoot, // read-only: plan spawn carries no write perms
+            extraArgs: [], // NO permission flags → auto-deny-write safety valve
+            onDone: (output) => {
+              const pending = pendingPlans.get(planId);
+              if (!pending) return;
+              server.broadcast({
+                type: 'jcPlanReady',
+                planId,
+                memberId: pending.memberId,
+                department: pending.department,
+                origin: pending.origin,
+                task: pending.task,
+                plan: output || '(プランを取得できませんでした。再度お試しください)',
+                stagingDir: pending.stagingDir,
+              });
+            },
+          });
         }
+      }
+      return;
+    }
+
+    // Step2 Fork B: Owner's tray decision 〇実行 / ✕却下 / ✎修正.
+    if (msg.type === 'jcPlanDecision') {
+      const d = data as { planId: string; action: string; comment?: string };
+      const pending = pendingPlans.get(d.planId);
+      if (!pending) {
+        console.log(`[JC Step2] plan ${d.planId?.slice(0, 8)} not found (already decided?)`);
+        return;
+      }
+
+      if (d.action === 'reject') {
+        // ✕ 却下 — nothing runs, no writes, drop the pending plan.
+        pendingPlans.delete(d.planId);
+        console.log(`[JC Step2] REJECT plan ${d.planId.slice(0, 8)} — no execute spawn`);
+        return;
+      }
+
+      if (d.action === 'revise') {
+        // ✎ 修正 — re-plan (read-only) with the Owner's comment appended. A NEW
+        // plan id is issued so the tray shows a fresh card. Nothing executes.
+        pendingPlans.delete(d.planId);
+        const newPlanId = crypto.randomUUID();
+        const stagingDir = resolveStagingDir(step2WorkspaceRoot, newPlanId);
+        pendingPlans.set(newPlanId, { ...pending, stagingDir });
+        const comment = (d.comment ?? '').trim();
+        const revisedCriteria =
+          `${pending.message}${comment ? `\n修正指示: ${comment}` : ''}`.trim();
+        console.log(`[JC Step2] REVISE plan → new ${newPlanId.slice(0, 8)} (read-only re-plan)`);
+        void spawnScoped({
+          prompt: buildPlanPrompt(pending.task, revisedCriteria, stagingDir),
+          cwd: step2WorkspaceRoot,
+          extraArgs: [],
+          onDone: (output) => {
+            const p = pendingPlans.get(newPlanId);
+            if (!p) return;
+            server.broadcast({
+              type: 'jcPlanReady',
+              planId: newPlanId,
+              memberId: p.memberId,
+              department: p.department,
+              origin: p.origin,
+              task: p.task,
+              plan: output || '(プランを取得できませんでした。再度お試しください)',
+              stagingDir: p.stagingDir,
+            });
+          },
+        });
+        return;
+      }
+
+      if (d.action === 'approve') {
+        // 〇 実行 — the ONLY place the scoped-write execute spawn fires. 案1 contract:
+        // writes confined to the staging dir; git/network/other paths denied.
+        pendingPlans.delete(d.planId);
+        try {
+          fs.mkdirSync(pending.stagingDir, { recursive: true });
+        } catch (e) {
+          console.error(`[JC Step2] failed to create staging dir: ${String(e)}`);
+        }
+        const settings = buildScopedSettings(pending.stagingDir, step2ProjectsRoot);
+        const execPrompt = buildExecutePrompt(pending.task, pending.message, pending.stagingDir);
+        console.log(
+          `[JC Step2] APPROVE → EXECUTE spawn (scoped write) → ${pending.memberId} @ ${pending.stagingDir}`,
+        );
+        // Surface member activity in the office while the execute spawn runs.
+        server.broadcast({
+          type: 'jcMemberStateChange',
+          agentId: -300,
+          memberId: pending.memberId,
+          jcState: 'coding',
+        });
+        void spawnScoped({
+          prompt: execPrompt,
+          cwd: pending.stagingDir, // cwd = staging so relative writes land here
+          extraArgs: ['--settings', settings, '--add-dir', pending.stagingDir],
+          onData: (text) => {
+            const summary = text.trim().slice(0, 100);
+            if (summary) {
+              server.broadcast({
+                type: 'jcActivitySummary',
+                agentId: -300,
+                memberId: pending.memberId,
+                summary,
+              });
+            }
+          },
+          onDone: (output, code) => {
+            server.broadcast({
+              type: 'jcMemberStateChange',
+              agentId: -300,
+              memberId: pending.memberId,
+              jcState: 'idle',
+            });
+            server.broadcast({
+              type: 'jcActivitySummary',
+              agentId: -300,
+              memberId: pending.memberId,
+              summary:
+                code === 0
+                  ? `下書きを作成しました → ${pending.stagingDir}`
+                  : `実行が完了しました (code ${code})`,
+            });
+            console.log(`[JC Step2] execute done (code ${code}): ${output.slice(0, 120)}`);
+          },
+        });
       }
       return;
     }
