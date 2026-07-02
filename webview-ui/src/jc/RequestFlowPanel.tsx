@@ -38,23 +38,109 @@ import {
 /** Label the UI always appends so free-text correction is always available. */
 const OTHER_LABEL = 'その他（自分で書く）';
 
-const FIELD_META: Array<{ key: keyof RequestTemplate; label: string; placeholder: string }> = [
-  {
-    key: 'purpose',
-    label: '何のために調べる？',
-    placeholder: '例: 国内ポーカー市場が伸びてるか掴んで、新しい大会を開くか判断したい',
+interface FieldMeta {
+  key: keyof RequestTemplate;
+  label: string;
+  placeholder: string;
+}
+
+/**
+ * kind別のカード表示メタ (2026-07-02 横展開)。テンプレは全カード共通の
+ * 「問いかけ型 3項目 + 例題 + ざっくりでOK」トーン。keys は共通
+ * (purpose/wants/overview) でラベルだけ部署別 — backend の KIND_FIELD_LABELS と対。
+ */
+const KIND_META: Record<string, { title: string; intro: string; fields: FieldMeta[] }> = {
+  // Research 📋 調査 — 現行 pilot（無改変）
+  research: {
+    title: '調査を依頼',
+    intro: '調べたいことを3つ、ざっくりでOK。分からない欄は空でも大丈夫。古賀が確認して詰めます。',
+    fields: [
+      {
+        key: 'purpose',
+        label: '何のために調べる？',
+        placeholder: '例: 国内ポーカー市場が伸びてるか掴んで、新しい大会を開くか判断したい',
+      },
+      {
+        key: 'wants',
+        label: '何を知りたい？',
+        placeholder: '例: プレイヤー人口の推移／競合大会（戦国・SPADIE等）の集客・参加費・客層',
+      },
+      {
+        key: 'overview',
+        label: 'どの範囲を調べる？（対象・期間）',
+        placeholder: '例: 国内アミューズメントポーカー・直近2〜3年・20〜40代中心',
+      },
+    ],
   },
-  {
-    key: 'wants',
-    label: '何を知りたい？',
-    placeholder: '例: プレイヤー人口の推移／競合大会（戦国・SPADIE等）の集客・参加費・客層',
+  // Marketing 📊 市場調査 — read型（research能動パス流用・例題だけマーケ寄り）
+  market: {
+    title: '市場調査を依頼',
+    intro: '調べたいことを3つ、ざっくりでOK。分からない欄は空でも大丈夫。担当が確認して詰めます。',
+    fields: [
+      {
+        key: 'purpose',
+        label: '何のために調べる？',
+        placeholder: '例: 福岡大会の広告をどこに出すか決めたい。読み手はマーケチーム',
+      },
+      {
+        key: 'wants',
+        label: '何を知りたい？',
+        placeholder: '例: 競合大会の集客チャネル／ポーカー層に届く媒体と広告相場',
+      },
+      {
+        key: 'overview',
+        label: 'どの範囲を調べる？（対象・期間）',
+        placeholder: '例: 九州のアミューズ施設と広告媒体・直近1年',
+      },
+    ],
   },
-  {
-    key: 'overview',
-    label: 'どの範囲を調べる？（対象・期間）',
-    placeholder: '例: 国内アミューズメントポーカー・直近2〜3年・20〜40代中心',
+  // Marketing 📄 資料 — write型
+  doc: {
+    title: '資料を依頼',
+    intro:
+      '作ってほしい資料のこと、ざっくりでOK。分からない欄は空でも大丈夫。下書き置き場にドラフトを作ります。',
+    fields: [
+      {
+        key: 'purpose',
+        label: '誰に見せる資料？',
+        placeholder: '例: 協賛候補の企業さん（JOPTを初めて知る人）',
+      },
+      {
+        key: 'wants',
+        label: '何を伝えたい？',
+        placeholder: '例: 大会の集客規模と、協賛すると何が得かを信じてもらいたい',
+      },
+      {
+        key: 'overview',
+        label: 'どんな形にする？（1枚もの・スライド・文章）',
+        placeholder: '例: スライド10枚くらい、グラフ多め・文字少なめ',
+      },
+    ],
   },
-];
+  // Eng 🔧 実装 — write型（成果物=コード一式+適用手順のドラフト。本物には書かない）
+  impl: {
+    title: '実装を依頼',
+    intro:
+      '作りたい・直したいこと、ざっくりでOK。分からない欄は空でも大丈夫。下書き置き場に「コード一式+適用手順」のドラフトを作ります（本物のリポには書きません）。',
+    fields: [
+      {
+        key: 'purpose',
+        label: '何を作る・直す？',
+        placeholder: '例: 大会スケジュールのCSVを読み込んで一覧表示する画面',
+      },
+      {
+        key: 'wants',
+        label: 'できたと言える条件は？',
+        placeholder: '例: CSVを置いたら一覧が出て、日付で絞り込める',
+      },
+      {
+        key: 'overview',
+        label: '対象はどこ？',
+        placeholder: '例: pixel-agents の画面まわり（分からなければ空でOK）',
+      },
+    ],
+  },
+};
 
 function panelStyle(accent: string): React.CSSProperties {
   return {
@@ -179,12 +265,15 @@ function TemplateForm({ flow, accent }: { flow: RequestFlow; accent: string }) {
       requestId: flow.id,
       memberId: flow.memberId,
       department: flow.department,
+      kind: flow.kind,
       purpose: local.purpose,
       wants: local.wants,
       overview: local.overview,
       priority: `P${flow.priority}`,
     });
   };
+
+  const meta = KIND_META[flow.kind] ?? KIND_META.research;
 
   return (
     <>
@@ -197,10 +286,10 @@ function TemplateForm({ flow, accent }: { flow: RequestFlow; accent: string }) {
           flexShrink: 0,
         }}
       >
-        調べたいことを3つ、ざっくりでOK。分からない欄は空でも大丈夫。古賀が確認して詰めます。
+        {meta.intro}
       </div>
       <div style={{ padding: '10px 12px', overflowY: 'auto', flex: 1, minHeight: 0 }}>
-        {FIELD_META.map((f) => (
+        {meta.fields.map((f) => (
           <div key={f.key} style={{ marginBottom: 12 }}>
             <label
               style={{
@@ -345,7 +434,17 @@ function ConfirmLoop({ flow, accent }: { flow: RequestFlow; accent: string }) {
         }}
       >
         <span style={{ color: accent, fontSize: 12, marginRight: 6 }}>私の理解</span>
-        <div style={{ color: '#e8e8f4', fontSize: 14, lineHeight: 1.6, marginTop: 4 }}>
+        {/* pre-wrap: write型の plan確認(①②③ + 書き先パス)を改行のまま読めるように */}
+        <div
+          style={{
+            color: '#e8e8f4',
+            fontSize: 14,
+            lineHeight: 1.6,
+            marginTop: 4,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+          }}
+        >
           {q.understanding}
         </div>
       </div>
@@ -489,11 +588,17 @@ export function RequestFlowPanel() {
   if (!flow) return null;
 
   const accent = DEPT_COLORS[flow.department] ?? '#00e676';
+  const formTitle = (KIND_META[flow.kind] ?? KIND_META.research).title;
   const title =
-    flow.phase === 'form' ? '調査を依頼' : flow.phase === 'awaiting' ? '確認中' : 'すり合わせ';
+    flow.phase === 'form' ? formTitle : flow.phase === 'awaiting' ? '確認中' : 'すり合わせ';
 
   return (
-    <div data-request-flow data-request-id={flow.id} style={panelStyle(accent)}>
+    <div
+      data-request-flow
+      data-request-id={flow.id}
+      data-request-kind={flow.kind}
+      style={panelStyle(accent)}
+    >
       <Header flow={flow} accent={accent} title={title} />
       {flow.phase === 'form' && <TemplateForm flow={flow} accent={accent} />}
       {flow.phase === 'awaiting' && <Awaiting accent={accent} />}

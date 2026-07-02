@@ -29,6 +29,7 @@ import { OfficeLog } from './jc/OfficeLog.js';
 import { OWNER_AGENT_ID } from './jc/owner-avatar-constants.js';
 import { OwnerAvatar } from './jc/OwnerAvatar.js';
 import { RequestFlowPanel } from './jc/RequestFlowPanel.js';
+import { RequestResultPanel } from './jc/RequestResultPanel.js';
 import { ResearchResultPanel } from './jc/ResearchResultPanel.js';
 import { TaskHistoryPanel } from './jc/TaskHistoryPanel.js';
 import { OfficeCanvas } from './office/components/OfficeCanvas.js';
@@ -494,6 +495,10 @@ function AppContent() {
 
       {/* Research findings panel: 調査完了 → prominent dismissible 調査結果 popup */}
       <ResearchResultPanel />
+
+      {/* 依頼(write型) result panel: 資料/実装の下書き完成 → 書き先パス+要約 popup
+          (--jc-live-spawn OFF / plan未確認 の明示ゲート通知もここに出る) */}
+      <RequestResultPanel />
 
       {/* PARKED (2026-07-02 Owner FB pivot): 〇✕✎ tray kept for FUTURE 許可制
           (AI-initiated) source only; NOT used by the 依頼(request) flow. Renders

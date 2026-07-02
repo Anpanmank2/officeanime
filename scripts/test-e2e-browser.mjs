@@ -300,6 +300,229 @@ async function run() {
     } catch (e) {
       assert(false, `Request-flow keystroke test threw: ${e.message}`);
     }
+
+    // ── Test 9: 依頼 4カード (2026-07-02 横展開) — cards render + dept templates ──
+    // The dock shows 4 request cards (research/market/doc/impl). Each opens the
+    // 3-field template with its OWN dept labels (問いかけ型).
+    console.log('  [Test 9] Request cards ×4 + dept-specific templates');
+    try {
+      // Close any flow left open by Test 7/8 (ESC-less: click ✕ if present).
+      const closeBtn = page.locator('[data-request-flow] button[title="閉じる"]');
+      if ((await closeBtn.count()) > 0) {
+        await closeBtn.click();
+        await page.waitForTimeout(200);
+      }
+      const kinds = await page
+        .locator('[data-request-open]')
+        .evaluateAll((els) => els.map((el) => el.getAttribute('data-request-kind')));
+      assert(
+        kinds.length === 4 && ['research', 'market', 'doc', 'impl'].every((k) => kinds.includes(k)),
+        `4 request cards present (got ${JSON.stringify(kinds)})`,
+      );
+
+      // 資料(doc) card opens the Marketing write-template with its own labels.
+      await page.locator('[data-request-kind="doc"]').click();
+      await page.waitForTimeout(300);
+      const docPanel = page.locator('[data-request-flow][data-request-kind="doc"]');
+      assert((await docPanel.count()) === 1, '資料(doc) flow panel opens with kind attr');
+      const docText = await docPanel.innerText();
+      const docLabelsOk =
+        docText.includes('誰に見せる資料？') &&
+        docText.includes('何を伝えたい？') &&
+        docText.includes('どんな形にする？');
+      assert(docLabelsOk, '資料 template shows doc 3項目 labels');
+      await page.locator('[data-request-flow] button[title="閉じる"]').click();
+      await page.waitForTimeout(200);
+
+      // 市場調査(market) card opens with the research-style (marketing例題) labels.
+      await page.locator('[data-request-kind="market"]').click();
+      await page.waitForTimeout(300);
+      const mkPanel = page.locator('[data-request-flow][data-request-kind="market"]');
+      const mkText = (await mkPanel.count()) > 0 ? await mkPanel.innerText() : '';
+      assert(
+        mkText.includes('何のために調べる？') && mkText.includes('どの範囲を調べる？'),
+        '市場調査 template shows market 3項目 labels',
+      );
+      await page.locator('[data-request-flow] button[title="閉じる"]').click();
+      await page.waitForTimeout(200);
+    } catch (e) {
+      assert(false, `Request 4-cards test threw: ${e.message}`);
+    }
+
+    // ── Test 10: write型(実装) — 3欄 real-keystroke + plan確認(①②③+書き先) ──
+    // AC-F: every template field takes fast ascii (17) + Japanese without
+    // charloss. AC-C: the write confirm ends with the plan question (understanding
+    // carries ①②③ + 書き先 staging path) and 確定 posts jcRequestConfirmed.
+    console.log('  [Test 10] Write-kind (impl): 3-field keystroke + plan confirm');
+    try {
+      await page.locator('[data-request-kind="impl"]').click();
+      await page.waitForTimeout(300);
+      const implPanel = page.locator('[data-request-flow][data-request-kind="impl"]');
+      assert((await implPanel.count()) === 1, '実装(impl) flow panel opens');
+      const implText = await implPanel.innerText();
+      assert(
+        implText.includes('何を作る・直す？') &&
+          implText.includes('できたと言える条件は？') &&
+          implText.includes('対象はどこ？'),
+        '実装 template shows impl 3項目 labels',
+      );
+
+      // Real keystrokes into ALL 3 textareas (fast ascii 17 chars + JP commit).
+      const FAST = 'quick-impl-check1'; // 17 chars, no delay
+      const JPS = ['一覧画面を作って', '日付で絞り込める', '対象は画面まわり'];
+      const tas = page.locator('[data-request-flow] textarea');
+      const taCount = await tas.count();
+      assert(taCount === 3, `impl template has 3 textareas (got ${taCount})`);
+      for (let i = 0; i < 3; i++) {
+        const ta = tas.nth(i);
+        await ta.click();
+        await page.keyboard.type(FAST);
+        await page.waitForTimeout(150);
+        const gotFast = await ta.inputValue();
+        assert(gotFast === FAST, `field${i + 1} fast ascii exact (got "${gotFast}")`);
+        await ta.click();
+        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
+        await page.keyboard.press('Delete');
+        await page.waitForTimeout(100);
+        await ta.click();
+        await page.keyboard.insertText(JPS[i]);
+        await page.waitForTimeout(150);
+        const gotJp = await ta.inputValue();
+        assert(gotJp === JPS[i], `field${i + 1} Japanese IME-commit exact (got "${gotJp}")`);
+      }
+
+      // Drive to confirm phase with a WRITE-shape question set (output + plan).
+      const STAGING = '/tmp/e2e-staging/office-tasks/req-e2e';
+      const implReqId = await implPanel.getAttribute('data-request-id');
+      assert(!!implReqId, 'impl flow exposes data-request-id');
+      await page.evaluate(
+        ({ requestId, staging }) => {
+          window.postMessage(
+            {
+              type: 'jcRequestQuestions',
+              requestId,
+              memberId: 'eng-01',
+              department: 'engineering',
+              questions: [
+                {
+                  understanding: 'アウトプットはコード一式+適用手順のドラフトと理解しました。',
+                  question: '形・完成条件はこれでよいですか?',
+                  options: ['はい、この形でお願いします', 'いえ、違う形にしたい'],
+                  field_ref: 'output',
+                },
+                {
+                  understanding: `こう作ります:\n① 依頼内容を整理\n② コード一式のドラフトを作成\n③ 適用手順をまとめる\n書き先: ${staging}`,
+                  question: 'この計画で進めてよいですか?',
+                  options: ['はい、この計画で進めてください'],
+                  field_ref: 'plan',
+                },
+              ],
+            },
+            '*',
+          );
+        },
+        { requestId: implReqId, staging: STAGING },
+      );
+      await page.waitForTimeout(400);
+
+      // Q1 = output spec question renders.
+      let confirmText = await implPanel.innerText();
+      assert(
+        confirmText.includes('形・完成条件はこれでよいですか?'),
+        'write confirm shows アウトプット仕様 question',
+      );
+      await page.locator('[data-request-option]').first().click();
+      await page.waitForTimeout(300);
+
+      // Q2 = plan confirm renders LAST with ①②③ + 書き先 staging path.
+      confirmText = await implPanel.innerText();
+      const planOk =
+        confirmText.includes('この計画で進めてよいですか?') &&
+        confirmText.includes('①') &&
+        confirmText.includes('書き先') &&
+        confirmText.includes(STAGING);
+      assert(planOk, 'plan confirm shows ①②③ + 書き先 staging path');
+
+      // その他 inline correction on the plan question (charloss-guarded input).
+      await page.locator('[data-request-other]').click();
+      await page.waitForTimeout(200);
+      const planOtherTa = page.locator('[data-request-other-input]').first();
+      await planOtherTa.waitFor({ timeout: 3000 });
+      const PLAN_FIX = 'readme-first-plan1'; // 17 chars fast
+      await planOtherTa.click();
+      await page.keyboard.type(PLAN_FIX);
+      await page.waitForTimeout(150);
+      const gotPlanFix = await planOtherTa.inputValue();
+      assert(gotPlanFix === PLAN_FIX, `plan その他 fast ascii exact (got "${gotPlanFix}")`);
+      await page.locator('[data-request-other-submit]').click();
+      await page.waitForTimeout(300);
+
+      // All questions answered → flow closes (jcRequestConfirmed posted).
+      const stillOpen = await page.locator('[data-request-flow]').count();
+      assert(stillOpen === 0, 'flow closes after plan 確定 (jcRequestConfirmed posted)');
+    } catch (e) {
+      assert(false, `Write-kind confirm test threw: ${e.message}`);
+    }
+
+    // ── Test 11: write型 result panel — 下書きパス + files + 要約 / gate notice ──
+    console.log('  [Test 11] Request result panel (write型: path + summary)');
+    try {
+      await page.evaluate(() => {
+        window.postMessage(
+          {
+            type: 'jcRequestResult',
+            requestId: 'req-e2e-result',
+            memberId: 'eng-01',
+            department: 'engineering',
+            kind: 'impl',
+            stagingDir: '/tmp/e2e-staging/office-tasks/req-e2e',
+            status: 'done',
+            files: ['patch/list-view.tsx', 'APPLY-STEPS.md'],
+            summary: '一覧画面のドラフト一式を作成しました。適用手順は APPLY-STEPS.md を参照。',
+          },
+          '*',
+        );
+      });
+      await page.waitForTimeout(400);
+      const rp = page.locator('[data-request-result]');
+      assert((await rp.count()) === 1, 'request result panel appears');
+      const rpText = await rp.innerText();
+      assert(
+        rpText.includes('/tmp/e2e-staging/office-tasks/req-e2e') &&
+          rpText.includes('APPLY-STEPS.md') &&
+          rpText.includes('ドラフト一式を作成しました'),
+        'result panel shows 書き先パス + files + 要約',
+      );
+      await rp.locator('button[title="閉じる"]').click();
+      await page.waitForTimeout(200);
+
+      // Gate notice (disabled = --jc-live-spawn OFF) renders the explicit message.
+      await page.evaluate(() => {
+        window.postMessage(
+          {
+            type: 'jcRequestResult',
+            requestId: 'req-e2e-disabled',
+            memberId: 'mkt-01',
+            department: 'marketing',
+            kind: 'doc',
+            stagingDir: '/tmp/e2e-staging/office-tasks/req-e2e-2',
+            status: 'disabled',
+            files: [],
+            summary:
+              '実行ゲート: サーバーが --jc-live-spawn フラグなしで起動しているため、実行していません。',
+          },
+          '*',
+        );
+      });
+      await page.waitForTimeout(400);
+      const rp2 = page.locator('[data-request-result][data-request-result-status="disabled"]');
+      assert((await rp2.count()) === 1, 'disabled gate notice panel appears');
+      const rp2Text = await rp2.innerText();
+      assert(rp2Text.includes('--jc-live-spawn'), 'gate notice mentions the flag explicitly');
+      await rp2.locator('button[title="閉じる"]').click();
+    } catch (e) {
+      assert(false, `Request result panel test threw: ${e.message}`);
+    }
   } finally {
     await browser.close();
     stopServer();

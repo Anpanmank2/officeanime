@@ -52,14 +52,61 @@ function buildResearchPrompt(task: string, criteria: string): string {
  * A pending request holds the 3-field template until the Owner has answered all
  * confirm questions "はい"; then it runs the SAME read-only research path.
  */
+/**
+ * ── 依頼カードの種別 (2026-07-02 横展開: 作る・書く系へ) ────────────────
+ * - research: Research 📋調査を依頼 — read型・現行 pilot そのまま（無改変）
+ * - market:   Marketing 📊市場調査を依頼 — read型・research 能動パス流用、
+ *             確認質問の生成だけマーケ文脈（読み手・競合視点）
+ * - doc:      Marketing 📄資料を依頼 — write型（scoped staging 書込）
+ * - impl:     Eng 🔧実装を依頼 — write型。成果物 = 下書き置き場に
+ *             「コード一式 + 適用手順」のドラフト。本物のリポには一切書かない
+ *
+ * write型は確認の締めに plan確認 1問（こう作ります①②③ + 書き先 = staging パス）
+ * が必ず入り、その「はい」（または その他 補正の確定）なしで execute は絶対に
+ * 発火しない。execute は案1 scoped-write 契約（buildScopedSettings）そのまま。
+ */
+type RequestKind = 'research' | 'market' | 'doc' | 'impl';
+
+const WRITE_KINDS: ReadonlySet<RequestKind> = new Set<RequestKind>(['doc', 'impl']);
+
+/** Coerce an untrusted wire value into a RequestKind (default 'research'). */
+function normalizeRequestKind(v: unknown): RequestKind {
+  return v === 'market' || v === 'doc' || v === 'impl' ? v : 'research';
+}
+
+/** kind別テンプレ項目ラベル（prompt/task 合成用。UI 側 KIND_META と対で保守）. */
+const KIND_FIELD_LABELS: Record<RequestKind, { purpose: string; wants: string; overview: string }> =
+  {
+    research: { purpose: '目的', wants: '知りたいこと', overview: 'ざっくり概要' },
+    market: {
+      purpose: '何のために調べる(目的)',
+      wants: '何を知りたい',
+      overview: 'どの範囲を調べる(対象・期間)',
+    },
+    doc: {
+      purpose: '誰に見せる資料か',
+      wants: '何を伝えたいか',
+      overview: 'どんな形にするか(1枚もの/スライド/文章)',
+    },
+    impl: {
+      purpose: '何を作る・直すか',
+      wants: 'できたと言える条件',
+      overview: '対象はどこか',
+    },
+  };
+
 interface PendingRequest {
   memberId: string;
   department: string;
+  /** Card kind — research/market = read型, doc/impl = write型. */
+  kind: RequestKind;
   /** 3-field template. */
   purpose: string; // 目的
   wants: string; // 知りたいこと
   overview: string; // ざっくり概要
   priority: number;
+  /** write型のみ: submit 時に確定した下書き置き場（plan/execute で同一パスを使う）. */
+  stagingDir?: string;
 }
 const pendingRequests = new Map<string, PendingRequest>();
 
@@ -69,6 +116,23 @@ function composeRequestTask(r: { purpose: string; wants: string; overview: strin
   if (r.overview.trim()) parts.push(r.overview.trim());
   if (r.wants.trim()) parts.push(`知りたいこと: ${r.wants.trim()}`);
   if (r.purpose.trim()) parts.push(`目的: ${r.purpose.trim()}`);
+  return parts.join(' / ') || '(内容未記入)';
+}
+
+/**
+ * Compose a WRITE-kind (doc/impl) template into a single task string using the
+ * kind's own field labels (誰に見せる/何を伝えたい/… , 何を作る/完成条件/…).
+ * research/market keep composeRequestTask (research pilot 無改変).
+ */
+function composeWriteTask(
+  kind: RequestKind,
+  r: { purpose: string; wants: string; overview: string },
+): string {
+  const L = KIND_FIELD_LABELS[kind];
+  const parts: string[] = [];
+  if (r.purpose.trim()) parts.push(`${L.purpose}: ${r.purpose.trim()}`);
+  if (r.wants.trim()) parts.push(`${L.wants}: ${r.wants.trim()}`);
+  if (r.overview.trim()) parts.push(`${L.overview}: ${r.overview.trim()}`);
   return parts.join(' / ') || '(内容未記入)';
 }
 
@@ -144,13 +208,93 @@ function buildConfirmQuestionsPrompt(r: {
   );
 }
 
+/**
+ * CONFIRM-QUESTIONS prompt for 市場調査 (market, read型) — READ-ONLY, same spawn
+ * contract and JSON schema as the research pilot. Only the LENS differs: the
+ * questions are generated in a marketing context (読み手=誰の意思決定か・競合
+ * 視点・どの顧客層か). Execution afterwards reuses the research active path.
+ */
+function buildMarketConfirmPrompt(r: { purpose: string; wants: string; overview: string }): string {
+  return (
+    `あなたはこれから市場調査を依頼されます。まだ調査はしないでください。\n` +
+    `依頼者(Owner)の意図を取り違えないよう、着手前に すり合わせの確認 をします。\n` +
+    `マーケティング視点で確認してください: この調査結果を誰が読んで何を決めるのか(読み手)、` +
+    `競合との比較が要るのか、どの顧客層・市場範囲を見るのか。\n` +
+    `以下の依頼内容を読み、あなたの「理解」を前に出した確認質問を 1〜3個 作ってください。\n` +
+    `各質問には「候補の答え」を2〜4個添えてください。Owner はその中から選ぶか、自分で一言補正できます。\n` +
+    `適応的に: 単純な確認は候補を最小(自然な肯定1つ)に、解釈が複数あり得る質問は ` +
+    `解釈の違いが分かる候補を2〜4個 出してください。候補には必ず自然な肯定(「はい、〜で合っています」)を1つ含めてください。\n\n` +
+    `【依頼内容】\n` +
+    `- 何のために調べる(目的): ${r.purpose || '(未記入)'}\n` +
+    `- 何を知りたい: ${r.wants || '(未記入)'}\n` +
+    `- どの範囲を調べる(対象・期間): ${r.overview || '(未記入)'}\n\n` +
+    `【出力形式(厳守)】 次の JSON 配列だけを返してください。前後に説明文やコードフェンスを付けないでください。\n` +
+    `[\n` +
+    `  {"understanding": "私はこう理解しました: …", "question": "…で合っていますか?", "options": ["はい、…で合っています", "いえ、…です", …], "field_ref": "purpose|wants|overview"},\n` +
+    `  … (1〜3個)\n` +
+    `]\n` +
+    `- understanding = あなたの理解(具体的に・1〜2文)\n` +
+    `- question = Owner に確認したいこと(読み手・競合・顧客層のズレを潰す)\n` +
+    `- options = 候補の答え 2〜4個(必ず肯定を1つ含む・簡潔に)\n` +
+    `- field_ref = その確認がどの項目に関係するか(purpose=目的 / wants=知りたいこと / overview=範囲)`
+  );
+}
+
+/**
+ * CONFIRM-QUESTIONS prompt for WRITE kinds (doc=資料 / impl=実装) — READ-ONLY.
+ *
+ * Same read-only spawn contract (no permission flags, no `/company`). ONE spawn
+ * produces BOTH the interpretation questions AND the closing plan confirmation
+ * (spawn数は増やさない):
+ *   - 解釈すり合わせ 1〜2問 (field_ref = purpose|wants|overview)
+ *   - アウトプット仕様(形・完成条件) 必ず1問 (field_ref = "output")
+ *   - 締めの plan確認 必ず1問 (field_ref = "plan"): understanding =
+ *     「こう作ります: ①②③ + 書き先 = <staging path>」/ options = はい。
+ * The parser (ensureWriteConfirmShape) guarantees output/plan questions exist
+ * even if the model's JSON is broken or drops them.
+ */
+function buildWriteConfirmPrompt(
+  kind: RequestKind,
+  r: { purpose: string; wants: string; overview: string },
+  stagingDir: string,
+): string {
+  const L = KIND_FIELD_LABELS[kind];
+  const goal =
+    kind === 'impl'
+      ? `成果物は「コード一式 + 適用手順」のドラフトで、下書き置き場にだけ作ります(本物のリポジトリには一切書きません)。`
+      : `成果物は資料のドラフトで、下書き置き場にだけ作ります。`;
+  return (
+    `あなたはこれから${kind === 'impl' ? '実装' : '資料作成'}を依頼されます。まだ作業はしないでください。\n` +
+    `依頼者(Owner)の意図を取り違えないよう、着手前に すり合わせの確認 をします。${goal}\n` +
+    `以下の依頼内容を読み、確認質問を作ってください。構成は厳守:\n` +
+    `1. 解釈のすり合わせ質問 1〜2個 (field_ref = "purpose" | "wants" | "overview")\n` +
+    `2. アウトプット仕様(形・完成条件)の確認 必ず1個 (field_ref = "output")\n` +
+    `3. 締めに 計画確認 必ず1個・配列の最後 (field_ref = "plan"):\n` +
+    `   - understanding = 「こう作ります:」で始め、手順を ①②③ の箇条書きで書き、` +
+    `最後の行に「書き先: ${stagingDir}」を必ず入れる\n` +
+    `   - question = 「この計画で進めてよいですか?」\n` +
+    `   - options = ["はい、この計画で進めてください"] のみ\n` +
+    `各質問には「候補の答え」を2〜4個添えてください(必ず自然な肯定を1つ含む)。\n\n` +
+    `【依頼内容】\n` +
+    `- ${L.purpose}: ${r.purpose || '(未記入)'}\n` +
+    `- ${L.wants}: ${r.wants || '(未記入)'}\n` +
+    `- ${L.overview}: ${r.overview || '(未記入)'}\n\n` +
+    `【出力形式(厳守)】 次の JSON 配列だけを返してください。前後に説明文やコードフェンスを付けないでください。\n` +
+    `[\n` +
+    `  {"understanding": "私はこう理解しました: …", "question": "…で合っていますか?", "options": ["はい、…で合っています", …], "field_ref": "purpose|wants|overview"},\n` +
+    `  {"understanding": "アウトプットはこう理解しました: …", "question": "形・完成条件はこれでよいですか?", "options": [……], "field_ref": "output"},\n` +
+    `  {"understanding": "こう作ります:\\n① …\\n② …\\n③ …\\n書き先: ${stagingDir}", "question": "この計画で進めてよいですか?", "options": ["はい、この計画で進めてください"], "field_ref": "plan"}\n` +
+    `]`
+  );
+}
+
 /** One confirm question surfaced to the frontend (私の理解 + 候補オプション). */
 interface ConfirmQuestion {
   understanding: string;
   question: string;
   /** Candidate answer options (2〜4); UI always appends 「その他」. */
   options: string[];
-  field_ref: 'purpose' | 'wants' | 'overview' | string;
+  field_ref: 'purpose' | 'wants' | 'overview' | 'output' | 'plan' | string;
 }
 
 /**
@@ -211,6 +355,19 @@ function parseConfirmQuestions(
       field_ref: 'overview',
     },
   ];
+  return parseConfirmQuestionsCore(output, fallback, 4);
+}
+
+/**
+ * Shared robust-parse core (extracted 2026-07-02 横展開; research behavior is
+ * byte-identical via parseConfirmQuestions above). NEVER throws; on any parse
+ * failure returns the caller-supplied fallback set.
+ */
+function parseConfirmQuestionsCore(
+  output: string,
+  fallback: ConfirmQuestion[],
+  maxQuestions: number,
+): ConfirmQuestion[] {
   try {
     const json = extractJsonArray(output);
     if (!json) return fallback;
@@ -242,12 +399,132 @@ function parseConfirmQuestions(
         options,
         field_ref: fieldRef,
       });
-      if (out.length >= 4) break; // cap at 4
+      if (out.length >= maxQuestions) break; // cap
     }
     return out.length > 0 ? out : fallback;
   } catch {
     return fallback;
   }
+}
+
+/** Deterministic fallback plan-confirm question for a write kind (never missing). */
+function buildWritePlanFallback(kind: RequestKind, stagingDir: string): ConfirmQuestion {
+  const step2 = kind === 'impl' ? '② コード一式のドラフトを作成' : '② 資料のドラフトを作成';
+  const step3 = kind === 'impl' ? '③ 適用手順と要約をまとめる' : '③ 構成の説明と要約をまとめる';
+  return {
+    understanding: `こう作ります:\n① 依頼内容と完成条件を整理\n${step2}\n${step3}\n書き先: ${stagingDir}`,
+    question: 'この計画で進めてよいですか?',
+    options: ['はい、この計画で進めてください'],
+    field_ref: 'plan',
+  };
+}
+
+/** Fallback question set for a write kind (parse failure → still 解釈+output+plan). */
+function buildWriteFallbackQuestions(
+  kind: RequestKind,
+  r: { purpose: string; wants: string; overview: string },
+  stagingDir: string,
+): ConfirmQuestion[] {
+  const L = KIND_FIELD_LABELS[kind];
+  return [
+    {
+      understanding: `${L.purpose}をこう理解しました: 「${r.purpose || '(未記入)'}」`,
+      question: 'この理解で合っていますか?',
+      options: ['はい、合っています'],
+      field_ref: 'purpose',
+    },
+    {
+      understanding:
+        `アウトプットをこう理解しました: 「${r.overview || '(未記入)'}」` +
+        `(完成条件: ${r.wants || '(未記入)'})`,
+      question: 'アウトプットの形・完成条件はこれでよいですか?',
+      options: ['はい、この形・完成条件でお願いします'],
+      field_ref: 'output',
+    },
+    buildWritePlanFallback(kind, stagingDir),
+  ];
+}
+
+/**
+ * Enforce the WRITE-kind confirm shape on whatever the spawn returned:
+ *   [解釈 0〜2問] → [アウトプット仕様 必ず1問] → [plan確認 必ず1問・最後]
+ * - plan の understanding には 書き先(staging path) を必ず含める(無ければ追記)。
+ * - plan の options には必ず肯定を入れる。
+ * This is what guarantees AC「write型は アウトプット仕様1問 + 締めplan確認1問」
+ * even when the model's JSON drops/reorders them.
+ */
+function ensureWriteConfirmShape(
+  questions: ConfirmQuestion[],
+  kind: RequestKind,
+  r: { purpose: string; wants: string; overview: string },
+  stagingDir: string,
+): ConfirmQuestion[] {
+  const planQs = questions.filter((q) => q.field_ref === 'plan');
+  const outputQs = questions.filter((q) => q.field_ref === 'output');
+  const interp = questions.filter((q) => q.field_ref !== 'plan' && q.field_ref !== 'output');
+
+  const plan: ConfirmQuestion =
+    planQs.length > 0 ? planQs[planQs.length - 1] : buildWritePlanFallback(kind, stagingDir);
+  // 書き先 = staging path を plan に必ず含める(実行先とプランの食い違いを防ぐ)。
+  if (!plan.understanding.includes(stagingDir)) {
+    plan.understanding = `${plan.understanding}\n書き先: ${stagingDir}`;
+  }
+  if (plan.options.length === 0) plan.options = ['はい、この計画で進めてください'];
+
+  const output: ConfirmQuestion =
+    outputQs.length > 0 ? outputQs[0] : buildWriteFallbackQuestions(kind, r, stagingDir)[1];
+
+  return [...interp.slice(0, 2), output, plan];
+}
+
+/**
+ * EXECUTE prompt for a WRITE-kind 依頼 — runs ONLY after the Owner confirmed the
+ * plan question (「はい」or その他補正の確定). Mirrors buildExecutePrompt's 絶対
+ * 厳守 contract; enforcement itself is buildScopedSettings (案1, PM live-proven).
+ */
+function buildRequestExecutePrompt(
+  kind: RequestKind,
+  task: string,
+  plan: string,
+  stagingDir: string,
+): string {
+  const goal =
+    kind === 'impl'
+      ? `成果物 = 「コード一式 + 適用手順」のドラフト。本物のリポジトリ・既存コードには一切書き込まないでください。`
+      : `成果物 = 資料のドラフト(Markdown等)。`;
+  return (
+    `Owner が確認済みの計画に従って、依頼されたタスクを実行してください。\n` +
+    `${goal}\n` +
+    `【絶対厳守】\n` +
+    `- 出力（ファイルの作成・書き込み）は下書き置き場のみ: ${stagingDir}\n` +
+    `- それ以外のファイル・リポジトリ・外部には一切触れないでください\n` +
+    `- git（add / commit / push）は実行しないでください\n` +
+    `- 本番反映は PM 検証と Owner GO の後に人が手で行います。あなたは下書きを作るだけです\n` +
+    `- 最後に「作ったファイル」と「内容の要約」を 3〜5 行で報告してください\n` +
+    `\n== タスク ==\n${task}\n` +
+    `\n== Owner 確認済みの計画 ==\n${plan}`
+  );
+}
+
+/** List files under a staging dir (relative paths, recursive, capped at 20). */
+function listStagingFiles(stagingDir: string): string[] {
+  const out: string[] = [];
+  const walk = (dir: string, rel: string): void => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (out.length >= 20) return;
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) walk(path.join(dir, e.name), r);
+      else out.push(r);
+    }
+  };
+  walk(stagingDir, '');
+  return out;
 }
 
 /**
@@ -916,24 +1193,38 @@ async function main(): Promise<void> {
         requestId: string;
         memberId: string;
         department: string;
+        kind?: string;
         purpose: string;
         wants: string;
         overview: string;
         priority: string;
       };
       const priorityNum = parseInt((m.priority || 'P3').replace('P', ''), 10) || 3;
-      const req = {
+      const kind = normalizeRequestKind(m.kind);
+      const isWrite = WRITE_KINDS.has(kind);
+      // write型: 下書き置き場を submit 時に確定(plan に載せるパス = execute の書込先)。
+      const stagingDir = isWrite ? resolveStagingDir(step2WorkspaceRoot, m.requestId) : undefined;
+      const req: PendingRequest = {
         memberId: m.memberId,
         department: m.department,
+        kind,
         purpose: m.purpose ?? '',
         wants: m.wants ?? '',
         overview: m.overview ?? '',
         priority: priorityNum,
+        stagingDir,
       };
       pendingRequests.set(m.requestId, req);
-      const prompt = buildConfirmQuestionsPrompt(req);
+      // kind別プロンプト: research=現行(無改変) / market=マーケ文脈(read) /
+      // doc,impl=解釈+アウトプット仕様+plan確認を1 spawnで(read-only は共通)。
+      const prompt =
+        kind === 'market'
+          ? buildMarketConfirmPrompt(req)
+          : isWrite
+            ? buildWriteConfirmPrompt(kind, req, stagingDir!)
+            : buildConfirmQuestionsPrompt(req);
       console.log(
-        `[JC Request] confirm-questions spawn (read-only) → ${m.memberId}: ${req.purpose.slice(0, 40)}`,
+        `[JC Request] confirm-questions spawn (read-only, kind=${kind}) → ${m.memberId}: ${req.purpose.slice(0, 40)}`,
       );
       // Show the researcher is "thinking" while it drafts confirm questions.
       server.broadcast({
@@ -949,7 +1240,19 @@ async function main(): Promise<void> {
         onDone: (output) => {
           const pending = pendingRequests.get(m.requestId);
           if (!pending) return;
-          const questions = parseConfirmQuestions(output, pending);
+          // write型は shape を強制(アウトプット仕様1問 + 締めplan確認1問・書き先付き)。
+          const questions = WRITE_KINDS.has(pending.kind)
+            ? ensureWriteConfirmShape(
+                parseConfirmQuestionsCore(
+                  output,
+                  buildWriteFallbackQuestions(pending.kind, pending, pending.stagingDir!),
+                  6,
+                ),
+                pending.kind,
+                pending,
+                pending.stagingDir!,
+              )
+            : parseConfirmQuestions(output, pending);
           server.broadcast({
             type: 'jcMemberStateChange',
             agentId: -400,
@@ -984,6 +1287,133 @@ async function main(): Promise<void> {
         return;
       }
       pendingRequests.delete(d.requestId);
+
+      // ── WRITE kinds (doc/impl) → 案1 scoped-write execute spawn ──────────
+      // 安全契約: (a) 書込 = staging 1dir のみ (b) それ以外は headless default-deny
+      // (c) Bash deny = git add/commit/push 不能 (d) 本番反映は PM+Owner GO 後に人が手で。
+      // execute は plan確認の答え(「はい」or その他補正の確定)が無い限り絶対に発火しない。
+      if (WRITE_KINDS.has(pending.kind)) {
+        const answers = (d.answers ?? []).filter(
+          (a) => a && typeof a.answer === 'string' && a.answer.trim(),
+        );
+        const planAnswer = answers.find((a) => a.fieldRef === 'plan');
+        const stagingDir = pending.stagingDir ?? resolveStagingDir(step2WorkspaceRoot, d.requestId);
+        const baseTask = composeWriteTask(pending.kind, pending);
+        // plan は execute prompt の専用セクションに入れるので answerCtx からは除外。
+        const task = baseTask + composeAnswerContext(answers.filter((a) => a.fieldRef !== 'plan'));
+        // Office animation (delegate → work_started) mirrors the read path.
+        writeOwnerDelegate(ownerEventsFile, {
+          memberId: pending.memberId,
+          department: pending.department,
+          task: baseTask,
+          message: '',
+          priority: `P${pending.priority}`,
+          deadline: null,
+          timestamp: new Date().toISOString(),
+        });
+        if (!planAnswer) {
+          // Hard gate: no plan confirmation → NO execute (直 ws メッセージ偽造も遮断)。
+          console.log(
+            `[JC Request] write kind=${pending.kind} WITHOUT plan answer — execute BLOCKED`,
+          );
+          server.broadcast({
+            type: 'jcRequestResult',
+            requestId: d.requestId,
+            memberId: pending.memberId,
+            department: pending.department,
+            kind: pending.kind,
+            stagingDir,
+            status: 'blocked',
+            files: [],
+            summary:
+              '計画の確認（「はい、この計画で進めてください」）が取れていないため、実行しませんでした。もう一度依頼してください。',
+          });
+          return;
+        }
+        if (!liveSpawnEnabled) {
+          // 既存セマンティクス維持: write型 execute は --jc-live-spawn フラグ配下。
+          // OFF のときは実行せず、UI に明示メッセージを返す。
+          console.log(
+            `[JC Request] write kind=${pending.kind} — --jc-live-spawn OFF → execute skipped (UI notice)`,
+          );
+          server.broadcast({
+            type: 'jcRequestResult',
+            requestId: d.requestId,
+            memberId: pending.memberId,
+            department: pending.department,
+            kind: pending.kind,
+            stagingDir,
+            status: 'disabled',
+            files: [],
+            summary:
+              '実行ゲート: サーバーが --jc-live-spawn フラグなしで起動しているため、実行していません。フラグ付きで起動し直すと、確認済みの内容で下書きを作成できます。',
+          });
+          return;
+        }
+        // Approved plan text = spawn の plan (understanding) + Owner のインライン補正。
+        const planText = planAnswer.isOther
+          ? `${planAnswer.understanding}\n【Owner 補正（この通りに反映してください）】${planAnswer.answer.trim()}`
+          : planAnswer.understanding;
+        try {
+          fs.mkdirSync(stagingDir, { recursive: true });
+        } catch (e) {
+          console.error(`[JC Request] failed to create staging dir: ${String(e)}`);
+        }
+        const settings = buildScopedSettings(stagingDir, step2ProjectsRoot);
+        const execPrompt = buildRequestExecutePrompt(pending.kind, task, planText, stagingDir);
+        console.log(
+          `[JC Request] CONFIRMED write kind=${pending.kind} → EXECUTE spawn (scoped write) → ${pending.memberId} @ ${stagingDir}`,
+        );
+        server.broadcast({
+          type: 'jcMemberStateChange',
+          agentId: -300,
+          memberId: pending.memberId,
+          jcState: 'coding',
+        });
+        void spawnScoped({
+          prompt: execPrompt,
+          cwd: stagingDir, // cwd = staging so relative writes land here
+          extraArgs: ['--settings', settings, '--add-dir', stagingDir],
+          onData: (text) => {
+            const summary = text.trim().slice(0, 100);
+            if (summary) {
+              server.broadcast({
+                type: 'jcActivitySummary',
+                agentId: -300,
+                memberId: pending.memberId,
+                summary,
+              });
+            }
+          },
+          onDone: (output, code) => {
+            server.broadcast({
+              type: 'jcMemberStateChange',
+              agentId: -300,
+              memberId: pending.memberId,
+              jcState: 'idle',
+            });
+            const files = listStagingFiles(stagingDir);
+            // 完了表示: 下書きのパス + 作成ファイル + 要約 (AC: write型完了時)。
+            server.broadcast({
+              type: 'jcRequestResult',
+              requestId: d.requestId,
+              memberId: pending.memberId,
+              department: pending.department,
+              kind: pending.kind,
+              stagingDir,
+              status: code === 0 ? 'done' : 'error',
+              files,
+              summary: output.trim().slice(0, 2000) || `実行が終了しました (code ${code})`,
+            });
+            console.log(
+              `[JC Request] write execute done (code ${code}) files=${files.length} @ ${stagingDir}`,
+            );
+          },
+        });
+        return;
+      }
+
+      // ── READ kinds (research / market) → 既存 research 能動パス(無改変) ──
       // Weave the Owner's picks/corrections into the task so the researcher runs
       // with the confirmed interpretation (取り違え消える). Falls back to the plain
       // composed task when no answers were provided.

@@ -36,6 +36,7 @@ import {
 import { addLogEntry } from '../jc/office-log-state.js';
 import { addPlan, type PlanOrigin } from '../jc/plan-state.js';
 import { type ConfirmQuestion, setRequestQuestions } from '../jc/request-flow-state.js';
+import { type RequestResultStatus, setRequestResult } from '../jc/request-result-state.js';
 import { setResearchResult } from '../jc/research-result-state.js';
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js';
 import type { OfficeState } from '../office/engine/officeState.js';
@@ -864,6 +865,36 @@ export function useExtensionMessages(
           fieldRef: q.field_ref,
         }));
         setRequestQuestions(rq.requestId, questions);
+      } else if (msg.type === 'jcRequestResult') {
+        // 依頼(request) write型 (資料 doc / 実装 impl) の終端: scoped execute
+        // spawn の完了 (done/error) または明示ゲート通知 (disabled = --jc-live-spawn
+        // OFF / blocked = plan未確認)。下書きパス+ファイル+要約をパネルに出す。
+        // Display only — research の 調査結果 パスとは別 store (research-result-
+        // state は触るな契約で無改変のまま)。
+        const rr = msg as {
+          requestId: string;
+          memberId: string;
+          department: string;
+          kind: string;
+          stagingDir: string;
+          status: string;
+          files?: string[];
+          summary?: string;
+        };
+        const rrRt = jcGetMemberRuntime(rr.memberId);
+        setRequestResult({
+          id: rr.requestId,
+          memberId: rr.memberId,
+          memberName: rrRt?.config.name ?? rr.memberId,
+          department: rrRt?.config.department ?? rr.department ?? 'engineering',
+          kind: rr.kind,
+          stagingDir: rr.stagingDir ?? '',
+          status: (['done', 'error', 'disabled', 'blocked'].includes(rr.status)
+            ? rr.status
+            : 'error') as RequestResultStatus,
+          files: Array.isArray(rr.files) ? rr.files.filter((f) => typeof f === 'string') : [],
+          summary: typeof rr.summary === 'string' ? rr.summary : '',
+        });
       } else if (msg.type === 'jcTasksBulkSync') {
         jcTasksBulkSync(msg.tasks as TaskDefinition[]);
       } else if (msg.type === 'jcActivitySummary') {

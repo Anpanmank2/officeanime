@@ -58,6 +58,17 @@ export interface RequestTemplate {
 }
 
 /**
+ * 依頼カードの種別 (2026-07-02 横展開: 作る・書く系へ):
+ *  - 'research': Research 📋調査を依頼 — read型・現行 pilot（無改変）
+ *  - 'market'  : Marketing 📊市場調査を依頼 — read型・research能動パス流用
+ *  - 'doc'     : Marketing 📄資料を依頼 — write型（下書き置き場に scoped 書込）
+ *  - 'impl'    : Eng 🔧実装を依頼 — write型（コード一式+適用手順のドラフト）
+ * The store is kind-agnostic (同じ template/questions/answers 機構); kind は
+ * ラベル分岐(UI)と backend のプロンプト/実行パス選択にだけ効く。
+ */
+export type RequestKind = 'research' | 'market' | 'doc' | 'impl';
+
+/**
  * Phase of the request flow:
  *  - 'form'      : the 3-field template is open, Owner is editing.
  *  - 'awaiting'  : template submitted, waiting for the read-only spawn's questions.
@@ -68,6 +79,8 @@ export type RequestPhase = 'form' | 'awaiting' | 'confirming';
 export interface RequestFlow {
   /** Request id — matches the backend pending-request id (routes questions/confirm). */
   id: string;
+  /** Card kind — research/market = read型, doc/impl = write型. */
+  kind: RequestKind;
   /** Roster member id that will investigate (e.g. "res-01"). */
   memberId: string;
   /** Resolved member name (e.g. "古賀 春樹"). Falls back to member id. */
@@ -138,6 +151,8 @@ export function openRequestFlow(opts: {
   memberId: string;
   memberName: string;
   department: string;
+  /** Card kind (default 'research' — the original pilot). */
+  kind?: RequestKind;
   priority?: number;
   /** Optional seed for the 概要 field (e.g. a picked dock card's task text). */
   seedOverview?: string;
@@ -147,6 +162,7 @@ export function openRequestFlow(opts: {
       typeof crypto !== 'undefined' && crypto.randomUUID
         ? crypto.randomUUID()
         : `req-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    kind: opts.kind ?? 'research',
     memberId: opts.memberId,
     memberName: opts.memberName,
     department: opts.department,
