@@ -237,6 +237,47 @@ export const LOG_DEPT_FILTER_MAP: Record<string, string> = {
   Secretary: 'exec',
 };
 
+// ── UI Text (2026-07-03 藤井 UI spec — centralized for easy swap) ──
+// P3 適用時に差し替えやすいよう新設文言は全てここに集約する。
+// トーン: ラベルは体言止め / 誘い文言は「〜してみましょう」 / 絵文字は1要素1個まで。
+export const UI_TEXT = {
+  // 会社ボード (旧 COMMAND BOARD)
+  companyBoardTitle: '🏛 会社ボード',
+  companyBoardScoreLabel: '会社スコア',
+  companyBoardTodayLabel: '本日完了（件）',
+  companyBoardZeroLine1: '今日のしごとは これから！',
+  // 制御改行 (\n + whiteSpace:pre-line 表示): 自然折返しだと「う」1字が孤立する。
+  // トーンガイド「1文言 全角20字目安」に沿い 2行に分割 (10字 / 17字)。
+  companyBoardZeroLine2: '下の依頼ドックから、\n最初のおしごとを頼んでみましょう 📋',
+  // 左下ボタン群
+  ownerArrive: '出社する',
+  ownerLeave: '退社する',
+  ownerButtonTitle: 'オーナーとしてオフィスに入る/出る',
+  tasksButton: 'しごと帳',
+  tasksButtonTitle: 'これまでの依頼と結果',
+  settingsButton: '設定',
+  settingsButtonTitle: '表示と動作の設定',
+} as const;
+
+// ── Zone Labels (2026-07-03 藤井 UI spec: 日本語化・最長5字) ──────
+// key = zone name used by jc-overlay ZONE_LABELS.
+export const ZONE_LABEL_TEXT: Record<string, string> = {
+  exec: '社長室',
+  marketing: 'マーケ部',
+  research: 'リサーチ部',
+  dev: '開発部',
+  ops: 'ラウンジ',
+};
+
+// ── Speech Bubble Duration (藤井 spec: 4秒 + 10字ごと+1秒, 上限8秒) ──
+export const SPEECH_BUBBLE_BASE_MS = 4000;
+export const SPEECH_BUBBLE_PER_10_CHARS_MS = 1000;
+export const SPEECH_BUBBLE_MAX_MS = 8000;
+
+// ── Ticker (会社ボード上部の出来事ティッカー) ───────────────────
+export const TICKER_MAX_ENTRIES = 5; // 最新5件 (藤井 spec §3)
+export const TICKER_MAX_CHARS = 40; // 40字超のみ「…」+ title で全文
+
 // ── Confidence Badge Colors (eng-05 spec) ───────────────────────
 export const CONFIDENCE_COLORS: Record<string, string> = {
   confirmed: '#5ac88c',

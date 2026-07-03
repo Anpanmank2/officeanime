@@ -1,4 +1,8 @@
-// ── Bottom Toolbar — Owner, Tasks, Settings ──────
+// ── Bottom Toolbar — Owner (出社/退社), しごと帳, 設定 ──────
+// Labels/titles centralized in UI_TEXT (jc-constants) per 2026-07-03 藤井 UI spec §4.
+// 委任ドックと同系のダークネイビー + 2px ボーダー(角丸なし)で白浮きを解消。
+
+import { UI_TEXT } from '../jc/jc-constants.js';
 
 interface BottomToolbarProps {
   isTaskHistoryOpen: boolean;
@@ -13,13 +17,21 @@ interface BottomToolbarProps {
 
 const btnBase: React.CSSProperties = {
   padding: '5px 10px',
-  fontSize: '24px',
-  color: 'rgba(200, 210, 240, 0.85)',
-  background: 'rgba(255, 255, 255, 0.06)',
-  border: '2px solid rgba(100, 140, 255, 0.15)',
+  fontSize: '12px',
+  color: '#c8d2f0',
+  background: 'rgba(20, 24, 48, 0.92)',
+  border: '2px solid rgba(100, 140, 255, 0.35)',
   borderRadius: 0,
   cursor: 'pointer',
   letterSpacing: '0.5px',
+};
+
+// ⚠ `key: cond ? x : undefined` は spread 後に btnBase を undefined で上書きし
+// UA 既定 (白ボタン) に落ちる — 旧「白浮き」の根因。active 時のみ上書きする。
+const btnActive: React.CSSProperties = {
+  color: '#5a8cff',
+  background: 'rgba(90, 140, 255, 0.15)',
+  border: '2px solid rgba(90, 140, 255, 0.5)',
 };
 
 export function BottomToolbar(props: BottomToolbarProps) {
@@ -39,50 +51,40 @@ export function BottomToolbar(props: BottomToolbarProps) {
     >
       {/* Left group: existing buttons */}
       <div style={{ display: 'flex', gap: 4 }}>
-        {/* Owner summon button */}
+        {/* Owner summon button — 出社する/退社する toggle */}
         {props.onToggleOwner !== undefined && (
           <button
             style={{
               ...btnBase,
-              fontSize: '9px',
-              fontFamily: "'FS Pixel Sans', sans-serif",
-              color: props.ownerAvatarActive ? '#ffd740' : 'rgba(255, 215, 64, 0.6)',
+              color: props.ownerAvatarActive ? '#ffd740' : 'rgba(255, 215, 64, 0.85)',
               background: props.ownerAvatarActive
                 ? 'rgba(255, 215, 64, 0.15)'
-                : 'rgba(255, 215, 64, 0.06)',
-              border: `2px solid ${props.ownerAvatarActive ? 'rgba(255, 215, 64, 0.7)' : 'rgba(255, 215, 64, 0.25)'}`,
+                : 'rgba(20, 24, 48, 0.92)',
+              border: `2px solid ${props.ownerAvatarActive ? 'rgba(255, 215, 64, 0.7)' : 'rgba(255, 215, 64, 0.35)'}`,
             }}
             onClick={props.onToggleOwner}
-            title={props.ownerAvatarActive ? 'Owner を退場させる' : 'Summon Owner'}
-            aria-label="Summon Owner"
+            title={UI_TEXT.ownerButtonTitle}
+            aria-label={UI_TEXT.ownerButtonTitle}
           >
-            OWNER
+            {props.ownerAvatarActive ? UI_TEXT.ownerLeave : UI_TEXT.ownerArrive}
           </button>
         )}
-        {/* Tasks button */}
+        {/* しごと帳 (task history) button */}
         <button
-          style={{
-            ...btnBase,
-            color: props.isTaskHistoryOpen ? '#5a8cff' : undefined,
-            background: props.isTaskHistoryOpen ? 'rgba(90, 140, 255, 0.15)' : undefined,
-            border: props.isTaskHistoryOpen ? '2px solid rgba(90, 140, 255, 0.5)' : undefined,
-          }}
+          style={{ ...btnBase, ...(props.isTaskHistoryOpen ? btnActive : {}) }}
           onClick={props.onToggleTaskHistory}
+          title={UI_TEXT.tasksButtonTitle}
         >
-          Tasks
+          {UI_TEXT.tasksButton}
         </button>
 
-        {/* Settings button */}
+        {/* 設定 (settings) button */}
         <button
-          style={{
-            ...btnBase,
-            color: props.isSettingsOpen ? '#5a8cff' : undefined,
-            background: props.isSettingsOpen ? 'rgba(90, 140, 255, 0.15)' : undefined,
-            border: props.isSettingsOpen ? '2px solid rgba(90, 140, 255, 0.5)' : undefined,
-          }}
+          style={{ ...btnBase, ...(props.isSettingsOpen ? btnActive : {}) }}
           onClick={props.onOpenSettings}
+          title={UI_TEXT.settingsButtonTitle}
         >
-          Settings
+          {UI_TEXT.settingsButton}
         </button>
       </div>
 

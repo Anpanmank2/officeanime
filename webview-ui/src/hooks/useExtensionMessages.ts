@@ -197,7 +197,20 @@ export function useExtensionMessages(
         pendingAgents = [];
         // Process buffered JC member arrivals — place directly at desk
         for (const a of pendingJCArrivals) {
+          // 出社ログは不在→在席の遷移時のみ (P2-1 dedupe, live 経路と同一規約)
+          const bufWasPresent = jcGetMemberRuntime(a.memberId)?.isPresent === true;
           jcMemberArriving(a.memberId);
+          if (!bufWasPresent) {
+            const bufRt = jcGetMemberRuntime(a.memberId);
+            addLogEntry({
+              timestamp: Date.now(),
+              memberId: a.memberId,
+              memberName: bufRt?.config.name ?? a.memberId,
+              department: bufRt?.config.department ?? 'exec',
+              type: 'arrival',
+              summary: `${bufRt?.config.name ?? a.memberId} が出社しました`,
+            });
+          }
           const existing = os.characters.get(a.agentId);
           if (existing) {
             if (existing.seatId) {
@@ -569,17 +582,25 @@ export function useExtensionMessages(
           return;
         }
 
+        // 出社spam根治 (2026-07-03 P2-1): jcMemberArriving は「presence を保証する」
+        // 冪等メッセージとして client-init / jc-events replay (再起動で lastProcessedIndex
+        // がリセット) / 再接続から同一メンバー宛に重複して届く。ログは不在→在席の
+        // 遷移時のみ記録する。jcMemberArriving() 自体は state 更新(+ e2e が assert する
+        // console.log)のため常に呼ぶ。
+        const arrWasPresent = jcGetMemberRuntime(memberId)?.isPresent === true;
         jcMemberArriving(memberId);
-        // Log arrival
-        const arrRt = jcGetMemberRuntime(memberId);
-        addLogEntry({
-          timestamp: Date.now(),
-          memberId,
-          memberName: arrRt?.config.name ?? memberId,
-          department: arrRt?.config.department ?? 'exec',
-          type: 'arrival',
-          summary: `${arrRt?.config.name ?? memberId} が出社しました`,
-        });
+        if (!arrWasPresent) {
+          // Log arrival (absent → present transition only)
+          const arrRt = jcGetMemberRuntime(memberId);
+          addLogEntry({
+            timestamp: Date.now(),
+            memberId,
+            memberName: arrRt?.config.name ?? memberId,
+            department: arrRt?.config.department ?? 'exec',
+            type: 'arrival',
+            summary: `${arrRt?.config.name ?? memberId} が出社しました`,
+          });
+        }
 
         // If character already exists (from agentCreated), reassign to correct seat
         const existing = os.characters.get(agentId);
@@ -639,17 +660,21 @@ export function useExtensionMessages(
       } else if (msg.type === 'jcMemberLeaving') {
         const agentId = msg.agentId as number;
         const memberId = msg.memberId as string;
+        // 退社も対称に dedupe: 在席中のみログ (replay された leave の重複を抑止)。
+        const depWasPresent = jcGetMemberRuntime(memberId)?.isPresent === true;
         jcMemberLeaving(memberId);
-        // Log departure
-        const depRt = jcGetMemberRuntime(memberId);
-        addLogEntry({
-          timestamp: Date.now(),
-          memberId,
-          memberName: depRt?.config.name ?? memberId,
-          department: depRt?.config.department ?? 'exec',
-          type: 'departure',
-          summary: `${depRt?.config.name ?? memberId} が退社しました`,
-        });
+        if (depWasPresent) {
+          // Log departure (present → leaving transition only)
+          const depRt = jcGetMemberRuntime(memberId);
+          addLogEntry({
+            timestamp: Date.now(),
+            memberId,
+            memberName: depRt?.config.name ?? memberId,
+            department: depRt?.config.department ?? 'exec',
+            type: 'departure',
+            summary: `${depRt?.config.name ?? memberId} が退社しました`,
+          });
+        }
 
         // Walk character to entrance, then despawn
         const ch = os.characters.get(agentId);
@@ -919,13 +944,15 @@ export function useExtensionMessages(
         jcAddSpeechBubble(msg.bubble as SpeechBubble);
         const bubble = msg.bubble as SpeechBubble;
         const rt = jcGetMemberRuntime(bubble.memberId);
+        // OFFICE LOG が全文の正 (P2-3): 吹き出し用に切り詰められた text ではなく
+        // fullText (あれば) を記録。吹き出し=短く / 文脈はログで、の一貫動線。
         addLogEntry({
           timestamp: Date.now(),
           memberId: bubble.memberId,
           memberName: rt?.config.name ?? bubble.memberId,
           department: bubble.department ?? rt?.config.department ?? 'exec',
           type: 'speech',
-          summary: `${rt?.config.name ?? bubble.memberId}: ${bubble.text}`,
+          summary: `${rt?.config.name ?? bubble.memberId}: ${bubble.fullText ?? bubble.text}`,
         });
       } else if (msg.type === 'jcFitBadge') {
         const m = msg as { memberId: string; tier: GameTier; fit: number; label: string };

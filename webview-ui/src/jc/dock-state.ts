@@ -17,6 +17,12 @@ export interface DockCard {
 
 // Seed cards cover the affinity spectrum so Owner can test ◎ vs ✗ by dropping the
 // SAME card on different members (e.g. 調査 card on 古賀=◎ vs 田中=✗).
+//
+// 2026-07-03 UI/UX整理 P1-1: the 4 依頼(request) cards are now the dock's
+// primary entries, so these demo cards are HIDDEN BY DEFAULT (not deleted —
+// they remain useful for affinity ◎/✗ spot-testing). Re-enable without a
+// rebuild via localStorage: `localStorage.setItem('pixelAgents.showSeedCards', '1')`
+// and reload. Manual [+] card add is unaffected.
 const SEED_CARDS: DockCard[] = [
   { id: 'seed-research', task: '市場の調査 research を分析する', short: '調査', priority: 3 },
   { id: 'seed-impl', task: '新機能を実装する implement コード', short: '実装', priority: 3 },
@@ -25,7 +31,19 @@ const SEED_CARDS: DockCard[] = [
   { id: 'seed-bugfix', task: 'バグ修正 fix クラッシュ対応', short: 'バグ修正', priority: 1 },
 ];
 
-let cards: DockCard[] = [...SEED_CARDS];
+/** Opt-in flag for the seed demo cards (default OFF). */
+function seedCardsEnabled(): boolean {
+  try {
+    return (
+      typeof localStorage !== 'undefined' &&
+      localStorage.getItem('pixelAgents.showSeedCards') === '1'
+    );
+  } catch {
+    return false; // storage unavailable (sandboxed webview) → default hidden
+  }
+}
+
+let cards: DockCard[] = seedCardsEnabled() ? [...SEED_CARDS] : [];
 let pickedId: string | null = null;
 let seq = 0;
 

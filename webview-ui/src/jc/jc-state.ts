@@ -1,6 +1,14 @@
 // ── Just Curious Virtual Office — Webview State Manager ─────────
 
-import { DEPT_COLORS, IDLE_TIMEOUT_MS, PERMANENT_ROLES, STATE_COLORS } from './jc-constants.js';
+import {
+  DEPT_COLORS,
+  IDLE_TIMEOUT_MS,
+  PERMANENT_ROLES,
+  SPEECH_BUBBLE_BASE_MS,
+  SPEECH_BUBBLE_MAX_MS,
+  SPEECH_BUBBLE_PER_10_CHARS_MS,
+  STATE_COLORS,
+} from './jc-constants.js';
 import type {
   AbsenceInfo,
   JCBubbleType,
@@ -90,6 +98,15 @@ const EXEC_POSITIONS: Array<{ id: string; col: number; row: number; label: strin
 export function jcLoadConfig(config: JCConfigData): void {
   jcConfig = config;
   for (const member of config.members) {
+    // 再接続 (server 再起動 → ws auto-reconnect) で jcConfigLoaded が再送される。
+    // 既存 runtime を作り直すと presence がリセットされ、直後の arrival replay が
+    // 「出社しました」を再ログしてしまう (P2-1 出社spam の一因)。既存メンバーは
+    // config だけ差し替え、live state (isPresent/jcState/稼働統計) は保持する。
+    const prev = memberRuntimes.get(member.id);
+    if (prev) {
+      prev.config = member;
+      continue;
+    }
     memberRuntimes.set(member.id, {
       memberId: member.id,
       config: member,
@@ -712,12 +729,23 @@ export function jcGetDashboardMembers(
 
 const speechBubbles: SpeechBubble[] = [];
 
+/** 表示時間 (2026-07-03 藤井 spec §3): 4秒 + 10字ごと+1秒、上限8秒。
+ *  長さはセリフの元の長さ (fullText 優先) で測る — 長い話ほど長く残す。 */
+export function computeBubbleDuration(bubble: SpeechBubble): number {
+  const len = (bubble.fullText ?? bubble.text).length;
+  return Math.min(
+    SPEECH_BUBBLE_BASE_MS + Math.floor(len / 10) * SPEECH_BUBBLE_PER_10_CHARS_MS,
+    SPEECH_BUBBLE_MAX_MS,
+  );
+}
+
 /** Add a speech bubble for a member */
 export function jcAddSpeechBubble(bubble: SpeechBubble): void {
   // Remove existing bubble for this member (only one at a time)
   const idx = speechBubbles.findIndex((b) => b.memberId === bubble.memberId);
   if (idx >= 0) speechBubbles.splice(idx, 1);
-  speechBubbles.push(bubble);
+  // sender 側の固定 duration (3000 等) は表示式で上書きする (藤井 spec §3)
+  speechBubbles.push({ ...bubble, duration: computeBubbleDuration(bubble) });
   scheduleMemberNotify();
 }
 

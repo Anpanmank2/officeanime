@@ -1032,6 +1032,12 @@ async function main(): Promise<void> {
     taskWatcher = new TaskWatcher(jcConfig as JCConfig, emptyAgents, 5, spawnClaude, true);
   }
 
+  // 出社spam根治 (2026-07-03 P2-1): jcMemberArriving は client-init / EventWatcher の
+  // jc-events replay から同一メンバー宛に何度も broadcast される「presence 保証」
+  // メッセージ。永続 office-log には 不在→在席 / 在席→不在 の遷移時だけ記録する
+  // (broadcast 自体は無改変 — キャラ表示の再構築はこれまで通り動く)。
+  const officeLogPresent = new Set<string>();
+
   // Helper: intercept broadcast messages to persist to office log
   function writeToOfficeLog(msg: unknown): void {
     const m = msg as { type?: string; [key: string]: unknown };
@@ -1050,6 +1056,8 @@ async function main(): Promise<void> {
     switch (m.type) {
       case 'jcMemberArriving': {
         const memberId = m.memberId as string;
+        if (officeLogPresent.has(memberId)) break; // already present — replay/re-init dup
+        officeLogPresent.add(memberId);
         officeLogWriter.write({
           timestamp: Date.now(),
           memberId,
@@ -1063,6 +1071,8 @@ async function main(): Promise<void> {
       }
       case 'jcMemberLeaving': {
         const memberId = m.memberId as string;
+        if (!officeLogPresent.has(memberId)) break; // not present — replayed leave dup
+        officeLogPresent.delete(memberId);
         officeLogWriter.write({
           timestamp: Date.now(),
           memberId,
@@ -1110,7 +1120,14 @@ async function main(): Promise<void> {
         break;
       }
       case 'jcSpeechBubble': {
-        const bubble = m.bubble as { memberId: string; text: string; department: string };
+        // ログは全文が正 (P2-3): 吹き出し用に切り詰められた text ではなく
+        // fullText (あれば) を記録する。文脈は OFFICE LOG で読む一貫動線。
+        const bubble = m.bubble as {
+          memberId: string;
+          text: string;
+          fullText?: string;
+          department: string;
+        };
         if (bubble) {
           officeLogWriter.write({
             timestamp: Date.now(),
@@ -1118,7 +1135,7 @@ async function main(): Promise<void> {
             memberName: findMemberName(bubble.memberId),
             department: bubble.department,
             type: 'speech',
-            summary: `${findMemberName(bubble.memberId)}: ${bubble.text}`,
+            summary: `${findMemberName(bubble.memberId)}: ${bubble.fullText ?? bubble.text}`,
             sourceEvent: 'jcSpeechBubble',
           });
         }

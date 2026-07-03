@@ -15,7 +15,7 @@ import { CompletionToast } from './jc/CompletionToast.js';
 import { DelegationDock } from './jc/DelegationDock.js';
 import { DeskCard } from './jc/DeskCard.js';
 import { gameGetCompanyScore, gameGetTodayCount, subscribeGame } from './jc/game-state.js';
-import { DEPT_COLORS } from './jc/jc-constants.js';
+import { DEPT_COLORS, TICKER_MAX_CHARS, TICKER_MAX_ENTRIES, UI_TEXT } from './jc/jc-constants.js';
 import {
   jcGetOwnerAvatarState,
   jcSetOwnerAvatarState,
@@ -145,16 +145,32 @@ function EditActionBar({
   );
 }
 
-// ── Command Board — shown only in command mode ────────────────────
-// Ticker showing latest 5 OfficeLog entries + operation board placeholder.
+// ── Command Board (会社ボード) — shown only in command mode ─────────
+// Ticker showing latest OfficeLog events + live company standings board.
+// 2026-07-03 藤井 UI spec §2/§3: board は左上退避 (マップ被さり解消)、
+// ticker は「出来事」専用 (セリフ断片は吹き出し + OFFICE LOG が正)。
+
+// 出来事専用 (藤井 spec §3): セリフ (type === 'speech') はティッカーに流さない —
+// 出社/開始/完了/委任の定型文だけになり「…」切れが構造的に消える。
+// Drop entries with no resolved member (removes "[] undefined: → coding" glitch).
+// ⚠ 必ず新しい配列を返すこと: office-log-state は同一配列を mutate するため、
+// 同じ参照を setState に渡すと React が bail out してティッカーが更新されない。
+function selectTickerEntries() {
+  return getLogEntries()
+    .filter((e) => e.memberName && e.memberName !== 'undefined' && e.summary)
+    .filter((e) => e.type !== 'speech')
+    .slice(-TICKER_MAX_ENTRIES)
+    .reverse();
+}
 
 function CommandBoard() {
-  const [recentEntries, setRecentEntries] = useState(() => getLogEntries().slice(-6).reverse());
+  const [tickerEntries, setTickerEntries] = useState(selectTickerEntries);
   const [companyScore, setCompanyScore] = useState(() => gameGetCompanyScore());
   const [todayCount, setTodayCount] = useState(() => gameGetTodayCount());
 
   useEffect(() => {
-    const update = () => setRecentEntries(getLogEntries().slice(-6).reverse());
+    const update = () => setTickerEntries(selectTickerEntries());
+    update();
     return subscribeLog(update);
   }, []);
 
@@ -166,12 +182,6 @@ function CommandBoard() {
     update();
     return subscribeGame(update);
   }, []);
-
-  // Drop entries with no resolved member (removes "[] undefined: → coding" glitch).
-  // The summary already contains the member name, so the [name] prefix was redundant.
-  const tickerEntries = recentEntries.filter(
-    (e) => e.memberName && e.memberName !== 'undefined' && e.summary,
-  );
 
   return (
     <>
@@ -213,71 +223,98 @@ function CommandBoard() {
               title={`${entry.memberName}: ${entry.summary}`}
             >
               {i > 0 && <span style={{ color: 'rgba(0,180,255,0.35)' }}>•</span>}
-              {entry.summary}
+              {/* 定型文は40字以内が常。超えた時だけ「…」(全文は title で) */}
+              {entry.summary.length > TICKER_MAX_CHARS
+                ? `${entry.summary.slice(0, TICKER_MAX_CHARS)}…`
+                : entry.summary}
             </span>
           ))
         )}
       </div>
 
-      {/* Command board — live company standings */}
+      {/* 会社ボード — live company standings.
+          左上退避 (藤井 spec §2): ティッカー下・マップ左の暗部余白。中央の
+          キャラ/デスクに被らない。ゼロ状態は数字でなく誘い文言 2 行。 */}
       <div
         style={{
           position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
+          top: 48,
+          left: 16,
           zIndex: 45,
           background: 'rgba(8, 10, 25, 0.75)',
           border: '2px solid rgba(0, 180, 255, 0.25)',
-          padding: '16px 24px',
-          minWidth: 280,
-          textAlign: 'center',
+          padding: '10px 14px',
+          minWidth: 200,
+          maxWidth: 280,
+          textAlign: 'left',
           pointerEvents: 'none',
         }}
       >
         <div style={{ fontSize: '16px', color: '#00f0ff', fontWeight: 'bold', marginBottom: 10 }}>
-          🏛 COMMAND BOARD
+          {UI_TEXT.companyBoardTitle}
         </div>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'flex-end',
-            gap: 32,
-            fontSize: '13px',
-          }}
-        >
-          {/* Number is the hero: large + bold so a "0" reads as a digit, not a period.
-              The pixel font's small "0" glyph is near-identical to "。" at 13px. */}
-          <span
+        {companyScore === 0 && todayCount === 0 ? (
+          // ゼロ状態: 「0」を2つ見せるより、最初のおしごとへ誘う (藤井 spec §2)
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontSize: '13px', color: '#00f0ff' }}>
+              {UI_TEXT.companyBoardZeroLine1}
+            </span>
+            <span
+              style={{
+                fontSize: '11px',
+                color: 'rgba(200,210,240,0.85)',
+                whiteSpace: 'pre-line', // 定数内 \n の制御改行を有効化 (1字孤立の折返し防止)
+              }}
+            >
+              {UI_TEXT.companyBoardZeroLine2}
+            </span>
+          </div>
+        ) : (
+          <div
             style={{
-              color: '#39ff14',
-              display: 'inline-flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 2,
+              display: 'flex',
+              justifyContent: 'flex-start',
+              alignItems: 'flex-end',
+              gap: 32,
+              fontSize: '13px',
             }}
           >
-            <span style={{ fontSize: '11px', opacity: 0.85 }}>会社スコア</span>
-            <b style={{ fontSize: '26px', fontWeight: 900, lineHeight: 1 }}>
-              {companyScore.toLocaleString()}
-            </b>
-          </span>
-          <span
-            style={{
-              color: '#f0d840',
-              display: 'inline-flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: 2,
-            }}
-          >
-            <span style={{ fontSize: '11px', opacity: 0.85 }}>本日完了（件）</span>
-            <b style={{ fontSize: '26px', fontWeight: 900, lineHeight: 1 }}>
-              {todayCount.toLocaleString()}
-            </b>
-          </span>
-        </div>
+            {/* Number is the hero: large + bold so a "0" reads as a digit, not a period.
+                The pixel font's small "0" glyph is near-identical to "。" at 13px. */}
+            <span
+              style={{
+                color: '#39ff14',
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 2,
+              }}
+            >
+              <span style={{ fontSize: '11px', opacity: 0.85 }}>
+                {UI_TEXT.companyBoardScoreLabel}
+              </span>
+              <b style={{ fontSize: '26px', fontWeight: 900, lineHeight: 1 }}>
+                {companyScore.toLocaleString()}
+              </b>
+            </span>
+            <span
+              style={{
+                color: '#f0d840',
+                display: 'inline-flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 2,
+              }}
+            >
+              <span style={{ fontSize: '11px', opacity: 0.85 }}>
+                {UI_TEXT.companyBoardTodayLabel}
+              </span>
+              <b style={{ fontSize: '26px', fontWeight: 900, lineHeight: 1 }}>
+                {todayCount.toLocaleString()}
+              </b>
+            </span>
+          </div>
+        )}
       </div>
     </>
   );

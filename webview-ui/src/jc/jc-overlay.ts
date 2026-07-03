@@ -26,6 +26,7 @@ import {
   MEMBER_IDLE_EMOJIS,
   SPEECH_BUBBLE_COLORS,
   TASK_STATUS_COLORS,
+  ZONE_LABEL_TEXT,
 } from './jc-constants.js';
 import {
   jcGetActiveLiaisons,
@@ -52,8 +53,10 @@ const NAMEPLATE_PADDING_X = 3;
 const NAMEPLATE_PADDING_Y = 2;
 const NAMEPLATE_OFFSET_Y = -2;
 
-const ZONE_LABEL_FONT = '9px "Press Start 2P", monospace';
-const ZONE_LABEL_FALLBACK_FONT = '10px monospace';
+// 日本語ラベル (2026-07-03 藤井 spec §1): 日本語glyphは Press Start 2P に無く
+// スタック内の monospace に落ちるため bold を付与して視認性を確保する。
+const ZONE_LABEL_FONT = 'bold 9px "Press Start 2P", monospace';
+const ZONE_LABEL_FALLBACK_FONT = 'bold 10px monospace';
 
 const EXEC_ICON_SIZE = 12;
 const EXEC_LABEL_FONT = '6px "Press Start 2P", monospace';
@@ -62,12 +65,13 @@ const EXEC_LABEL_FALLBACK_FONT = '7px monospace';
 const STATS_FALLBACK_FONT = '8px monospace';
 
 // ── Zone labels ──────────────────────────────────────────────────
+// 文言は ZONE_LABEL_TEXT (jc-constants) に集約 — P3 差し替えは定数側で行う。
 const ZONE_LABELS: Array<{ text: string; col: number; row: number; zone: string }> = [
-  { text: 'EXECUTIVE', col: 10, row: 2, zone: 'exec' },
-  { text: 'MARKETING', col: 4, row: 7, zone: 'marketing' },
-  { text: 'RESEARCH', col: 17, row: 7, zone: 'research' },
-  { text: 'DEV ZONE', col: 4, row: 15, zone: 'dev' },
-  { text: 'LOUNGE', col: 17, row: 15, zone: 'ops' },
+  { text: ZONE_LABEL_TEXT.exec, col: 10, row: 2, zone: 'exec' },
+  { text: ZONE_LABEL_TEXT.marketing, col: 4, row: 7, zone: 'marketing' },
+  { text: ZONE_LABEL_TEXT.research, col: 17, row: 7, zone: 'research' },
+  { text: ZONE_LABEL_TEXT.dev, col: 4, row: 15, zone: 'dev' },
+  { text: ZONE_LABEL_TEXT.ops, col: 17, row: 15, zone: 'ops' },
 ];
 
 // ── Glass walls ──────────────────────────────────────────────────

@@ -437,6 +437,10 @@ export interface SpeechBubble {
   id: string;
   memberId: string;
   text: string;
+  /** Untruncated original line — OFFICE LOG/ticker log this instead of the
+   *  bubble-truncated `text` (2026-07-03 P2-3 「…」切れ対策). Optional for
+   *  backward compat: senders that don't truncate may omit it. */
+  fullText?: string;
   department: string;
   timestamp: number; // Date.now()
   duration: number; // ms (default 3000)
