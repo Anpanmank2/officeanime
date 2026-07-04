@@ -17,6 +17,7 @@ import {
   jcActivitySummaryUpdate,
   jcAddSpeechBubble,
   jcGetBreakTarget,
+  jcGetDeskPosition,
   jcGetMemberRuntime,
   jcGetPokerSeat,
   jcLoadConfig,
@@ -28,11 +29,20 @@ import {
   jcTasksBulkSync,
   jcTaskUpdate,
   jcTriggerLiaison,
+  jcTriggerMailFlight,
   jcTriggerSubagentThinking,
   jcTriggerTaskCompleted,
   jcTriggerWave,
   jcUpdateMappings,
 } from '../jc/index.js';
+import { IDLE_TINT_STATES, MAIL_FLIGHT_MS, NON_WORKING_STATES } from '../jc/jc-constants.js';
+import { jcGetAllMembers } from '../jc/jc-state.js';
+import {
+  appendKarteEvent,
+  bulkSetKarteEvents,
+  computeMemberWorkloads,
+  type KarteRawEvent,
+} from '../jc/karte-state.js';
 import { addLogEntry } from '../jc/office-log-state.js';
 import { addPlan, type PlanOrigin } from '../jc/plan-state.js';
 import { type ConfirmQuestion, setRequestQuestions } from '../jc/request-flow-state.js';
@@ -112,6 +122,92 @@ export interface ExtensionMessageState {
   watchAllSessions: boolean;
   setWatchAllSessions: (v: boolean) => void;
   alwaysShowLabels: boolean;
+}
+
+/**
+ * member → character の解決 (§2(a) 彩度落ちフラグ同期用)。
+ * jc-events 経由の jcMemberStateChange は agentId がランダム負数のため
+ * characters.get(agentId) では引けない — 到着時に刻んだ ch.jcMemberId で逆引きする。
+ * 同一 member の再到着で複数 hit し得るため最後 (最新) の char を返す。
+ */
+function findMemberCharacter(os: OfficeState, memberId: string) {
+  let found: ReturnType<OfficeState['characters']['get']> = undefined;
+  for (const ch of os.characters.values()) {
+    if (!ch.isSubagent && ch.jcMemberId === memberId) found = ch;
+  }
+  return found;
+}
+
+/**
+ * R1 稼働率の根治 (2026-07-03 Owner確定): 接続・再起動・reload 時に
+ * jcEventHistory (イベント履歴) から全 member の状態を復元する。
+ * 「稼働中 = 未完了のしごとを持つ間」(karte-state の正本定義) に該当する member を
+ * 出社+働く姿に戻す — 「新イベントが来るまで 0/x」を根絶する。
+ *
+ * - agentId は roster index による安定負数 (-9000 - idx): 再実行 (config 再送・
+ *   history 再 sync) しても同じ id に解決され、キャラが重複しない。
+ * - 既存の jcMemberArriving / jcMemberStateChange 経路を synthetic MessageEvent で
+ *   再利用する (layout 未ロード時の buffering・出社ログ dedupe を既存規約のまま通す)。
+ * - すでに present / working 状態の member はそのまま (live 経路を上書きしない)。
+ */
+function reconcileWorkloadPresence(): void {
+  const members = jcGetAllMembers();
+  if (members.length === 0) return; // config 未ロード — jcConfigLoaded 後に再実行される
+  const workloads = computeMemberWorkloads();
+  const dispatch = (data: unknown) => window.dispatchEvent(new MessageEvent('message', { data }));
+  const restored: string[] = [];
+  members.forEach((m, idx) => {
+    const wl = workloads.get(m.id);
+    const active = wl?.active.length ?? 0;
+    if (active === 0) return;
+    const stableAgentId = -9000 - idx;
+    if (jcGetMemberRuntime(m.id)?.isPresent !== true) {
+      dispatch({
+        type: 'jcMemberArriving',
+        agentId: stableAgentId,
+        memberId: m.id,
+        deskId: m.deskId,
+        seatUid: m.deskId,
+        hueShift: m.hueShift,
+        palette: m.palette ?? 0,
+      });
+    }
+    // 状態も同一定義から復元。live 経路で既に働いている member は上書きしない。
+    const st = jcGetMemberRuntime(m.id)?.jcState;
+    if (!st || NON_WORKING_STATES.has(st)) {
+      const startedAt = wl!.active.reduce((min, w) => Math.min(min, w.startedAt), Date.now());
+      dispatch({
+        type: 'jcMemberStateChange',
+        agentId: stableAgentId,
+        memberId: m.id,
+        jcState: 'coding',
+        stateSince: startedAt,
+      });
+    }
+    restored.push(`${m.id}(${active})`);
+  });
+  console.log(
+    restored.length > 0
+      ? `[JC-WV] Workload restore: ${restored.length} member(s) with open work — ${restored.join(', ')}`
+      : '[JC-WV] Workload restore: no open work in history',
+  );
+}
+
+/**
+ * deskId → 実 seat uid の解決 (skill: seatuid-trap 罠1 の根治)。
+ * layout の椅子 uid は 'mkt-bench-01' 形式で DESK_POSITIONS の deskId
+ * ('mkt-desk-01') と一致しない — uid 直引きが外れたらデスク座標一致で引く。
+ * これで jc-events 駆動の member が「自分の席」に座る (到着順の空席流れを防ぐ)。
+ */
+function resolveSeatUid(os: OfficeState, deskId: string): string | null {
+  if (!deskId) return null;
+  if (os.seats.has(deskId)) return deskId;
+  const pos = jcGetDeskPosition(deskId);
+  if (!pos) return null;
+  for (const [uid, seat] of os.seats) {
+    if (seat.seatCol === pos.col && seat.seatRow === pos.row) return uid;
+  }
+  return null;
 }
 
 function saveAgentSeats(os: OfficeState): void {
@@ -211,17 +307,20 @@ export function useExtensionMessages(
               summary: `${bufRt?.config.name ?? a.memberId} が出社しました`,
             });
           }
+          // deskId → 実 seat uid (bench形式) を解決 — 自分の席に座らせる
+          const bufSeatUid = resolveSeatUid(os, a.deskId) ?? a.deskId;
           const existing = os.characters.get(a.agentId);
           if (existing) {
+            existing.jcMemberId = a.memberId; // member→char 逆引き用 (§2(a))
             if (existing.seatId) {
               const oldSeat = os.seats.get(existing.seatId);
               if (oldSeat) oldSeat.assigned = false;
             }
-            if (a.deskId && os.seats.has(a.deskId)) {
-              const seat = os.seats.get(a.deskId)!;
+            if (bufSeatUid && os.seats.has(bufSeatUid)) {
+              const seat = os.seats.get(bufSeatUid)!;
               if (!seat.assigned) {
                 seat.assigned = true;
-                existing.seatId = a.deskId;
+                existing.seatId = bufSeatUid;
                 existing.tileCol = seat.seatCol;
                 existing.tileRow = seat.seatRow;
                 existing.x = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
@@ -230,8 +329,9 @@ export function useExtensionMessages(
               }
             }
           } else {
-            os.addAgent(a.agentId, a.palette, a.hueShift, a.deskId, true);
+            os.addAgent(a.agentId, a.palette, a.hueShift, bufSeatUid, true);
             const ch2 = os.characters.get(a.agentId);
+            if (ch2) ch2.jcMemberId = a.memberId; // member→char 逆引き用 (§2(a))
             if (ch2 && ch2.seatId) {
               const s2 = os.seats.get(ch2.seatId);
               if (s2) {
@@ -262,6 +362,9 @@ export function useExtensionMessages(
         }
         pendingJCArrivals = [];
         layoutReadyRef.current = true;
+        // R1: layout 前に届いた履歴で state だけ復元済みのケースの
+        // キャラ着席/アニメ同期を取り直す (冪等 — 安定 agentId)。
+        reconcileWorkloadPresence();
         setLayoutReady(true);
         if (msg.wasReset) {
           setLayoutWasReset(true);
@@ -568,19 +671,24 @@ export function useExtensionMessages(
       // ── JC Messages ──────────────────────────────────────────
       else if (msg.type === 'jcConfigLoaded') {
         jcLoadConfig(msg.config);
+        // R1: 拡張経路等で config が履歴より後に届くケースの取りこぼし防止
+        // (roster が無いと復元できない)。冪等 — 安定 agentId + 遷移 dedupe。
+        reconcileWorkloadPresence();
       } else if (msg.type === 'jcMemberArriving') {
         const agentId = msg.agentId as number;
         const memberId = msg.memberId as string;
         const deskId = msg.deskId as string;
         const hueShift = (msg.hueShift as number) ?? 0;
         const palette = msg.palette as number | undefined;
-        const seatUid = deskId; // seat UID in layout matches deskId
 
         // Buffer if layout not ready yet (seats don't exist)
         if (!layoutReadyRef.current) {
           pendingJCArrivals.push({ agentId, memberId, deskId, hueShift, palette });
           return;
         }
+
+        // deskId → 実 seat uid (bench形式) を解決 — member を自分の席に座らせる
+        const seatUid = resolveSeatUid(os, deskId) ?? deskId;
 
         // 出社spam根治 (2026-07-03 P2-1): jcMemberArriving は「presence を保証する」
         // 冪等メッセージとして client-init / jc-events replay (再起動で lastProcessedIndex
@@ -605,6 +713,7 @@ export function useExtensionMessages(
         // If character already exists (from agentCreated), reassign to correct seat
         const existing = os.characters.get(agentId);
         if (existing) {
+          existing.jcMemberId = memberId; // member→char 逆引き用 (§2(a))
           // Free old seat
           if (existing.seatId) {
             const oldSeat = os.seats.get(existing.seatId);
@@ -629,6 +738,7 @@ export function useExtensionMessages(
           // Create character at preferred seat, then walk from nearby tile
           os.addAgent(agentId, palette, hueShift, seatUid, true);
           const ch = os.characters.get(agentId);
+          if (ch) ch.jcMemberId = memberId; // member→char 逆引き用 (§2(a))
           if (ch && ch.seatId) {
             const seat = os.seats.get(ch.seatId);
             if (seat) {
@@ -727,6 +837,11 @@ export function useExtensionMessages(
           if (m.activitySummary !== null) {
             jcActivitySummaryUpdate(m.memberId, m.activitySummary);
           }
+          // §2(a): 再初期化後も彩度落ち状態を復元
+          const syncCh = findMemberCharacter(os, m.memberId);
+          if (syncCh) {
+            syncCh.jcDesaturated = IDLE_TINT_STATES.has(m.jcState);
+          }
         }
       } else if (msg.type === 'jcMemberStateChange') {
         const agentId = msg.agentId as number;
@@ -734,6 +849,14 @@ export function useExtensionMessages(
         const stateSince = msg.stateSince as number | undefined;
         jcMemberStateChange(msg.memberId, jcState, stateSince);
         jcRecordActivity(msg.memberId as string);
+
+        // §2(a) 出社アイドル: idle/break は彩度落ちスプライトに切替
+        // (agentId は event 経由だとランダム負数 → member の座席で解決)
+        const tintCh =
+          os.characters.get(agentId) ?? findMemberCharacter(os, msg.memberId as string);
+        if (tintCh) {
+          tintCh.jcDesaturated = IDLE_TINT_STATES.has(jcState);
+        }
         // Log state change (skip empty/undefined IDs → no "undefined: → coding" ghost row)
         const scMid = msg.memberId as string;
         const scRt = jcGetMemberRuntime(scMid);
@@ -748,21 +871,25 @@ export function useExtensionMessages(
           });
         }
 
-        // Sync character animation with JC state
-        const ch = os.characters.get(agentId);
+        // Sync character animation with JC state.
+        // agentId は jc-events 経路ではランダム負数 (member の実キャラと不一致) —
+        // ch.jcMemberId 逆引きで実キャラに fallback する (skill: seatuid-trap 罠2)。
+        // これで event 駆動の member も「普通に働く姿」(着席+タイピング) になる。
+        const ch = os.characters.get(agentId) ?? findMemberCharacter(os, scMid);
         if (ch) {
+          const chId = ch.id;
           if (jcState === 'reading' || jcState === 'reviewing') {
             ch.currentTool = 'Read'; // triggers reading animation
             ch.isActive = true;
-            os.sendToSeat(agentId);
+            os.sendToSeat(chId);
           } else if (jcState === 'coding') {
             ch.currentTool = 'Write'; // triggers typing animation
             ch.isActive = true;
-            os.sendToSeat(agentId);
+            os.sendToSeat(chId);
           } else if (jcState === 'thinking') {
             ch.currentTool = 'Task'; // triggers thinking animation
             ch.isActive = true;
-            os.sendToSeat(agentId);
+            os.sendToSeat(chId);
           } else if (jcState === 'idle') {
             ch.currentTool = null;
             ch.isActive = false; // will trigger idle wander
@@ -772,28 +899,28 @@ export function useExtensionMessages(
             ch.state = CharacterState.ERROR;
             ch.frame = 0;
             ch.frameTimer = 0;
-            os.sendToSeat(agentId);
+            os.sendToSeat(chId);
           } else if (jcState === 'break') {
             ch.currentTool = null;
             ch.isActive = false;
             // Walk to break zone target based on member's breakBehavior
             const memberId = msg.memberId as string;
             const target = jcGetBreakTarget(memberId);
-            os.walkToTile(agentId, target.col, target.row);
+            os.walkToTile(chId, target.col, target.row);
           } else if (jcState === 'meeting') {
             ch.currentTool = null;
             ch.isActive = false;
             // Walk to poker table
-            const seatIdx = Array.from(os.characters.keys()).indexOf(agentId);
+            const seatIdx = Array.from(os.characters.keys()).indexOf(chId);
             const seat = jcGetPokerSeat(seatIdx >= 0 ? seatIdx : 0);
-            os.walkToTile(agentId, seat.col, seat.row);
+            os.walkToTile(chId, seat.col, seat.row);
           } else if (jcState === 'handoff') {
             ch.currentTool = null;
             ch.isActive = false;
             // Walk to poker table for handoff discussion
-            const handoffIdx = Array.from(os.characters.keys()).indexOf(agentId);
+            const handoffIdx = Array.from(os.characters.keys()).indexOf(chId);
             const handoffSeat = jcGetPokerSeat(handoffIdx >= 0 ? handoffIdx : 0);
-            os.walkToTile(agentId, handoffSeat.col, handoffSeat.row);
+            os.walkToTile(chId, handoffSeat.col, handoffSeat.row);
           }
         }
       } else if (msg.type === 'jcTaskCompleted') {
@@ -978,6 +1105,16 @@ export function useExtensionMessages(
         gameSetCompanyScore(m.total, m.delta, m.todayCount, m.memberName, m.tier);
         // Clear the finished member's gauge/badge shortly after completion.
         gameClearMember(m.memberId);
+      } else if (msg.type === 'jcEventHistory') {
+        // client-init の jc-events 全量 sync (実データ) → R1 稼働復元
+        bulkSetKarteEvents((msg.events ?? []) as KarteRawEvent[]);
+        reconcileWorkloadPresence();
+      } else if (msg.type === 'jcHistoryEvent') {
+        // EventWatcher からの逐次 push (冪等 append)
+        appendKarteEvent(msg.event as KarteRawEvent);
+      } else if (msg.type === 'jcMailFly') {
+        // R5 ✉️メール演出 — 依頼発行 (delegate) の実イベントのみが発火源
+        jcTriggerMailFlight(msg.fromMemberId as string, msg.toMemberId as string, MAIL_FLIGHT_MS);
       }
     };
     window.addEventListener('message', handler);

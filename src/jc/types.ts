@@ -132,6 +132,9 @@ export type JCMessageToWebview =
   | { type: 'officeLog:history'; entries: unknown[]; hasMore: boolean }
   | { type: 'jcSpeechBubble'; bubble: SpeechBubble }
   | { type: 'jcOfficeEvent'; event: OfficeEvent }
+  // ── 部署カルテ (2026-07-03 藤井 §3): 生イベント履歴の転送 ──
+  | { type: 'jcHistoryEvent'; event: OfficeEvent }
+  | { type: 'jcEventHistory'; events: OfficeEvent[] }
   // ── Slice1 game overlay messages (DEV-SPEC §4.2) ──
   | {
       type: 'jcFitBadge';
@@ -291,6 +294,9 @@ export const OfficeEventType = {
   DELEGATE: 'delegate',
   DELEGATION_COMPLETE: 'delegation_complete',
   PROGRESS_CHECK: 'progress_check',
+  // 2026-07-04 R2: 秘書 1h ヒートビート痕跡 (from exec-sec)。「活動」には数えない
+  // (店じまいタイマーをリセットしない) — 最終確認 HH:MM + 巡回リングの源。
+  OFFICE_HEARTBEAT: 'office_heartbeat',
 } as const;
 export type OfficeEventType = (typeof OfficeEventType)[keyof typeof OfficeEventType];
 
@@ -332,7 +338,8 @@ export interface CrossDeptMessageEvent extends OfficeEventBase {
   event: 'cross_dept_message';
   from: string; // member ID
   to: string; // member ID
-  message: string;
+  // R6 防御 (2026-07-03): jc-events は複数 writer — message 欠落があり得る (wire reality)
+  message?: string;
   from_dept: string;
   to_dept: string;
 }
@@ -379,7 +386,7 @@ export interface RoleEscalateEvent extends OfficeEventBase {
   from: string; // member ID (e.g. secretary)
   to: string; // member ID (e.g. CEO)
   role: string; // role name for display
-  message: string; // escalation text
+  message?: string; // escalation text (欠落し得る — R6 防御)
 }
 
 /** Delegation from lead/CEO to agent */
@@ -387,9 +394,9 @@ export interface DelegateEvent extends OfficeEventBase {
   event: 'delegate';
   from: string; // delegator member ID
   to: string[]; // delegatee member IDs
-  task: string;
-  department: string;
-  message: string; // delegation text for speech bubble
+  task?: string;
+  department?: string;
+  message?: string; // delegation text for speech bubble (欠落し得る — R6 防御)
 }
 
 /** Delegation completion report (agent → lead → CEO) */
@@ -397,8 +404,8 @@ export interface DelegationCompleteEvent extends OfficeEventBase {
   event: 'delegation_complete';
   from: string; // completing member ID
   to: string; // report-to member ID
-  task: string;
-  message: string; // completion text
+  task?: string;
+  message?: string; // completion text (欠落し得る — R6 防御)
 }
 
 /** Progress check by secretary */
@@ -406,7 +413,15 @@ export interface ProgressCheckEvent extends OfficeEventBase {
   event: 'progress_check';
   from: string; // secretary member ID
   to: string; // checked member ID
-  message: string;
+  message?: string; // 欠落し得る — R6 防御
+}
+
+/** Secretary hourly heartbeat (2026-07-04 R2). Drives 最終確認 HH:MM + 巡回リング.
+ *  NOT counted as "activity" (does not reset the office-close timer). */
+export interface OfficeHeartbeatEvent extends OfficeEventBase {
+  event: 'office_heartbeat';
+  from: string; // exec-sec
+  message?: string; // 任意 (巡回メモ等)
 }
 
 /** Union of all office events */
@@ -422,7 +437,8 @@ export type OfficeEvent =
   | RoleEscalateEvent
   | DelegateEvent
   | DelegationCompleteEvent
-  | ProgressCheckEvent;
+  | ProgressCheckEvent
+  | OfficeHeartbeatEvent;
 
 /** Office events file schema */
 export interface OfficeEventsFile {

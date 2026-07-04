@@ -338,6 +338,31 @@ interface JCEventsFile {
 }
 
 function startEventListening(): void {
+  // R1 稼働復元 (2026-07-03 差戻しv2): 初回に jc-events.json の全履歴を
+  // bulk sync する (standalone server の client-init jcEventHistory と同じ役割)。
+  // これが無いと reload 後の稼働チップ/状態が「新イベントが来るまで 0/x」になる。
+  // ⚠ standalone (WS 接続あり) では server の client-init が正 — こちらの bulk は
+  // 別ファイル (extension root の jc-events.json) を読んで正史を上書きし得るため
+  // WS ポートが無い純ブラウザ (vite dev) モードのみで行う。
+  const wsPort = (window as unknown as Record<string, unknown>).__PIXEL_AGENTS_WS_PORT__;
+  if (!wsPort) {
+    void (async () => {
+      try {
+        const res = await fetch(`${import.meta.env.BASE_URL}jc-events.json?t=${Date.now()}`);
+        if (res.ok) {
+          const file = (await res.json()) as JCEventsFile;
+          if (file.events && Array.isArray(file.events)) {
+            lastEventIndex = file.events.length; // polling fallback と二重処理しない
+            dispatch({ type: 'jcEventHistory', events: file.events });
+            console.log(`[BrowserMock] Event history synced (${file.events.length} events)`);
+          }
+        }
+      } catch {
+        // 履歴なし/mid-write — 逐次イベントに任せる
+      }
+    })();
+  }
+
   // Primary: HMR custom event from Vite server (real-time, no polling)
   if (import.meta.hot) {
     import.meta.hot.on('jc-events-update', (data: { events: Record<string, unknown>[] }) => {
@@ -355,8 +380,13 @@ function startEventListening(): void {
     console.log('[BrowserMock] HMR event listener registered');
   }
 
-  // Fallback: polling for production builds or when HMR is unavailable
-  if (!import.meta.hot) {
+  // Fallback: polling for pure-browser builds or when HMR is unavailable.
+  // ⚠ standalone (WS あり) では polling も行わない — server の EventWatcher が
+  // 正史 (workspace の jc-events.json) を push する。extension root の別ファイルを
+  // 読むと stale なイベント (例: e2e の残骸) を実オフィスに注入してしまう。
+  if (wsPort) {
+    // no-op: server push (EventWatcher) が唯一のイベント源
+  } else if (!import.meta.hot) {
     startEventPolling();
   } else {
     // Even with HMR, start polling after a delay as safety net
@@ -412,6 +442,9 @@ function findMember(id: string) {
 function handleBrowserEvent(event: Record<string, unknown>): void {
   const type = event.event as string;
   console.log(`[BrowserMock] Event: ${type}`, event);
+
+  // 稼働の正本 store (karte-state) へも逐次 append — 冪等 dedupe 済み (R1)。
+  dispatch({ type: 'jcHistoryEvent', event });
 
   switch (type) {
     case 'agent_leave': {
@@ -533,6 +566,12 @@ function handleBrowserEvent(event: Record<string, unknown>): void {
             toMemberId: memberId,
             color: '#39ff14',
             duration: 2000,
+          });
+          // R5 ✉️メール演出 — 依頼発行 (delegate) の実イベントに 1:1
+          dispatch({
+            type: 'jcMailFly',
+            fromMemberId: event.from as string,
+            toMemberId: memberId,
           });
         }
       }

@@ -163,7 +163,7 @@ export function JCMemberInfoPanel({
     >
       <div
         style={{
-          background: 'rgba(8, 10, 25, 0.94)',
+          background: 'rgba(38, 43, 47, 0.94)',
           color: '#fff',
           border: `2px solid ${accentColor}88`,
           borderRadius: 0,

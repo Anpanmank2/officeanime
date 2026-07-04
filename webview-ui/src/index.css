@@ -46,10 +46,11 @@
 }
 
 :root {
-  --pixel-bg: #1e1e2e;
-  --pixel-border: #4a4a6a;
-  --pixel-border-light: #6a6a8a;
-  --pixel-accent: #5a8cff;
+  /* 2026-07-03 藤井 §5: アース+クールトーン (チャコール地 × ティール枠) */
+  --pixel-bg: #262b2f;
+  --pixel-border: #3d5450;
+  --pixel-border-light: #55736d;
+  --pixel-accent: #5fc2b4;
   --pixel-green: #5ac88c;
   --pixel-shadow: 2px 2px 0px #0a0a14;
 
@@ -61,7 +62,7 @@
   --pixel-btn-disabled-opacity: 0.35;
 
   /* Active/selected button state */
-  --pixel-active-bg: rgba(90, 140, 255, 0.25);
+  --pixel-active-bg: rgba(46, 158, 144, 0.25);
 
   /* Agent button */
   --pixel-agent-bg: rgba(90, 200, 140, 0.15);
@@ -99,17 +100,17 @@
   --neon-purple: #bf5fff;
   --neon-pink: #ff6b9d;
 
-  /* Department neon accents */
-  --dept-eng: #00b4ff;
-  --dept-eng-glow: rgba(0, 180, 255, 0.35);
-  --dept-mkt: #ff4d8d;
-  --dept-mkt-glow: rgba(255, 77, 141, 0.35);
-  --dept-res: #00e676;
-  --dept-res-glow: rgba(0, 230, 118, 0.35);
-  --dept-exec: #ffd740;
-  --dept-exec-glow: rgba(255, 215, 64, 0.35);
-  --dept-ops: #b388ff;
-  --dept-ops-glow: rgba(179, 136, 255, 0.35);
+  /* Department accents (2026-07-03 藤井 §5: アース+クール、glow=primary rgba 0.4) */
+  --dept-eng: #8fa6b3;
+  --dept-eng-glow: rgba(143, 166, 179, 0.4);
+  --dept-mkt: #a6cfbe;
+  --dept-mkt-glow: rgba(166, 207, 190, 0.4);
+  --dept-res: #a9c6d6;
+  --dept-res-glow: rgba(169, 198, 214, 0.4);
+  --dept-exec: #e4c36e;
+  --dept-exec-glow: rgba(228, 195, 110, 0.4);
+  --dept-ops: #b08a5e;
+  --dept-ops-glow: rgba(176, 138, 94, 0.4);
 
   /* State neon colors */
   --state-coding: #39ff14;
@@ -122,9 +123,9 @@
   --state-meeting: #b388ff;
   --state-presenting: #bf5fff;
 
-  /* Glass panel */
-  --glass-bg: rgba(20, 20, 40, 0.75);
-  --glass-border: rgba(100, 140, 255, 0.25);
+  /* Glass panel (§5: チャコール地 × ティール枠) */
+  --glass-bg: rgba(38, 43, 47, 0.8);
+  --glass-border: rgba(46, 158, 144, 0.35);
   --glass-highlight: rgba(255, 255, 255, 0.06);
 }
 

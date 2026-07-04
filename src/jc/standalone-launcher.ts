@@ -653,6 +653,10 @@ let jcMembers: JCMemberEntry[] = [];
 let jcConfig: unknown = null;
 let taskWatcher: TaskWatcher | null = null;
 const officeLogWriter = new OfficeLogWriter();
+/** 部署カルテ (2026-07-03 藤井 §3): client-init で全量 sync する jc-events.json のパス。
+ *  EventWatcher は接続中クライアントへの push 専用で replay しないため、
+ *  後から接続したクライアントにはここから履歴を渡す。main() で設定。 */
+let jcEventsFileForInit: string | null = null;
 
 /** Resolve the watched jc-events.json path (mirrors EventWatcher workspace resolution). */
 function resolveJcEventsPath(args: string[]): string {
@@ -869,6 +873,21 @@ function buildClientInitMessages(respond: (msg: unknown) => void): void {
   // 4. Current task queue
   if (taskWatcher) {
     taskWatcher.syncToWebview();
+  }
+
+  // 5. 部署カルテ (2026-07-03 藤井 §3): jc-events.json 全量を渡す (実データのみ)。
+  // EventWatcher は push 専用で replay しないため、接続時に履歴 sync が必要
+  // (skill: pixel-standalone-webview-eventwatcher-screenshot-timing の根本原因への恒久対処)。
+  if (jcEventsFileForInit && fs.existsSync(jcEventsFileForInit)) {
+    try {
+      const raw = fs.readFileSync(jcEventsFileForInit, 'utf-8');
+      const file = JSON.parse(raw) as { events?: unknown[] };
+      if (Array.isArray(file.events)) {
+        respond({ type: 'jcEventHistory', events: file.events });
+      }
+    } catch {
+      // mid-write 等 — 次の接続 or EventWatcher の逐次 push に任せる
+    }
   }
 }
 
@@ -1184,6 +1203,8 @@ async function main(): Promise<void> {
 
   // jc-events.json path for Owner delegations from the board (Slice1 T10).
   const ownerEventsFile = resolveJcEventsPath(args);
+  // 部署カルテ: client-init の履歴 sync も同じ events ファイルから読む
+  jcEventsFileForInit = ownerEventsFile;
   // Step2: workspace root (claude cwd base) + protected projects root for the
   // scoped-write execute-spawn contract.
   const step2WorkspaceRoot = resolveClaudeWorkspaceRoot(args);

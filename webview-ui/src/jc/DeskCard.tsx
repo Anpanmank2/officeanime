@@ -184,7 +184,7 @@ export function DeskCard({ memberId, position, onClose }: DeskCardProps) {
     >
       <div
         style={{
-          background: 'rgba(8, 10, 25, 0.96)',
+          background: 'rgba(38, 43, 47, 0.96)',
           color: '#fff',
           border: `2px solid ${accentColor}88`,
           borderTop: `1px solid ${accentColor}aa`,

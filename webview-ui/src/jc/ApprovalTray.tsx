@@ -21,6 +21,7 @@ import { vscode } from '../vscodeApi.js';
 import { DEPT_COLORS, DEPT_LABELS } from './jc-constants.js';
 import {
   getAwaitingCount,
+  getPlanHighlightMemberId,
   getPlans,
   type PlanCard,
   removePlan,
@@ -67,8 +68,8 @@ function ReviseBox({ card, onDone }: { card: PlanCard; onDone: () => void }) {
           style={{
             flex: 1,
             background: text.trim() ? '#3a2e10' : '#222',
-            color: text.trim() ? '#f0d840' : '#666',
-            border: '1px solid #f0d840',
+            color: text.trim() ? '#E4C36E' : '#666',
+            border: '1px solid #E4C36E',
             borderRadius: 0,
             fontSize: 12,
             padding: '4px 0',
@@ -96,9 +97,9 @@ function ReviseBox({ card, onDone }: { card: PlanCard; onDone: () => void }) {
   );
 }
 
-function TrayCard({ card }: { card: PlanCard }) {
+function TrayCard({ card, flash }: { card: PlanCard; flash: boolean }) {
   const [revising, setRevising] = useState(false);
-  const accent = DEPT_COLORS[card.department] ?? '#f0d840';
+  const accent = DEPT_COLORS[card.department] ?? '#E4C36E';
   const deptLabel = DEPT_LABELS[card.department] ?? card.department.toUpperCase();
   const originLabel = card.origin === 'requested' ? '依頼' : '許可まち';
 
@@ -109,6 +110,8 @@ function TrayCard({ card }: { card: PlanCard }) {
         background: 'var(--pixel-bg)',
         border: `2px solid ${accent}`,
         borderRadius: 0,
+        // R2 ‼️導線: キャラクリック直後は赤アウトラインで誘目 (挙動は無改変)
+        outline: flash ? '3px solid #ff3d3d' : undefined,
         boxShadow: '2px 2px 0px #0a0a14',
         marginBottom: 8,
       }}
@@ -244,8 +247,8 @@ function TrayCard({ card }: { card: PlanCard }) {
             title="修正して再プラン"
             style={{
               background: '#2a2008',
-              color: '#f0d840',
-              border: '1px solid #f0d840',
+              color: '#E4C36E',
+              border: '1px solid #E4C36E',
               borderRadius: 0,
               fontSize: 13,
               padding: '5px 10px',
@@ -266,12 +269,23 @@ function TrayCard({ card }: { card: PlanCard }) {
 
 export function ApprovalTray() {
   const [plans, setPlans] = useState<PlanCard[]>(getPlans);
+  const [highlightMember, setHighlightMember] = useState<string | null>(getPlanHighlightMemberId);
 
   useEffect(() => {
-    const update = () => setPlans([...getPlans()]);
+    const update = () => {
+      setPlans([...getPlans()]);
+      setHighlightMember(getPlanHighlightMemberId());
+    };
     update();
     return subscribePlans(update);
   }, []);
+
+  // flash の期限切れで自動消灯 (3.2s 後に再評価)
+  useEffect(() => {
+    if (!highlightMember) return;
+    const t = setTimeout(() => setHighlightMember(getPlanHighlightMemberId()), 3200);
+    return () => clearTimeout(t);
+  }, [highlightMember]);
 
   if (plans.length === 0) return null;
 
@@ -299,7 +313,7 @@ export function ApprovalTray() {
           alignItems: 'center',
           gap: 8,
           background: '#2a2008',
-          border: '2px solid #f0d840',
+          border: '2px solid #E4C36E',
           borderRadius: 0,
           boxShadow: '2px 2px 0px #0a0a14',
           padding: '6px 10px',
@@ -307,13 +321,13 @@ export function ApprovalTray() {
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 14, fontWeight: 'bold', color: '#f0d840' }}>承認まち</span>
+        <span style={{ fontSize: 14, fontWeight: 'bold', color: '#E4C36E' }}>承認まち</span>
         <span
           style={{
             fontSize: 14,
             fontWeight: 900,
             color: '#0a0a14',
-            background: '#f0d840',
+            background: '#E4C36E',
             borderRadius: 0,
             padding: '0 8px',
             minWidth: 22,
@@ -328,7 +342,11 @@ export function ApprovalTray() {
       {/* Scrollable card list */}
       <div style={{ overflowY: 'auto', minHeight: 0 }}>
         {plans.map((card) => (
-          <TrayCard key={card.id} card={card} />
+          <TrayCard
+            key={card.id}
+            card={card}
+            flash={card.status === 'awaiting' && card.memberId === highlightMember}
+          />
         ))}
       </div>
     </div>

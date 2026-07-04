@@ -11,23 +11,45 @@ import { useEditorKeyboard } from './hooks/useEditorKeyboard.js';
 import { useExtensionMessages } from './hooks/useExtensionMessages.js';
 import { AbsentStatusPopup } from './jc/AbsentStatusPopup.js';
 import { ApprovalTray } from './jc/ApprovalTray.js';
+import { CompletedArchivePanel } from './jc/CompletedArchivePanel.js';
 import { CompletionToast } from './jc/CompletionToast.js';
 import { DelegationDock } from './jc/DelegationDock.js';
+import { DeptKartePanel } from './jc/DeptKartePanel.js';
 import { DeskCard } from './jc/DeskCard.js';
 import { gameGetCompanyScore, gameGetTodayCount, subscribeGame } from './jc/game-state.js';
-import { DEPT_COLORS, TICKER_MAX_CHARS, TICKER_MAX_ENTRIES, UI_TEXT } from './jc/jc-constants.js';
 import {
+  DEPT_COLORS,
+  OFFICE_HEARTBEAT_LABEL_COLOR,
+  OFFICE_PILL_BG,
+  OFFICE_PILL_CLOSED_COLOR,
+  OFFICE_PILL_OPEN_COLOR,
+  OFFICE_PILL_TEXT_COLOR,
+  TICKER_MAX_CHARS,
+  TICKER_MAX_ENTRIES,
+  UI_TEXT,
+} from './jc/jc-constants.js';
+import {
+  jcGetMemberForAgent,
   jcGetOwnerAvatarState,
   jcSetOwnerAvatarState,
   subscribeOwnerAvatar,
 } from './jc/jc-state.js';
 import type { AbsenceInfo, OwnerAvatarState } from './jc/jc-types.js';
 import { JCMemberInfoPanel } from './jc/JCMemberInfoPanel.js';
+import { subscribeKarte } from './jc/karte-state.js';
 import { ModeProvider } from './jc/ModeContext.js';
+import {
+  officeHoursEvaluate,
+  officeHoursGetLastHeartbeatAt,
+  officeHoursGetPhase,
+  subscribeOfficeHours,
+} from './jc/office-hours-state.js';
 import { getLogEntries, subscribeLog } from './jc/office-log-state.js';
 import { OfficeLog } from './jc/OfficeLog.js';
 import { OWNER_AGENT_ID } from './jc/owner-avatar-constants.js';
 import { OwnerAvatar } from './jc/OwnerAvatar.js';
+import { flashPlansForMember, getPlans } from './jc/plan-state.js';
+import { getRequestFlow, setRequestFlowHidden } from './jc/request-flow-state.js';
 import { RequestFlowPanel } from './jc/RequestFlowPanel.js';
 import { RequestResultPanel } from './jc/RequestResultPanel.js';
 import { ResearchResultPanel } from './jc/ResearchResultPanel.js';
@@ -163,10 +185,44 @@ function selectTickerEntries() {
     .reverse();
 }
 
+/** office_heartbeat 時刻 → HH:MM (無ければ「—」)。 */
+function formatHeartbeatHHMM(ms: number | null): string {
+  if (ms === null) return '—';
+  const d = new Date(ms);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 function CommandBoard() {
   const [tickerEntries, setTickerEntries] = useState(selectTickerEntries);
   const [companyScore, setCompanyScore] = useState(() => gameGetCompanyScore());
   const [todayCount, setTodayCount] = useState(() => gameGetTodayCount());
+
+  // ── R2 営業状態 (2026-07-04 藤井 spec §1/§4): 会社ボード見出しに status pill +
+  // 最終確認 HH:MM を同居させる。1s tick で状態機を進め (無イベントでも 2h で店じまい)、
+  // 新イベント (karte) で即 reopen、office-hours 遷移で pill を更新。
+  const [officePhase, setOfficePhase] = useState(() => officeHoursGetPhase());
+  const [lastHeartbeatAt, setLastHeartbeatAt] = useState<number | null>(() =>
+    officeHoursGetLastHeartbeatAt(),
+  );
+
+  useEffect(() => {
+    const tick = () => {
+      officeHoursEvaluate(Date.now());
+      setOfficePhase(officeHoursGetPhase());
+      setLastHeartbeatAt(officeHoursGetLastHeartbeatAt());
+    };
+    tick();
+    const unsubKarte = subscribeKarte(tick); // 新イベントで即評価 (reopen)
+    const unsubOffice = subscribeOfficeHours(tick); // 遷移で pill 更新
+    const timer = setInterval(tick, 1000); // 時間経過で店じまい/相の進行を反映
+    return () => {
+      unsubKarte();
+      unsubOffice();
+      clearInterval(timer);
+    };
+  }, []);
+
+  const officeClosed = officePhase === 'closed';
 
   useEffect(() => {
     const update = () => setTickerEntries(selectTickerEntries());
@@ -196,8 +252,8 @@ function CommandBoard() {
           display: 'flex',
           gap: 14,
           alignItems: 'center',
-          background: 'rgba(8, 10, 25, 0.88)',
-          border: '2px solid rgba(0, 180, 255, 0.2)',
+          background: 'rgba(38, 43, 47, 0.94)',
+          border: '2px solid rgba(46, 158, 144, 0.3)',
           padding: '4px 12px',
           maxWidth: '60%',
           overflowX: 'auto',
@@ -241,8 +297,8 @@ function CommandBoard() {
           top: 48,
           left: 16,
           zIndex: 45,
-          background: 'rgba(8, 10, 25, 0.75)',
-          border: '2px solid rgba(0, 180, 255, 0.25)',
+          background: 'rgba(38, 43, 47, 0.8)',
+          border: '2px solid rgba(46, 158, 144, 0.4)',
           padding: '10px 14px',
           minWidth: 200,
           maxWidth: 280,
@@ -250,13 +306,64 @@ function CommandBoard() {
           pointerEvents: 'none',
         }}
       >
-        <div style={{ fontSize: '16px', color: '#00f0ff', fontWeight: 'bold', marginBottom: 10 }}>
-          {UI_TEXT.companyBoardTitle}
+        {/* 見出し行: タイトル + 営業状態 pill (右端・§1) */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 8,
+            marginBottom: 2,
+          }}
+        >
+          <span style={{ fontSize: '16px', color: '#5FC2B4', fontWeight: 'bold' }}>
+            {UI_TEXT.companyBoardTitle}
+          </span>
+          <span
+            data-office-pill
+            data-office-state={officePhase}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 5,
+              background: OFFICE_PILL_BG,
+              padding: '2px 8px',
+              borderRadius: 10,
+              fontSize: '11px',
+              whiteSpace: 'nowrap',
+              color: officeClosed ? OFFICE_PILL_CLOSED_COLOR : OFFICE_PILL_TEXT_COLOR,
+            }}
+          >
+            <span
+              // 営業中=呼吸pulse (灯り) / 本日終了=消灯 (pulse無)
+              className={officeClosed ? undefined : 'office-pill-pulse'}
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                display: 'inline-block',
+                background: officeClosed ? OFFICE_PILL_CLOSED_COLOR : OFFICE_PILL_OPEN_COLOR,
+              }}
+            />
+            {officeClosed ? '本日終了' : '営業中'}
+          </span>
+        </div>
+        {/* pill 直下: 最終確認 HH:MM (§4・秘書 office_heartbeat 由来・無ければ —) */}
+        <div
+          data-office-heartbeat
+          style={{
+            fontSize: '11px',
+            color: OFFICE_HEARTBEAT_LABEL_COLOR,
+            marginBottom: 10,
+            textAlign: 'right',
+          }}
+        >
+          最終確認 {formatHeartbeatHHMM(lastHeartbeatAt)}
         </div>
         {companyScore === 0 && todayCount === 0 ? (
           // ゼロ状態: 「0」を2つ見せるより、最初のおしごとへ誘う (藤井 spec §2)
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: '13px', color: '#00f0ff' }}>
+            <span style={{ fontSize: '13px', color: '#5FC2B4' }}>
               {UI_TEXT.companyBoardZeroLine1}
             </span>
             <span
@@ -299,7 +406,7 @@ function CommandBoard() {
             </span>
             <span
               style={{
-                color: '#f0d840',
+                color: '#E4C36E',
                 display: 'inline-flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -390,6 +497,32 @@ function AppContent() {
     position: { x: number; y: number };
   } | null>(null);
 
+  // 部署カルテパネル (2026-07-03 藤井 §3): 部署ホワイトボードクリックで開く
+  const [deptKarte, setDeptKarte] = useState<{
+    department: string;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  // R4 本棚 = 完了アーカイブ (保存ボックス): 本棚クリックで開く
+  const [archivePanel, setArchivePanel] = useState<{
+    position: { x: number; y: number };
+  } | null>(null);
+
+  const handleBookshelfClick = useCallback((screenPos: { x: number; y: number }) => {
+    // 再クリックはトグルで閉じる
+    setArchivePanel((prev) => (prev ? null : { position: screenPos }));
+  }, []);
+
+  const handleDeptBoardClick = useCallback(
+    (department: string, screenPos: { x: number; y: number }) => {
+      // 同じ部署のボード再クリックはトグルで閉じる
+      setDeptKarte((prev) =>
+        prev?.department === department ? null : { department, position: screenPos },
+      );
+    },
+    [],
+  );
+
   const handleDeskCardOpen = useCallback(
     (memberId: string, screenPos: { x: number; y: number }) => {
       // In owner avatar mode, DialogBox takes priority — skip DeskCard
@@ -443,6 +576,24 @@ function AppContent() {
     // Skip clicks on the owner avatar itself
     if (focusId === OWNER_AGENT_ID) return;
 
+    // R2 ‼️承認待ち導線: クリックしたキャラの member が Owner 回答待ちなら
+    // 該当の確認パネルへ誘導する。確認フロー自体の挙動は無改変 (導線のみ)。
+    const ch = os.characters.get(focusId);
+    const memberId = ch?.jcMemberId ?? jcGetMemberForAgent(focusId);
+    if (memberId) console.log(`[JC-WV] char click: agent=${focusId} member=${memberId}`);
+    if (memberId) {
+      const flow = getRequestFlow();
+      if (flow && flow.memberId === memberId && flow.hidden) {
+        // 「あとで」でしまった依頼確認 (RequestFlowPanel の当該リクエスト) を再表示
+        setRequestFlowHidden(false);
+        return;
+      }
+      if (getPlans().some((p) => p.status === 'awaiting' && p.memberId === memberId)) {
+        // plan確認 (承認まちtray) — 該当カードを赤アウトラインで誘目
+        flashPlansForMember(memberId);
+      }
+    }
+
     vscode.postMessage({ type: 'focusAgent', id: focusId });
   }, []);
 
@@ -495,6 +646,12 @@ function AppContent() {
           50% { opacity: 0.3; }
         }
         .pixel-agents-pulse { animation: pixel-agents-pulse ${PULSE_ANIMATION_DURATION_SEC}s ease-in-out infinite; }
+        /* R2 営業インジケータ 呼吸pulse (§1: alpha 0.6↔1.0 / 2.4s) — 灯りの合図 */
+        @keyframes office-pill-pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+        .office-pill-pulse { animation: office-pill-pulse 2.4s ease-in-out infinite; }
       `}</style>
 
       <OfficeCanvas
@@ -502,6 +659,8 @@ function AppContent() {
         onClick={handleClick}
         onAbsentDeskClick={handleAbsentDeskClick}
         onDeskCardOpen={handleDeskCardOpen}
+        onDeptBoardClick={handleDeptBoardClick}
+        onBookshelfClick={handleBookshelfClick}
         isEditMode={editor.isEditMode}
         editorState={editorState}
         onEditorTileAction={editor.handleEditorTileAction}
@@ -709,6 +868,23 @@ function AppContent() {
           memberId={deskCard.memberId}
           position={deskCard.position}
           onClose={() => setDeskCard(null)}
+        />
+      )}
+
+      {/* ── 部署カルテ (部署ホワイトボードクリック / 2026-07-03 藤井 §3) ── */}
+      {deptKarte && (
+        <DeptKartePanel
+          department={deptKarte.department}
+          position={deptKarte.position}
+          onClose={() => setDeptKarte(null)}
+        />
+      )}
+
+      {/* ── R4 本棚 = 完了アーカイブ (保存ボックス / 本棚クリック) ── */}
+      {archivePanel && (
+        <CompletedArchivePanel
+          position={archivePanel.position}
+          onClose={() => setArchivePanel(null)}
         />
       )}
 

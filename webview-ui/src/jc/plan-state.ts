@@ -97,6 +97,24 @@ export function removePlan(id: string): void {
   scheduleNotify();
 }
 
+// ── R2 ‼️導線 (2026-07-03 差戻しv2): キャラクリック → 該当カードを誘目 ──
+// 表示だけの層 — 承認フローの挙動 (jcPlanDecision) は無改変。
+let highlightMemberId: string | null = null;
+let highlightUntil = 0;
+
+/** ‼️ のキャラをクリックした member の awaiting カードを一定時間ハイライト */
+export function flashPlansForMember(memberId: string): void {
+  highlightMemberId = memberId;
+  highlightUntil = Date.now() + 3000;
+  scheduleNotify();
+}
+
+/** 現在ハイライト中の member (期限切れは null) */
+export function getPlanHighlightMemberId(): string | null {
+  if (!highlightMemberId || Date.now() > highlightUntil) return null;
+  return highlightMemberId;
+}
+
 /** Subscribe to store changes. Returns unsubscribe fn for useEffect cleanup. */
 export function subscribePlans(fn: () => void): () => void {
   listeners.add(fn);

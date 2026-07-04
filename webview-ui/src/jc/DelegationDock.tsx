@@ -110,7 +110,7 @@ export function DelegationDock() {
         gap: 6,
         maxWidth: '70%',
         flexWrap: 'wrap',
-        background: 'rgba(8, 10, 25, 0.92)',
+        background: 'rgba(38, 43, 47, 0.94)',
         border: '2px solid var(--pixel-border, #2a2a3a)',
         boxShadow: '2px 2px 0px #0a0a14',
         borderRadius: 0,
@@ -118,7 +118,7 @@ export function DelegationDock() {
         fontFamily: '"Press Start 2P", monospace',
       }}
     >
-      <span style={{ color: '#00f0ff', fontSize: 10, marginRight: 4 }}>
+      <span style={{ color: '#5FC2B4', fontSize: 10, marginRight: 4 }}>
         委任ドック
         {pickedId && (
           <span style={{ color: '#39ff14' }}> ▶ 秘書か部署ゾーンへ (自動で最適担当)</span>

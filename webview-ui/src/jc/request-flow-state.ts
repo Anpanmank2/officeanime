@@ -103,6 +103,12 @@ export interface RequestFlow {
    * weave in the Owner's picks/corrections (取り違えが消える).
    */
   answers: RequestAnswer[];
+  /**
+   * R2 ‼️導線 (2026-07-03 差戻しv2): true = パネルを一旦しまってオフィスに戻って
+   * いる状態。flow (pending request) は生きたまま — member に ‼️ が出て、
+   * キャラクリックで再度開ける。確認フロー自体の挙動は無改変 (表示だけの層)。
+   */
+  hidden: boolean;
 }
 
 let flow: RequestFlow | null = null;
@@ -172,7 +178,18 @@ export function openRequestFlow(opts: {
     questions: [],
     questionIdx: 0,
     answers: [],
+    hidden: false,
   };
+  scheduleNotify();
+}
+
+/**
+ * R2 ‼️導線: パネルの表示/非表示だけを切り替える (flow は生きたまま)。
+ * hidden=true で「あとで」— member に ‼️ が出て、キャラクリックで false に戻す。
+ */
+export function setRequestFlowHidden(hidden: boolean): void {
+  if (!flow || flow.hidden === hidden) return;
+  flow = { ...flow, hidden };
   scheduleNotify();
 }
 
@@ -197,7 +214,8 @@ export function markRequestAwaiting(): void {
  */
 export function setRequestQuestions(requestId: string, questions: ConfirmQuestion[]): void {
   if (!flow || flow.id !== requestId) return;
-  flow = { ...flow, phase: 'confirming', questions, questionIdx: 0, answers: [] };
+  // 確認質問が届いたら必ず表に出す (hidden 解除) — Owner の回答待ちが始まる瞬間。
+  flow = { ...flow, phase: 'confirming', questions, questionIdx: 0, answers: [], hidden: false };
   scheduleNotify();
 }
 

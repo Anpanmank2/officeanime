@@ -144,7 +144,8 @@ export function renderScene(
 
   // Characters
   for (const ch of characters) {
-    const sprites = getCharacterSprites(ch.palette, ch.hueShift);
+    // JC 出社アイドル: 彩度落ち variant (cache key `palette:hueShift:idle`)
+    const sprites = getCharacterSprites(ch.palette, ch.hueShift, ch.jcDesaturated ? 'idle' : null);
     const spriteData = getCharacterSprite(ch, sprites);
     const cached = getCachedSprite(spriteData, zoom);
     // Sitting offset: shift character down when seated so they visually sit in the chair

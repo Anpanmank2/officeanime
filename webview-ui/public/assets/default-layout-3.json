@@ -739,8 +739,8 @@
     {
       "uid": "break-espresso-01",
       "type": "ESPRESSO_MACHINE",
-      "col": 20,
-      "row": 2
+      "col": 21,
+      "row": 15
     },
     {
       "uid": "mkt-bench-01",
@@ -1201,8 +1201,8 @@
     {
       "uid": "eng-whiteboard-01",
       "type": "WHITEBOARD",
-      "col": 9,
-      "row": 13
+      "col": 8,
+      "row": 15
     },
     {
       "uid": "eng-bookshelf-01",
@@ -1291,8 +1291,8 @@
     {
       "uid": "poker-trophy-02",
       "type": "TROPHY_CASE",
-      "col": 23,
-      "row": 16
+      "col": 20,
+      "row": 3
     },
     {
       "uid": "poker-dart-01",
@@ -1407,6 +1407,24 @@
       "type": "PLANT",
       "col": 21,
       "row": 4
+    },
+    {
+      "type": "WHITEBOARD",
+      "col": 18,
+      "row": 13,
+      "uid": "res-whiteboard-01"
+    },
+    {
+      "type": "WHITEBOARD",
+      "col": 4,
+      "row": 2,
+      "uid": "verify-whiteboard-01"
+    },
+    {
+      "type": "WHITEBOARD",
+      "col": 11,
+      "row": 0,
+      "uid": "exec-whiteboard-01"
     }
   ],
   "tileColors": [

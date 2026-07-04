@@ -18,9 +18,9 @@ interface BottomToolbarProps {
 const btnBase: React.CSSProperties = {
   padding: '5px 10px',
   fontSize: '12px',
-  color: '#c8d2f0',
-  background: 'rgba(20, 24, 48, 0.92)',
-  border: '2px solid rgba(100, 140, 255, 0.35)',
+  color: '#D8D2C4',
+  background: 'rgba(38, 43, 47, 0.94)',
+  border: '2px solid rgba(46, 158, 144, 0.45)',
   borderRadius: 0,
   cursor: 'pointer',
   letterSpacing: '0.5px',
@@ -56,10 +56,10 @@ export function BottomToolbar(props: BottomToolbarProps) {
           <button
             style={{
               ...btnBase,
-              color: props.ownerAvatarActive ? '#ffd740' : 'rgba(255, 215, 64, 0.85)',
+              color: props.ownerAvatarActive ? '#E4C36E' : 'rgba(255, 215, 64, 0.85)',
               background: props.ownerAvatarActive
                 ? 'rgba(255, 215, 64, 0.15)'
-                : 'rgba(20, 24, 48, 0.92)',
+                : 'rgba(38, 43, 47, 0.94)',
               border: `2px solid ${props.ownerAvatarActive ? 'rgba(255, 215, 64, 0.7)' : 'rgba(255, 215, 64, 0.35)'}`,
             }}
             onClick={props.onToggleOwner}

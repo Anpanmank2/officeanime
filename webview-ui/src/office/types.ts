@@ -202,4 +202,8 @@ export interface Character {
   matrixEffectSeeds: number[];
   /** Workspace folder name (only set for multi-root workspaces) */
   folderName?: string;
+  /** JC: 出社アイドル (idle/break) — 彩度落ちスプライトで描画 (2026-07-03 藤井 §2(a)) */
+  jcDesaturated?: boolean;
+  /** JC: このキャラが表す member ID (jcMemberArriving で設定。member→char 逆引き用) */
+  jcMemberId?: string;
 }

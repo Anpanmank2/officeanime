@@ -32,6 +32,7 @@ import {
   type RequestFlow,
   type RequestTemplate,
   setRequestField,
+  setRequestFlowHidden,
   subscribeRequestFlow,
 } from './request-flow-state.js';
 
@@ -206,27 +207,50 @@ function Header({ flow, accent, title }: { flow: RequestFlow; accent: string; ti
           {flow.memberName}
         </span>
       </div>
-      <button
-        onClick={() => {
-          vscode.postMessage({ type: 'jcRequestCancel', requestId: flow.id });
-          closeRequestFlow();
-        }}
-        title="閉じる"
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: 16,
-          padding: '0 2px',
-          color: 'var(--pixel-close-text)',
-          lineHeight: 1,
-          flexShrink: 0,
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--pixel-close-hover)')}
-        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--pixel-close-text)')}
-      >
-        ✕
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        {flow.phase !== 'form' && (
+          // R2 ‼️導線: 「あとで」= パネルをしまうだけ (依頼は生きたまま)。
+          // 担当キャラに ‼️ が出て、クリックでこのパネルが再度開く。
+          <button
+            data-request-minimize
+            onClick={() => setRequestFlowHidden(true)}
+            title="あとで回答する（キャラの ‼️ をクリックで再開）"
+            style={{
+              background: 'none',
+              border: `1px solid ${accent}`,
+              cursor: 'pointer',
+              fontSize: 11,
+              padding: '2px 8px',
+              color: accent,
+              lineHeight: 1.4,
+              fontFamily: 'inherit',
+            }}
+          >
+            あとで
+          </button>
+        )}
+        <button
+          onClick={() => {
+            vscode.postMessage({ type: 'jcRequestCancel', requestId: flow.id });
+            closeRequestFlow();
+          }}
+          title="取り消して閉じる"
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: 16,
+            padding: '0 2px',
+            color: 'var(--pixel-close-text)',
+            lineHeight: 1,
+            flexShrink: 0,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--pixel-close-hover)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--pixel-close-text)')}
+        >
+          ✕
+        </button>
+      </div>
     </div>
   );
 }
@@ -487,8 +511,8 @@ function ConfirmLoop({ flow, accent }: { flow: RequestFlow; accent: string }) {
             style={{
               textAlign: 'left',
               background: '#2a2008',
-              color: '#f0d840',
-              border: '1px solid #f0d840',
+              color: '#E4C36E',
+              border: '1px solid #E4C36E',
               borderRadius: 0,
               fontSize: 14,
               padding: '8px 10px',
@@ -501,13 +525,13 @@ function ConfirmLoop({ flow, accent }: { flow: RequestFlow; accent: string }) {
         ) : (
           <div
             style={{
-              border: '1px solid #f0d840',
+              border: '1px solid #E4C36E',
               borderRadius: 0,
               padding: '8px 10px',
               background: '#181410',
             }}
           >
-            <div style={{ color: '#f0d840', fontSize: 12, marginBottom: 6 }}>
+            <div style={{ color: '#E4C36E', fontSize: 12, marginBottom: 6 }}>
               自分の言葉で補足（この項目だけ直せます）
             </div>
             <textarea
@@ -586,6 +610,9 @@ export function RequestFlowPanel() {
   }, []);
 
   if (!flow) return null;
+  // R2 ‼️導線: 「あとで」中はパネル非表示 (flow は生きている)。
+  // 担当キャラに ‼️ が出て、キャラクリック (App.handleClick) で再表示される。
+  if (flow.hidden) return null;
 
   const accent = DEPT_COLORS[flow.department] ?? '#00e676';
   const formTitle = (KIND_META[flow.kind] ?? KIND_META.research).title;

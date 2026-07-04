@@ -29,9 +29,9 @@ const menuItemBase: React.CSSProperties = {
 const checkboxStyle = (checked: boolean): React.CSSProperties => ({
   width: 14,
   height: 14,
-  border: `2px solid ${checked ? 'rgba(0, 240, 255, 0.6)' : 'rgba(100, 140, 255, 0.3)'}`,
+  border: `2px solid ${checked ? 'rgba(95, 194, 180, 0.7)' : 'rgba(46, 158, 144, 0.4)'}`,
   borderRadius: 0,
-  background: checked ? 'rgba(0, 180, 255, 0.35)' : 'transparent',
+  background: checked ? 'rgba(46, 158, 144, 0.45)' : 'transparent',
   flexShrink: 0,
   display: 'flex',
   alignItems: 'center',
@@ -52,7 +52,7 @@ function PixelCheckbox({ checked }: { checked: boolean }) {
 
 const sectionLabel: React.CSSProperties = {
   fontSize: '16px',
-  color: 'rgba(0, 240, 255, 0.6)',
+  color: 'rgba(95, 194, 180, 0.7)',
   padding: '8px 10px 2px',
   fontWeight: 'bold',
 };
@@ -76,15 +76,15 @@ export function SettingsModal({ onClose, zoom, onZoomChange }: SettingsModalProp
           left: '50%',
           transform: 'translate(-50%, -50%)',
           zIndex: 50,
-          background: 'rgba(8, 10, 25, 0.96)',
-          border: '2px solid rgba(0, 180, 255, 0.25)',
+          background: 'rgba(38, 43, 47, 0.96)',
+          border: '2px solid rgba(46, 158, 144, 0.4)',
           borderRadius: 0,
           padding: '4px',
-          boxShadow: '0 0 16px rgba(0, 180, 255, 0.08), 2px 2px 0px #0a0a14',
+          boxShadow: '0 0 16px rgba(46, 158, 144, 0.12), 2px 2px 0px #0a0a14',
           minWidth: 260,
           maxHeight: '80vh',
           overflowY: 'auto',
-          borderTop: '1px solid rgba(0, 240, 255, 0.3)',
+          borderTop: '1px solid rgba(95, 194, 180, 0.4)',
         }}
       >
         {/* Header */}
@@ -94,7 +94,7 @@ export function SettingsModal({ onClose, zoom, onZoomChange }: SettingsModalProp
             alignItems: 'center',
             justifyContent: 'space-between',
             padding: '4px 10px',
-            borderBottom: '1px solid rgba(0, 180, 255, 0.2)',
+            borderBottom: '1px solid rgba(46, 158, 144, 0.3)',
             marginBottom: '4px',
           }}
         >

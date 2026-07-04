@@ -17,23 +17,41 @@ import {
   TIER_GLYPH,
 } from './game-state.js';
 import {
+  ABSENT_DESK_OVERLAY,
+  ABSENT_SLATE,
   BUBBLE_EMOJIS,
   DEPT_LABELS,
   DEPT_NEON,
-  IDLE_EMOJI_OFF_MS,
-  IDLE_EMOJI_ON_MS,
-  IDLE_EMOJI_TRIGGER_MS,
-  MEMBER_IDLE_EMOJIS,
+  FOCUS_WORK_COUNT,
+  IDLE_MURMUR_CYCLE_MS,
+  IDLE_MURMUR_LINES,
+  IDLE_MURMUR_ON_MS,
+  IDLE_ZZZ_AFTER_MS,
+  MAIL_FLIGHT_ARC_TILES,
+  OCCUPANCY_CHIP_COLORS,
+  OFFICE_CLOSED_SUBTITLE,
+  OFFICE_CLOSED_TEXT_Y_RATIO,
+  OFFICE_CLOSED_TITLE,
+  OFFICE_CLOSED_TITLE_COLOR,
+  OFFICE_DIM_RGB,
+  OFFICE_HEARTBEAT_LABEL_COLOR,
+  OFFICE_HEARTBEAT_RING_COLOR,
+  OFFICE_SECRETARY_SEAT,
   SPEECH_BUBBLE_COLORS,
+  STATUS_APPROVAL_EMOJI,
+  STATUS_FOCUS_EMOJI,
+  STATUS_ICON_OFFSET_PX,
   TASK_STATUS_COLORS,
   ZONE_LABEL_TEXT,
+  ZONE_LIGHT_TINTS,
 } from './jc-constants.js';
 import {
   jcGetActiveLiaisons,
+  jcGetActiveMailFlights,
   jcGetActivitySummary,
   jcGetDashboardMembers,
   jcGetDeptColor,
-  jcGetDeptStats,
+  jcGetDeskPosition,
   jcGetDeskTaskStatus,
   jcGetExecPositions,
   jcGetMemberForAgent,
@@ -45,6 +63,10 @@ import {
   jcIsActive,
 } from './jc-state.js';
 import type { JCBubbleType, JCState } from './jc-types.js';
+import { computeDeptOccupancy, computeMemberWorkloads } from './karte-state.js';
+import { officeHoursRenderState } from './office-hours-state.js';
+import { getPlans } from './plan-state.js';
+import { getRequestFlow } from './request-flow-state.js';
 
 // ── Rendering Constants (overlay-specific) ───────────────────────
 const NAMEPLATE_FONT = '7px "Press Start 2P", monospace';
@@ -66,13 +88,29 @@ const STATS_FALLBACK_FONT = '8px monospace';
 
 // ── Zone labels ──────────────────────────────────────────────────
 // 文言は ZONE_LABEL_TEXT (jc-constants) に集約 — P3 差し替えは定数側で行う。
+// 2026-07-03 藤井 layout spec §1: verify(検証室)/hall(殿堂) を転用追加。
 const ZONE_LABELS: Array<{ text: string; col: number; row: number; zone: string }> = [
   { text: ZONE_LABEL_TEXT.exec, col: 10, row: 2, zone: 'exec' },
   { text: ZONE_LABEL_TEXT.marketing, col: 4, row: 7, zone: 'marketing' },
   { text: ZONE_LABEL_TEXT.research, col: 17, row: 7, zone: 'research' },
   { text: ZONE_LABEL_TEXT.dev, col: 4, row: 15, zone: 'dev' },
   { text: ZONE_LABEL_TEXT.ops, col: 17, row: 15, zone: 'ops' },
+  { text: ZONE_LABEL_TEXT.verify, col: 2, row: 2, zone: 'verify' },
+  { text: ZONE_LABEL_TEXT.hall, col: 20, row: 2, zone: 'hall' },
 ];
+
+// ゾーン → 部署 (稼働チップ / 照明の実データ参照キー)。
+// ops(ラウンジ)/verify(検証室)/hall(殿堂) は所属 roster を持たない共用ゾーン → null
+// (チップ非表示・照明は全社稼働率に連動)。
+const ZONE_TO_DEPT: Record<string, string | null> = {
+  exec: 'exec',
+  marketing: 'marketing',
+  research: 'research',
+  dev: 'engineering',
+  ops: null,
+  verify: null,
+  hall: null,
+};
 
 // ── Glass walls ──────────────────────────────────────────────────
 const GLASS_WALLS: Array<{ col: number; row: number; width: number; height: number }> = [];
@@ -95,8 +133,33 @@ const ZONE_AREAS: Array<{
   { zone: 'research', col: 13, row: 6, width: 12, height: 8 },
   { zone: 'dev', col: 1, row: 15, width: 12, height: 7 },
   { zone: 'ops', col: 13, row: 15, width: 12, height: 7 },
+  // 2026-07-03 藤井 layout spec §1 転用: 上段左=検証室 / 上段右=殿堂
+  { zone: 'verify', col: 1, row: 2, width: 6, height: 4 },
+  { zone: 'hall', col: 18, row: 2, width: 7, height: 4 },
 ];
 
+/** ゾーンの稼働率% (分母=roster)。共用ゾーンは全社稼働率。
+ *  稼働の定義は R1 正本 (未完了しごと保有 = computeDeptOccupancy) に統一。 */
+function zoneWorkingRate(
+  zone: string,
+  deptStats: Record<string, { present: number; total: number; working: number }>,
+): number {
+  const deptKey = ZONE_TO_DEPT[zone];
+  if (deptKey) {
+    const stats = deptStats[deptKey];
+    return stats && stats.total > 0 ? (stats.working / stats.total) * 100 : 0;
+  }
+  // 共用ゾーン (ラウンジ/検証室/殿堂): 全社の稼働率に連動
+  let working = 0;
+  let total = 0;
+  for (const stats of Object.values(deptStats)) {
+    working += stats.working;
+    total += stats.total;
+  }
+  return total > 0 ? (working / total) * 100 : 0;
+}
+
+// §2(c) ゾーン照明=稼働率メタファー: 3段階 (≥50% アンバー灯 / 1-49% 淡灯 / 0% 消灯)
 function renderZoneBackgrounds(
   ctx: CanvasRenderingContext2D,
   offsetX: number,
@@ -104,28 +167,18 @@ function renderZoneBackgrounds(
   s: number,
 ): void {
   ctx.save();
-  const deptStats = jcGetDeptStats();
+  const deptStats = computeDeptOccupancy();
 
   for (const area of ZONE_AREAS) {
-    const neon = DEPT_NEON[area.zone];
-    if (!neon) continue;
-
     const x = offsetX + area.col * s;
     const y = offsetY + area.row * s;
     const w = area.width * s;
     const h = area.height * s;
 
-    // Check if any members are active in this zone
-    const deptKey =
-      area.zone === 'dev' ? 'engineering' : area.zone === 'ops' ? 'engineering' : area.zone;
-    const stats = deptStats[deptKey];
-    const hasActive = stats ? stats.present > 0 : false;
-
-    // Subtle zone tint — brighter when members are active
-    ctx.fillStyle = neon.glow;
-    ctx.globalAlpha = hasActive ? 0.08 : 0.03;
+    const rate = zoneWorkingRate(area.zone, deptStats);
+    ctx.fillStyle =
+      rate >= 50 ? ZONE_LIGHT_TINTS.high : rate > 0 ? ZONE_LIGHT_TINTS.mid : ZONE_LIGHT_TINTS.off;
     ctx.fillRect(x, y, w, h);
-    ctx.globalAlpha = 1;
   }
 
   ctx.restore();
@@ -208,29 +261,39 @@ export function renderJCOverlay(
 
   const s = TILE_SIZE * zoom;
 
-  // 0a. Zone background tints (lowest layer)
-  renderZoneBackgrounds(ctx, offsetX, offsetY, s);
+  // ── R2 営業状態 (2026-07-04 藤井 spec): CLOSED (店じまい) 中は稼働系の発光を
+  // 全 off にして「静けさ」を作る。減光は全面 dim レイヤ 1 枚に一本化するため、
+  // ゾーン消灯 tint / 不在デスク暗転 / デスク glow / 品質ゲージ / チップ発光 /
+  // ネームプレート / 稼働アイコンは asleep(=closed) では描かない (二重減光回避)。
+  const office = officeHoursRenderState(Date.now());
+  const asleep = office.phase === 'closed';
 
-  // 0b. Neon glass walls
+  // 0a. Zone background tints (lowest layer) — asleep は全面dimに一本化
+  if (!asleep) renderZoneBackgrounds(ctx, offsetX, offsetY, s);
+
+  // 0b. Neon glass walls (構造・薄く残す)
   renderGlassWalls(ctx, offsetX, offsetY, s, zoom);
 
-  // 1. Active desk glow rings (behind nameplates)
-  renderActiveDeskGlow(ctx, offsetX, offsetY, s, zoom);
+  // 0c. §2(a) 不在デスクの空席暗転 (家具の上・ラベル/プレートの下)
+  if (!asleep) renderAbsentDeskOverlays(ctx, offsetX, offsetY, s);
+
+  // 1. Active desk glow rings (behind nameplates) — CLOSED で off
+  if (!asleep) renderActiveDeskGlow(ctx, offsetX, offsetY, s, zoom);
 
   // 2. Department signs (neon wall-mounted plaques)
   renderDepartmentSigns(ctx, offsetX, offsetY, s, zoom);
 
-  // 3. Always-on mini nameplates with state dots
-  renderAlwaysOnNameplates(ctx, offsetX, offsetY, s, zoom);
+  // 3. Always-on mini nameplates with state dots — CLOSED で off (静けさ)
+  if (!asleep) renderAlwaysOnNameplates(ctx, offsetX, offsetY, s, zoom);
 
   // 4. Task status indicators on desks
-  renderTaskIndicators(ctx, offsetX, offsetY, s, zoom);
+  if (!asleep) renderTaskIndicators(ctx, offsetX, offsetY, s, zoom);
 
-  // 4a. Slice1: quality gauge bars (speed reflects affinity — AC-1 visual)
-  renderQualityGauge(ctx, offsetX, offsetY, s, zoom);
+  // 4a. Slice1: quality gauge bars (speed reflects affinity — AC-1 visual) — CLOSED で off
+  if (!asleep) renderQualityGauge(ctx, offsetX, offsetY, s, zoom);
 
   // 4b. Slice1: affinity ◎/△/✗ badges above characters
-  renderAffinityBadges(ctx, offsetX, offsetY, s, zoom);
+  if (!asleep) renderAffinityBadges(ctx, offsetX, offsetY, s, zoom);
 
   // 5. Hover nameplate (detailed, shown on mouse hover)
   if (hoverTileCol !== undefined && hoverTileRow !== undefined) {
@@ -243,9 +306,14 @@ export function renderJCOverlay(
   // 7. Department liaison beams
   renderLiaisonBeams(ctx, offsetX, offsetY, s, zoom);
 
-  // 8. JC state bubbles above characters
+  // 7.5. R5 ✉️メール飛翔 (依頼発行=委任の実イベント駆動)
   if (characters) {
-    renderJCCharacterBubbles(ctx, characters, offsetX, offsetY, zoom);
+    renderMailFlights(ctx, characters, offsetX, offsetY, s, zoom);
+  }
+
+  // 8. R2 状態表示 v2 (Owner設計 5種・頭上統一オフセット・顔に被せない) — CLOSED で off
+  if (characters && !asleep) {
+    renderMemberStatusIcons(ctx, characters, offsetX, offsetY, zoom);
   }
 
   // 9. Activity summary speech bubbles
@@ -263,6 +331,82 @@ export function renderJCOverlay(
 
   // 12. Routing hint (screen-space) while a card hovers over a target zone.
   renderRouteHint(ctx, canvasWidth);
+
+  // 13. R2 営業状態 (2026-07-04 藤井 spec §2-§4): 全面 dim / 店じまい文言 /
+  // 秘書巡回リング。map+characters+overlay 全部の上に載せて一様に減光する
+  // (故に最後に描く)。QC hook __JC_OFFICE_QC もここで公開。
+  renderOfficeHours(ctx, office, offsetX, offsetY, s);
+}
+
+// ── R2 営業状態レイヤ (全面dim + 店じまい文言 + 秘書巡回リング) ──────────────
+function renderOfficeHours(
+  ctx: CanvasRenderingContext2D,
+  office: ReturnType<typeof officeHoursRenderState>,
+  offsetX: number,
+  offsetY: number,
+  s: number,
+): void {
+  const cw = ctx.canvas.width;
+  const ch = ctx.canvas.height;
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+
+  // (a) 全面 dim レイヤ 1 枚 (map+characters+overlay を一様に減光)。
+  if (office.dimAlpha > 0.001) {
+    ctx.save();
+    ctx.fillStyle = `rgba(${OFFICE_DIM_RGB}, ${office.dimAlpha.toFixed(3)})`;
+    ctx.fillRect(0, 0, cw, ch);
+    ctx.restore();
+  }
+
+  // (b) 店じまい文言 (中央やや下・背景なし・点滅なし)。dim の上に静かに。
+  if (office.textAlpha > 0.001) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const cx = cw / 2;
+    const cy = ch * OFFICE_CLOSED_TEXT_Y_RATIO;
+    // 主文 18px / 副文 13px (canvas は device-px・dpr 反映)。
+    const titlePx = Math.round(18 * dpr);
+    const subPx = Math.round(13 * dpr);
+    ctx.globalAlpha = office.textAlpha;
+    ctx.font = `${titlePx}px "Press Start 2P", sans-serif`;
+    ctx.fillStyle = OFFICE_CLOSED_TITLE_COLOR;
+    ctx.fillText(OFFICE_CLOSED_TITLE, cx, cy);
+    // 副文はスレート明・やや薄く。
+    ctx.globalAlpha = office.textAlpha * 0.9;
+    ctx.font = `${subPx}px "Press Start 2P", sans-serif`;
+    ctx.fillStyle = OFFICE_HEARTBEAT_LABEL_COLOR;
+    ctx.fillText(OFFICE_CLOSED_SUBTITLE, cx, cy + titlePx + 10 * dpr);
+    ctx.restore();
+  }
+
+  // (c) 秘書巡回リング (office_heartbeat のワンショット・既存 glow 流用・歩行なし)。
+  // 秘書の席 (8,4) 足元に半径 0→大・alpha 0.5→0 のアンバーリング。CLOSED でも
+  // dim の上に薄く出す (見守り感)。
+  if (office.ringProgress !== null) {
+    const p = office.ringProgress;
+    const cx = offsetX + (OFFICE_SECRETARY_SEAT.col + 0.5) * s;
+    const cy = offsetY + (OFFICE_SECRETARY_SEAT.row + 1) * s; // 足元
+    const radius = s * (0.4 + p * 1.6);
+    const alpha = 0.5 * (1 - p);
+    ctx.save();
+    ctx.strokeStyle = `rgba(${OFFICE_HEARTBEAT_RING_COLOR}, ${alpha.toFixed(3)})`;
+    ctx.lineWidth = Math.max(2, s * 0.12);
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // (d) QC hook 公開 (表示検証専用 — skill: pixel-office-canvas-qc-hooks 準拠)。
+  if (typeof window !== 'undefined') {
+    (window as unknown as Record<string, unknown>).__JC_OFFICE_QC = {
+      state: office.phase,
+      dimAlpha: Number(office.dimAlpha.toFixed(3)),
+      lastHeartbeat: office.lastHeartbeatAt,
+      ringActive: office.ringProgress !== null,
+    };
+  }
 }
 
 // ── Living-loop routing hint: "→ 秘書へ委任" / "→ Engineering へ委任" ──
@@ -282,7 +426,7 @@ function renderRouteHint(ctx: CanvasRenderingContext2D, canvasWidth: number): vo
   // Hard pixel-art frame (sharp corners, hard shadow).
   ctx.fillStyle = '#0a0a14';
   ctx.fillRect(x + 2, y + 2, w, h);
-  ctx.fillStyle = 'rgba(8, 10, 25, 0.95)';
+  ctx.fillStyle = 'rgba(38, 43, 47, 0.95)';
   ctx.fillRect(x, y, w, h);
   ctx.strokeStyle = '#39ff14';
   ctx.lineWidth = 2;
@@ -303,12 +447,14 @@ function renderActiveDeskGlow(
 ): void {
   if (zoom < 2) return;
   const members = jcGetDashboardMembers();
+  const workloads = computeMemberWorkloads();
   const now = Date.now();
   ctx.save();
 
   for (const m of members) {
     if (!m.isPresent) continue;
-    if (m.state === 'idle' || m.state === 'arriving' || m.state === 'leaving') continue;
+    // R1 統一定義: 稼働 = 未完了の生きたしごとを保有
+    if ((workloads.get(m.memberId)?.active.length ?? 0) === 0) continue;
 
     const cx = offsetX + (m.deskCol + 0.5) * s;
     const cy = offsetY + (m.deskRow + 0.5) * s;
@@ -347,6 +493,7 @@ function renderAlwaysOnNameplates(
 ): void {
   if (zoom < 2) return;
   const members = jcGetDashboardMembers();
+  const workloads = computeMemberWorkloads();
   const miniFont = zoom >= 3 ? '5px "Press Start 2P", monospace' : '6px monospace';
 
   ctx.save();
@@ -357,6 +504,11 @@ function renderAlwaysOnNameplates(
   for (const m of members) {
     const cx = offsetX + (m.deskCol + 0.5) * s;
     const ty = offsetY + (m.deskRow + 1) * s + 1 * zoom; // Below desk tile
+
+    // §2(a) 3状態 (R1 統一定義): 働き=未完了しごと保有 / 出社アイドル=在席・保有0 / 不在
+    const hasWork = (workloads.get(m.memberId)?.active.length ?? 0) > 0;
+    const isIdleish = m.isPresent && !hasWork;
+    ctx.globalAlpha = m.isPresent && !isIdleish ? 1 : 0.6;
 
     // Short name label
     const label = m.nameEn.length > 10 ? m.nameEn.slice(0, 9) + '.' : m.nameEn;
@@ -375,9 +527,9 @@ function renderAlwaysOnNameplates(
     ctx.fillStyle = m.isPresent ? 'rgba(10, 15, 35, 0.85)' : 'rgba(10, 10, 20, 0.6)';
     ctx.fillRect(bgX, bgY, bgW, bgH);
 
-    // Left accent bar (department color)
+    // Left accent bar (department color; 不在はスレート)
     const accentW = Math.max(1, Math.round(zoom * 0.3));
-    ctx.fillStyle = m.isPresent ? m.deptColor : `${m.deptColor}44`;
+    ctx.fillStyle = m.isPresent ? m.deptColor : ABSENT_SLATE;
     ctx.fillRect(bgX, bgY, accentW, bgH);
 
     // State dot (right side)
@@ -386,14 +538,33 @@ function renderAlwaysOnNameplates(
     const dotY = bgY + bgH / 2;
     ctx.beginPath();
     ctx.arc(dotX, dotY, dotR, 0, Math.PI * 2);
-    ctx.fillStyle = m.stateColor;
+    ctx.fillStyle = m.isPresent ? m.stateColor : ABSENT_SLATE;
     ctx.fill();
 
-    // Name text
-    ctx.fillStyle = m.isPresent ? '#ccccdd' : '#555566';
+    // Name text (不在はスレート — 空席が「誰が居ないか」を語る)
+    ctx.fillStyle = m.isPresent ? '#ccccdd' : ABSENT_SLATE;
     ctx.fillText(label, cx - dotR, ty);
+    ctx.globalAlpha = 1;
   }
 
+  ctx.restore();
+}
+
+// ── §2(a) 不在デスクの空席暗転オーバーレイ ─────────────────────
+// 不在メンバーのデスクタイルを rgba(10,12,18,0.35) で暗転。空席=情報。
+function renderAbsentDeskOverlays(
+  ctx: CanvasRenderingContext2D,
+  offsetX: number,
+  offsetY: number,
+  s: number,
+): void {
+  const members = jcGetDashboardMembers();
+  ctx.save();
+  ctx.fillStyle = ABSENT_DESK_OVERLAY;
+  for (const m of members) {
+    if (m.isPresent) continue;
+    ctx.fillRect(offsetX + m.deskCol * s, offsetY + m.deskRow * s, s, s);
+  }
   ctx.restore();
 }
 
@@ -404,6 +575,8 @@ const TIER_COLOR: Record<GameTier, string> = {
   bad: '#ff3d3d', // ✗ red
 };
 
+// R2 (差戻しv2): 顔に被る頭上バッジは廃止し、ゲージ行 (デスク下・ネームプレート
+// の更に下) へ移設。頭上は 5種の状態表示専用にする。
 function renderAffinityBadges(
   ctx: CanvasRenderingContext2D,
   offsetX: number,
@@ -429,32 +602,37 @@ function renderAffinityBadges(
     const tier = g ? g.tier : preview!.tier;
     const glyph = TIER_GLYPH[tier];
     const cx = offsetX + (m.deskCol + 0.5) * s;
-    // Above the character's head (one tile above the desk).
-    const cy = offsetY + m.deskRow * s - 3 * zoom;
+    // ゲージ行 (renderQualityGauge と同じ基準線) — 顔に被らない位置。
+    const barH = Math.max(2, 3 * zoom);
+    const rowCy = offsetY + (m.deskRow + 1) * s + 9 * zoom + barH / 2;
+    const barW = s * 1.2;
 
-    // Preview badge pulses (min 0.75 so it stays clearly visible) + dashed ring
-    // to read as "not yet assigned".
-    const pulse = isPreview ? 0.75 + 0.25 * ((Math.sin(now / 250) + 1) / 2) : 1;
-    const r = Math.max(6, zoom * 3);
-    ctx.globalAlpha = pulse;
-    ctx.fillStyle = 'rgba(10, 15, 35, 0.85)';
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.lineWidth = Math.max(1, zoom * 0.4);
-    ctx.strokeStyle = TIER_COLOR[tier];
-    if (isPreview) ctx.setLineDash([Math.max(2, zoom), Math.max(2, zoom)]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.fillStyle = TIER_COLOR[tier];
-    ctx.fillText(glyph, cx, cy + 1);
-    ctx.globalAlpha = 1;
-
-    // T8: stalled member shows a flashing red [!] beside the badge.
-    if (g && g.stuck && Math.floor(now / 400) % 2 === 0) {
-      ctx.fillStyle = '#ff3d3d';
-      ctx.fillText('[!]', cx + r + Math.max(6, zoom * 3), cy + 1);
+    if (g) {
+      // 実行中: ゲージ右端に tier グリフだけを添える (シンプル化)
+      ctx.fillStyle = TIER_COLOR[tier];
+      ctx.fillText(glyph, cx + barW / 2 + Math.max(5, zoom * 2.5), rowCy);
+      // T8: stalled member shows a flashing red [!] beside the glyph.
+      if (g.stuck && Math.floor(now / 400) % 2 === 0) {
+        ctx.fillStyle = '#ff3d3d';
+        ctx.fillText('[!]', cx + barW / 2 + Math.max(12, zoom * 6), rowCy);
+      }
+    } else {
+      // 委任カードのドロップ先プレビュー: 点線リング付きバッジ (ゲージ行に表示)
+      const pulse = 0.75 + 0.25 * ((Math.sin(now / 250) + 1) / 2);
+      const r = Math.max(6, zoom * 3);
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = 'rgba(10, 15, 35, 0.85)';
+      ctx.beginPath();
+      ctx.arc(cx, rowCy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = Math.max(1, zoom * 0.4);
+      ctx.strokeStyle = TIER_COLOR[tier];
+      ctx.setLineDash([Math.max(2, zoom), Math.max(2, zoom)]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = TIER_COLOR[tier];
+      ctx.fillText(glyph, cx, rowCy + 1);
+      ctx.globalAlpha = 1;
     }
   }
   ctx.restore();
@@ -513,6 +691,8 @@ function renderDepartmentSigns(
 ): void {
   ctx.save();
   const now = Date.now();
+  // §2(b) 稼働チップ — R1 統一定義 (未完了しごと保有) から導出
+  const deptStats = computeDeptOccupancy();
 
   for (const label of ZONE_LABELS) {
     const cx = offsetX + (label.col + 0.5) * s;
@@ -525,10 +705,25 @@ function renderDepartmentSigns(
       text: '#cccccc',
     };
 
+    // §2(b) 稼働チップ「働き/在籍」— roster を持つ部署ゾーンのみ (実データ)
+    const chipDept = ZONE_TO_DEPT[label.zone];
+    const chipStats = chipDept ? deptStats[chipDept] : undefined;
+    const chipText = chipStats ? `${chipStats.working}/${chipStats.total}` : null;
+    const chipRate =
+      chipStats && chipStats.total > 0 ? (chipStats.working / chipStats.total) * 100 : 0;
+    const chipColor =
+      chipRate >= 50
+        ? OCCUPANCY_CHIP_COLORS.high
+        : chipRate > 0
+          ? OCCUPANCY_CHIP_COLORS.mid
+          : OCCUPANCY_CHIP_COLORS.zero;
+
     const signFont = zoom >= 3 ? ZONE_LABEL_FONT : ZONE_LABEL_FALLBACK_FONT;
     ctx.font = signFont;
-    const textMetrics = ctx.measureText(label.text);
-    const textW = textMetrics.width;
+    const labelW = ctx.measureText(label.text).width;
+    const chipGap = chipText ? Math.max(4, zoom * 1.5) : 0;
+    const chipW = chipText ? ctx.measureText(chipText).width : 0;
+    const textW = labelW + chipGap + chipW;
     const textH = zoom >= 3 ? 9 : 10;
 
     const padX = Math.max(6, 7 * zoom * 0.4);
@@ -595,18 +790,25 @@ function renderDepartmentSigns(
     ctx.fillRect(rx - pinW / 2, pinY, pinW, pinH);
     ctx.globalAlpha = 1;
 
-    // Text (neon glow effect)
+    // Text (neon glow effect) — ラベル + 稼働チップを左詰めで並べる
     ctx.font = signFont;
-    ctx.textAlign = 'center';
+    ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
+    const contentX = cx - textW / 2;
     // Text glow layer
     ctx.globalAlpha = 0.3 + pulse * 0.15;
     ctx.fillStyle = neon.primary;
-    ctx.fillText(label.text, cx + 0.5, signY + signH / 2 + 0.5);
+    ctx.fillText(label.text, contentX + 0.5, signY + signH / 2 + 0.5);
     // Main text
     ctx.globalAlpha = 1;
     ctx.fillStyle = neon.text;
-    ctx.fillText(label.text, cx, signY + signH / 2);
+    ctx.fillText(label.text, contentX, signY + signH / 2);
+    // 稼働チップ (数字色 = ≥50% ティール / 1-49% アンバー / 0% スレート)
+    if (chipText) {
+      ctx.fillStyle = chipColor;
+      ctx.fillText(chipText, contentX + labelW + chipGap, signY + signH / 2);
+    }
+    ctx.textAlign = 'center';
   }
 
   ctx.restore();
@@ -843,23 +1045,22 @@ function renderLiaisonBeams(
     ctx.globalAlpha = alpha * 0.6;
     ctx.stroke();
 
-    // Moving envelope icon along the beam
+    // Moving light pulse along the beam.
+    // (✉️ は R5 renderMailFlights に一本化 — delegate で二重に飛ばない)
     const px = x1 + (x2 - x1) * progress;
     const py = y1 + (y2 - y1) * progress;
 
-    // Envelope glow
     ctx.beginPath();
-    ctx.arc(px, py, LIAISON_PARTICLE_SIZE * zoom * 2.5, 0, Math.PI * 2);
+    ctx.arc(px, py, LIAISON_PARTICLE_SIZE * zoom * 1.6, 0, Math.PI * 2);
     ctx.fillStyle = beamColor;
-    ctx.globalAlpha = alpha * 0.25;
+    ctx.globalAlpha = alpha * 0.35;
     ctx.fill();
 
-    // Envelope emoji
-    ctx.globalAlpha = alpha;
-    ctx.font = `${Math.max(8, 10 * zoom)}px serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('✉️', px, py);
+    ctx.beginPath();
+    ctx.arc(px, py, LIAISON_PARTICLE_SIZE * zoom * 0.7, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.fill();
   }
 
   ctx.restore();
@@ -869,7 +1070,9 @@ function renderLiaisonBeams(
 
 function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void {
   const stats = jcGetStats();
-  const deptCounts = jcGetDeptStats();
+  // R1 統一定義: 稼働 = 未完了しごと保有 (computeDeptOccupancy / workloads)
+  const deptCounts = computeDeptOccupancy();
+  const workloads = computeMemberWorkloads();
   const members = jcGetDashboardMembers();
 
   ctx.save();
@@ -896,27 +1099,17 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
   for (const dept of deptOrder) {
     const count = deptCounts[dept];
     if (!count || count.total === 0) continue;
-    const working = members.filter(
-      (m) =>
-        m.department === dept &&
-        m.isPresent &&
-        m.state !== 'idle' &&
-        m.state !== 'arriving' &&
-        m.state !== 'leaving',
-    );
     deptLines.push({
       label: DEPT_LABELS[dept] ?? dept.toUpperCase(),
       present: count.present,
       total: count.total,
       color: jcGetDeptColor(dept),
-      hasWorking: working.length > 0,
+      hasWorking: count.working > 0,
     });
   }
 
-  // Active members (present & working) with activity info
-  const activeMembers = members.filter(
-    (m) => m.isPresent && m.state !== 'idle' && m.state !== 'arriving' && m.state !== 'leaving',
-  );
+  // Active members (未完了しごと保有) with activity info
+  const activeMembers = members.filter((m) => (workloads.get(m.memberId)?.active.length ?? 0) > 0);
 
   // Slice1: company score rows (top of HUD, DEV-SPEC §6-8)
   const companyScore = gameGetCompanyScore();
@@ -961,16 +1154,16 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
   const boxY = topMargin;
 
   // Background with glass effect
-  ctx.fillStyle = 'rgba(8, 10, 25, 0.88)';
+  ctx.fillStyle = 'rgba(38, 43, 47, 0.94)';
   ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
 
   // Neon border
-  ctx.strokeStyle = 'rgba(0, 180, 255, 0.3)';
+  ctx.strokeStyle = 'rgba(46, 158, 144, 0.45)';
   ctx.lineWidth = 1;
   ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
 
   // Top accent line
-  ctx.fillStyle = 'rgba(0, 240, 255, 0.5)';
+  ctx.fillStyle = 'rgba(95, 194, 180, 0.55)';
   ctx.fillRect(boxX, boxY, boxWidth, 1);
 
   // Header
@@ -978,7 +1171,7 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
   let textY = boxY + padding;
 
   ctx.font = STATS_FALLBACK_FONT;
-  ctx.fillStyle = '#00f0ff';
+  ctx.fillStyle = '#5FC2B4';
   ctx.fillText(headerText, textX, textY);
   textY += lineHeight;
 
@@ -986,7 +1179,7 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
   ctx.fillStyle = '#39ff14';
   ctx.fillText(scoreText, textX, textY);
   textY += lineHeight;
-  ctx.fillStyle = '#f0d840';
+  ctx.fillStyle = '#E4C36E';
   ctx.fillText(todayText, textX, textY);
   textY += lineHeight;
 
@@ -1020,7 +1213,7 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
   // Active members section
   if (showActiveList) {
     // Separator line
-    ctx.fillStyle = 'rgba(0, 240, 255, 0.15)';
+    ctx.fillStyle = 'rgba(95, 194, 180, 0.2)';
     ctx.fillRect(boxX + padding, textY + 2, boxWidth - padding * 2, 1);
     textY += 8;
 
@@ -1049,9 +1242,36 @@ function renderTeamHUD(ctx: CanvasRenderingContext2D, canvasWidth: number): void
   ctx.restore();
 }
 
-// ── Character bubbles ────────────────────────────────────────────
+// ── R2 状態表示 v2 (Owner設計・5種・2026-07-03 差戻しv2) ─────────────
+// ① 通常稼働 (未完了しごと1件) = アイコンなし (働く姿 + ゲージはデスク下)
+// ② タスク集中 (2件以上)       = 🔥
+// ③ 待機 (0件・出社中)          = 吹き出しでぼやき → 5分継続で zzz
+// ④ 承認待ち (Owner回答待ち)     = ‼️ (キャラクリックで確認パネルが開く)
+// ⑤ 不在                        = 空席暗転 (renderAbsentDeskOverlays)
+// 全インジケータは頭上統一オフセット STATUS_ICON_OFFSET_PX — 顔に被せない。
+// 稼働判定は R1 正本 (computeMemberWorkloads) に統一。
 
-function renderJCCharacterBubbles(
+/** member → 最新の非subagentキャラ (skill: seatuid-trap の正解パターン) */
+function memberIdOfChar(ch: Character): string | undefined {
+  return ch.jcMemberId ?? jcGetMemberForAgent(ch.id);
+}
+
+/**
+ * 承認待ち (Owner の回答待ち) member 集合:
+ * 依頼フローの確認 (phase=confirming) + plan確認 (承認まちtray awaiting)。
+ * 表示 (‼️) とクリック導線 (App.handleClick) が同じ判定を共有する。
+ */
+export function jcGetApprovalWaitMemberIds(): Set<string> {
+  const out = new Set<string>();
+  const flow = getRequestFlow();
+  if (flow && flow.phase === 'confirming') out.add(flow.memberId);
+  for (const p of getPlans()) {
+    if (p.status === 'awaiting') out.add(p.memberId);
+  }
+  return out;
+}
+
+function renderMemberStatusIcons(
   ctx: CanvasRenderingContext2D,
   characters: Character[],
   offsetX: number,
@@ -1059,100 +1279,277 @@ function renderJCCharacterBubbles(
   zoom: number,
 ): void {
   const now = Date.now();
+  const workloads = computeMemberWorkloads(now);
+  const approvalWait = jcGetApprovalWaitMemberIds();
+  const liveBubbles = jcGetSpeechBubbles();
+  // QC/実機検証フック: 各 member の状態アイコンとキャラ画面座標を毎フレーム公開
+  // (描画には無関与 — playwright QC がクリック座標と表示状態を検証するために読む)
+  const qcDebug: Array<{ memberId: string; icon: string; x: number; y: number }> = [];
+
+  // member → 最後 (最新) のキャラ。同一 member の再到着で複数 char が居ても 1 個。
+  const charOf = new Map<string, Character>();
   for (const ch of characters) {
     if (ch.isSubagent) continue;
-    const memberId = jcGetMemberForAgent(ch.id);
-    if (!memberId) continue;
+    const mid = memberIdOfChar(ch);
+    if (mid) charOf.set(mid, ch);
+  }
+
+  for (const [memberId, ch] of charOf) {
     const runtime = jcGetMemberRuntime(memberId);
-    if (!runtime) continue;
+    if (!runtime?.isPresent) continue;
+    const wl = workloads.get(memberId);
+    const active = wl?.active.length ?? 0;
+
+    // §2(a) 彩度落ちも R1 統一定義から: 在席かつ未完了しごと0 = 出社アイドル
+    ch.jcDesaturated = active === 0;
 
     const sittingOff = isSittingState(ch.state) ? -4 : 0;
-    const screenX = offsetX + ch.x * zoom;
-    const screenY = offsetY + (ch.y + sittingOff) * zoom;
+    const anchorX = offsetX + ch.x * zoom;
+    const headY = offsetY + (ch.y + sittingOff) * zoom;
+    const anchorY = headY - STATUS_ICON_OFFSET_PX * zoom;
 
-    // ── Temporary emotion emoji (highest priority) ──
+    // 一時エフェクト (🎉/👋/🧠/😤ほか) は最優先 — 2秒で消える演出レイヤー
     if (runtime.emotionEmoji && now < runtime.emotionUntil) {
-      renderIdleEmoji(ctx, runtime.emotionEmoji, screenX, screenY, zoom);
+      renderStatusEmoji(ctx, runtime.emotionEmoji, anchorX, anchorY, zoom, null, 1);
+      qcDebug.push({ memberId, icon: runtime.emotionEmoji, x: anchorX, y: anchorY });
       continue;
     }
-    // Clear expired emotions
     if (runtime.emotionEmoji && now >= runtime.emotionUntil) {
       runtime.emotionEmoji = null;
     }
 
-    // ── Focus mode: 🔥 after 3 min of coding/reading ──
-    if (runtime.workingSince && (runtime.jcState === 'coding' || runtime.jcState === 'reading')) {
-      const workElapsed = now - runtime.workingSince;
-      if (workElapsed >= 3 * 60 * 1000) {
-        renderIdleEmoji(ctx, '🔥', screenX, screenY, zoom);
-        continue;
-      }
+    // ④ ‼️ 承認待ち — Owner が承認/回答するまで点滅 (クリックでパネル)
+    if (approvalWait.has(memberId)) {
+      const pulse = 0.7 + 0.3 * ((Math.sin(now / 280) + 1) / 2);
+      renderStatusEmoji(ctx, STATUS_APPROVAL_EMOJI, anchorX, anchorY, zoom, '#ff3d3d', pulse);
+      qcDebug.push({ memberId, icon: 'approval', x: anchorX, y: anchorY });
+      continue;
     }
 
-    // ── Long idle (10min+) → 💤 sleeping ──
-    if (runtime.jcState === 'idle' && runtime.idleSince) {
-      const idleElapsed = now - runtime.idleSince;
-      if (idleElapsed >= 10 * 60 * 1000) {
-        renderIdleEmoji(ctx, '💤', screenX, screenY, zoom);
-        continue;
-      }
+    // ② 🔥 タスク集中 (未完了の生きたしごと 2件以上)
+    if (active >= FOCUS_WORK_COUNT) {
+      renderStatusEmoji(ctx, STATUS_FOCUS_EMOJI, anchorX, anchorY, zoom, null, 1);
+      qcDebug.push({ memberId, icon: 'focus', x: anchorX, y: anchorY });
+      continue;
     }
 
-    // ── Per-member idle emoji (blink cycle: 5s on / 3s off) ──
-    if (runtime.jcState === 'idle' && runtime.idleSince) {
-      const elapsed = now - runtime.idleSince;
-      if (elapsed >= IDLE_EMOJI_TRIGGER_MS) {
-        const memberEmoji = MEMBER_IDLE_EMOJIS[memberId];
-        if (memberEmoji) {
-          const cycleMs = IDLE_EMOJI_ON_MS + IDLE_EMOJI_OFF_MS;
-          const phase = (elapsed - IDLE_EMOJI_TRIGGER_MS) % cycleMs;
-          if (phase < IDLE_EMOJI_ON_MS) {
-            renderIdleEmoji(ctx, memberEmoji, screenX, screenY, zoom);
-            continue; // Skip default bubble when showing idle emoji
-          }
-        }
-      }
+    // ① 通常稼働 (1件) = アイコンなし — 普通に働く姿で語る
+    if (active >= 1) {
+      qcDebug.push({ memberId, icon: 'working', x: anchorX, y: anchorY });
+      continue;
     }
 
-    // Default state bubble
-    if (!runtime.bubbleType) continue;
-    renderJCBubble(ctx, runtime.bubbleType, screenX, screenY, zoom);
+    // ③ 待機 (未完了0件・出社中): ぼやき → IDLE_ZZZ_AFTER_MS 継続で zzz
+    const idleAnchor = runtime.idleSince ?? runtime.stateSince;
+    const elapsed = now - idleAnchor;
+    if (elapsed >= IDLE_ZZZ_AFTER_MS) {
+      renderZzz(ctx, anchorX, anchorY, zoom, now);
+      qcDebug.push({ memberId, icon: 'zzz', x: anchorX, y: anchorY });
+      continue;
+    }
+    qcDebug.push({ memberId, icon: 'idle', x: anchorX, y: anchorY });
+    // ぼやきは周期表示。実セリフ (speech bubble) 表示中は譲る。
+    if (liveBubbles.some((b) => b.memberId === memberId)) continue;
+    const cycle = Math.floor(elapsed / IDLE_MURMUR_CYCLE_MS);
+    const phase = elapsed % IDLE_MURMUR_CYCLE_MS;
+    if (phase < IDLE_MURMUR_ON_MS) {
+      let hash = 0;
+      for (let i = 0; i < memberId.length; i++) hash = (hash * 31 + memberId.charCodeAt(i)) | 0;
+      const line = IDLE_MURMUR_LINES[Math.abs(hash + cycle) % IDLE_MURMUR_LINES.length];
+      renderMurmurBubble(ctx, line, anchorX, headY, zoom);
+    }
   }
+
+  // QC hook 公開 (表示検証専用 — UI 挙動には無関与)。view = 現在のカメラ変換
+  // (camera-follow で pan が動くため、QC のタイル→画面座標変換はこれを使う)。
+  (window as unknown as Record<string, unknown>).__JC_STATUS_QC = qcDebug;
+  (window as unknown as Record<string, unknown>).__JC_VIEW_QC = { offsetX, offsetY, zoom };
 }
 
-/** Render a per-member idle emoji bubble (same position as state bubble) */
-function renderIdleEmoji(
+/** 頭上統一位置に絵文字ステータスを描く (白丸バブル + 任意の注意リング) */
+function renderStatusEmoji(
   ctx: CanvasRenderingContext2D,
   emoji: string,
+  x: number,
+  y: number,
+  zoom: number,
+  ringColor: string | null,
+  alpha: number,
+): void {
+  ctx.save();
+  const bgSize = 12 * zoom;
+  ctx.globalAlpha = alpha;
+
+  // Soft white bubble background
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.beginPath();
+  ctx.arc(x, y, bgSize / 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Attention ring (‼️ 用) or subtle slate ring
+  ctx.beginPath();
+  ctx.arc(x, y, bgSize / 2 + 1, 0, Math.PI * 2);
+  ctx.strokeStyle = ringColor ?? 'rgba(102, 102, 136, 0.4)';
+  ctx.lineWidth = ringColor ? Math.max(1.5, zoom * 0.6) : 1;
+  ctx.stroke();
+
+  ctx.font = `${10 * zoom}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(emoji, x, y + zoom * 0.5);
+  ctx.restore();
+}
+
+/** ③ 待機5分超の zzz 表記 (ゆっくり上下に揺れる寝息) */
+function renderZzz(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  zoom: number,
+  now: number,
+): void {
+  ctx.save();
+  const bob = Math.sin(now / 600) * zoom;
+  ctx.font = `bold ${Math.max(8, 7 * zoom)}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#0a0a14';
+  ctx.fillText('zzz', x + 1, y + bob + 1);
+  ctx.fillStyle = '#9fb0c0';
+  ctx.fillText('zzz', x, y + bob);
+  ctx.restore();
+}
+
+/** ③ 待機のぼやき吹き出し (「仕事がないなー…」等 — jc-constants の汎用文言) */
+function renderMurmurBubble(
+  ctx: CanvasRenderingContext2D,
+  text: string,
   charX: number,
-  charY: number,
+  charYScreen: number,
   zoom: number,
 ): void {
   ctx.save();
-  ctx.font = `${10 * zoom}px serif`;
+  const FONT = zoom >= 3 ? '6px "Press Start 2P", monospace' : '7px monospace';
+  ctx.font = FONT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
 
-  const bx = charX;
-  const by = charY - 20 * zoom;
-  const bgSize = 12 * zoom;
+  const PADDING_X = 4 * zoom;
+  const PADDING_Y = 3 * zoom;
+  const OFFSET_Y = -36 * zoom; // 実セリフ (speech bubble) と同じ頭上帯 — 顔に被らない
+  const TAIL_SIZE = 3 * zoom;
 
-  // Soft white bubble background
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+  const textW = ctx.measureText(text).width;
+  const textH = zoom >= 3 ? 6 : 7;
+  const bgX = charX - textW / 2 - PADDING_X;
+  const bgY = charYScreen + OFFSET_Y - textH - PADDING_Y;
+  const bgW = textW + PADDING_X * 2;
+  const bgH = textH + PADDING_Y * 2;
+
+  ctx.globalAlpha = 0.92;
+  // Shadow + dark bg + slate border (独白トーン: 部署色を使わない)
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.fillRect(bgX + 1, bgY + 1, bgW, bgH);
+  ctx.fillStyle = 'rgba(24, 27, 34, 0.92)';
+  ctx.fillRect(bgX, bgY, bgW, bgH);
+  ctx.strokeStyle = 'rgba(148, 163, 178, 0.55)';
+  ctx.lineWidth = Math.max(1, zoom * 0.4);
+  ctx.strokeRect(bgX, bgY, bgW, bgH);
+
+  // Tail
+  ctx.fillStyle = 'rgba(24, 27, 34, 0.92)';
   ctx.beginPath();
-  ctx.arc(bx, by, bgSize / 2, 0, Math.PI * 2);
+  ctx.moveTo(charX - TAIL_SIZE, bgY + bgH);
+  ctx.lineTo(charX, bgY + bgH + TAIL_SIZE);
+  ctx.lineTo(charX + TAIL_SIZE, bgY + bgH);
   ctx.fill();
 
-  // Subtle ring (research green tint for idle personality)
-  ctx.beginPath();
-  ctx.arc(bx, by, bgSize / 2 + 1, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(102, 102, 136, 0.4)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
+  ctx.fillStyle = '#b8c2cc';
+  ctx.fillText(text, charX, charYScreen + OFFSET_Y);
+  ctx.restore();
+}
 
-  // Emoji
-  ctx.globalAlpha = 1;
-  ctx.fillText(emoji, bx, by + bgSize / 3);
+// ── R5 ✉️メール飛翔 (依頼発行=委任の実イベント駆動) ──────────────────
+// jcMailFly (event-watcher handleDelegate / browserMock delegate) のみが発火源。
+// 封筒は送り手→受け手のキャラ間を放物線で飛び、着地でパルスが出る。
+// 新規スプライトなし — 絵文字✉️の Canvas 描画。
+function renderMailFlights(
+  ctx: CanvasRenderingContext2D,
+  characters: Character[],
+  offsetX: number,
+  offsetY: number,
+  s: number,
+  zoom: number,
+): void {
+  const flights = jcGetActiveMailFlights();
+  if (flights.length === 0) return;
+  const now = Date.now();
+
+  const posOf = (memberId: string): { x: number; y: number } | null => {
+    let found: Character | undefined;
+    for (const ch of characters) {
+      if (!ch.isSubagent && memberIdOfChar(ch) === memberId) found = ch;
+    }
+    if (found) {
+      return { x: offsetX + found.x * zoom, y: offsetY + (found.y - 8) * zoom };
+    }
+    // キャラ不在 (未出社) はデスク位置へ
+    const deskId = jcGetMemberRuntime(memberId)?.config.deskId;
+    const desk = deskId ? jcGetDeskPosition(deskId) : undefined;
+    return desk ? { x: offsetX + (desk.col + 0.5) * s, y: offsetY + (desk.row + 0.5) * s } : null;
+  };
+
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (const f of flights) {
+    const from = posOf(f.fromMemberId);
+    const to = posOf(f.toMemberId);
+    if (!from || !to) continue;
+
+    const t = Math.min(1, (now - f.startTime) / f.duration);
+    // easeInOutQuad — 飛び出しと着地が柔らかい
+    const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+    // 放物線 (2次ベジェ): 制御点は中点の上空
+    const ctrlX = (from.x + to.x) / 2;
+    const ctrlY = Math.min(from.y, to.y) - MAIL_FLIGHT_ARC_TILES * s;
+    const bez = (p: number): { x: number; y: number } => {
+      const m = 1 - p;
+      return {
+        x: m * m * from.x + 2 * m * p * ctrlX + p * p * to.x,
+        y: m * m * from.y + 2 * m * p * ctrlY + p * p * to.y,
+      };
+    };
+
+    // 残像トレイル (2枚・薄く)
+    for (let k = 1; k <= 2; k++) {
+      const p = Math.max(0, e - k * 0.09);
+      const q = bez(p);
+      ctx.globalAlpha = 0.2 / k;
+      ctx.font = `${Math.max(10, 10 * zoom)}px serif`;
+      ctx.fillText('✉️', q.x, q.y);
+    }
+
+    // 封筒本体 (着地間際でフェードアウト)
+    const pos = bez(e);
+    ctx.globalAlpha = t > 0.92 ? Math.max(0, (1 - t) / 0.08) : 1;
+    ctx.font = `${Math.max(12, 12 * zoom)}px serif`;
+    ctx.fillText('✉️', pos.x, pos.y);
+
+    // 着地パルス — 受け手に「届いた」リング
+    if (t > 0.8) {
+      const pp = (t - 0.8) / 0.2;
+      ctx.globalAlpha = (1 - pp) * 0.7;
+      ctx.beginPath();
+      ctx.arc(to.x, to.y, (4 + pp * 10) * zoom, 0, Math.PI * 2);
+      ctx.strokeStyle = '#E4C36E';
+      ctx.lineWidth = Math.max(1.5, zoom * 0.6);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   ctx.restore();
 }
 
@@ -1166,8 +1563,8 @@ function renderActivityBubbles(
 ): void {
   const BUBBLE_FONT = `${Math.max(6, 7 * zoom)}px "Press Start 2P", monospace`;
   const BUBBLE_FALLBACK_FONT = `${Math.max(7, 8 * zoom)}px monospace`;
-  const BUBBLE_BG = 'rgba(8, 10, 25, 0.92)';
-  const BUBBLE_BORDER = 'rgba(0, 240, 255, 0.3)';
+  const BUBBLE_BG = 'rgba(38, 43, 47, 0.94)';
+  const BUBBLE_BORDER = 'rgba(95, 194, 180, 0.4)';
   const BUBBLE_TEXT = '#d0d0e8';
   const BUBBLE_PADDING_X = 4 * zoom;
   const BUBBLE_PADDING_Y = 2 * zoom;
@@ -1181,7 +1578,7 @@ function renderActivityBubbles(
 
   for (const ch of characters) {
     if (ch.isSubagent) continue;
-    const memberId = jcGetMemberForAgent(ch.id);
+    const memberId = memberIdOfChar(ch);
     if (!memberId) continue;
     const summary = jcGetActivitySummary(memberId);
     if (!summary) continue;
@@ -1257,7 +1654,7 @@ function renderSpeechBubbles(
     let charY: number | null = null;
     for (const ch of characters) {
       if (ch.isSubagent) continue;
-      const memberId = jcGetMemberForAgent(ch.id);
+      const memberId = memberIdOfChar(ch);
       if (memberId === bubble.memberId) {
         const sittingOff = isSittingState(ch.state) ? -4 : 0;
         charX = offsetX + ch.x * zoom;

@@ -83,8 +83,8 @@ export function OfficeLog({
         right: 0,
         width: expanded ? 400 : 280,
         height: '100%',
-        background: 'rgba(8, 10, 25, 0.95)',
-        borderLeft: '2px solid rgba(0, 180, 255, 0.3)',
+        background: 'rgba(38, 43, 47, 0.95)',
+        borderLeft: '2px solid rgba(46, 158, 144, 0.45)',
         zIndex: 50,
         display: 'flex',
         flexDirection: 'column',
@@ -95,13 +95,13 @@ export function OfficeLog({
       <div
         style={{
           padding: '8px 10px',
-          borderBottom: '2px solid rgba(0, 180, 255, 0.2)',
+          borderBottom: '2px solid rgba(46, 158, 144, 0.3)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
         }}
       >
-        <span style={{ fontSize: '18px', color: '#00f0ff', fontWeight: 'bold' }}>OFFICE LOG</span>
+        <span style={{ fontSize: '18px', color: '#5FC2B4', fontWeight: 'bold' }}>OFFICE LOG</span>
         <button
           onClick={onClose}
           style={{
@@ -127,10 +127,10 @@ export function OfficeLog({
               flex: 1,
               padding: '4px 0',
               fontSize: '13px',
-              background: activeFilter === filter ? 'rgba(0, 180, 255, 0.15)' : 'transparent',
-              color: activeFilter === filter ? '#00f0ff' : 'var(--pixel-text-dim)',
+              background: activeFilter === filter ? 'rgba(46, 158, 144, 0.25)' : 'transparent',
+              color: activeFilter === filter ? '#5FC2B4' : 'var(--pixel-text-dim)',
               border: 'none',
-              borderBottom: activeFilter === filter ? '2px solid #00f0ff' : '2px solid transparent',
+              borderBottom: activeFilter === filter ? '2px solid #5FC2B4' : '2px solid transparent',
               cursor: 'pointer',
             }}
           >

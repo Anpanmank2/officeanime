@@ -27,6 +27,20 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+# 3a. R6: malformed event (message欠落) が EventWatcher を殺さない (AC-7)
+npx tsx scripts/test-malformed-delegate.mts
+if [ $? -ne 0 ]; then
+  echo "❌ BLOCKED: malformed-event defense test failed"
+  exit 1
+fi
+
+# 3b. R1: 稼働の正本定義 (workload derivation) — チップ/照明/カルテ/状態表示の源
+npx tsx scripts/test-workload.mts
+if [ $? -ne 0 ]; then
+  echo "❌ BLOCKED: workload derivation test failed"
+  exit 1
+fi
+
 # 4. Playwright E2E: browser loads, permanent residents appear
 node scripts/test-e2e-browser.mjs
 if [ $? -ne 0 ]; then

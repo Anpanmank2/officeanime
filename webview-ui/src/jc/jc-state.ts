@@ -3,6 +3,7 @@
 import {
   DEPT_COLORS,
   IDLE_TIMEOUT_MS,
+  NON_WORKING_STATES,
   PERMANENT_ROLES,
   SPEECH_BUBBLE_BASE_MS,
   SPEECH_BUBBLE_MAX_MS,
@@ -39,12 +40,16 @@ export const POKER_TABLE_SEATS = [
   { col: 17, row: 18 },
 ];
 
-/** Break zone target positions by breakBehavior type */
+/** Break zone target positions by breakBehavior type.
+ *  2026-07-03 藤井 layout spec §1 転用②: break什器をラウンジへ集約 (たまり場強化)。
+ *  coffee=(21,16) 移設後エスプレッソ(21,15)前 / sofa=ラウンジソファ(22,20)前 /
+ *  arcade=ダーツボード(20,14)前 / bookshelf=ウィスキー棚(14,14)前 /
+ *  meeting=検証室の応接テーブル脇 (応接兼用のため現状維持)。 */
 const BREAK_TARGETS: Record<string, { col: number; row: number }> = {
-  coffee: { col: 22, row: 3 },
-  sofa: { col: 21, row: 4 },
-  arcade: { col: 20, row: 2 },
-  bookshelf: { col: 23, row: 2 },
+  coffee: { col: 21, row: 16 },
+  sofa: { col: 22, row: 19 },
+  arcade: { col: 20, row: 15 },
+  bookshelf: { col: 14, row: 15 },
   meeting: { col: 3, row: 3 },
 };
 
@@ -328,20 +333,48 @@ export function jcGetStats(): { present: number; total: number } {
   return { present, total };
 }
 
-/** Get per-department member count stats */
-export function jcGetDeptStats(): Record<string, { present: number; total: number }> {
-  const deptStats: Record<string, { present: number; total: number }> = {};
+/** Get per-department member count stats.
+ *  working: 在席かつ NON_WORKING_STATES 以外 (2026-07-03 藤井 §2(b) 稼働チップ分子)。 */
+export function jcGetDeptStats(): Record<
+  string,
+  { present: number; total: number; working: number }
+> {
+  const deptStats: Record<string, { present: number; total: number; working: number }> = {};
   for (const runtime of memberRuntimes.values()) {
     const dept = runtime.config.department;
     if (!deptStats[dept]) {
-      deptStats[dept] = { present: 0, total: 0 };
+      deptStats[dept] = { present: 0, total: 0, working: 0 };
     }
     deptStats[dept].total++;
     if (runtime.isPresent) {
       deptStats[dept].present++;
+      if (!NON_WORKING_STATES.has(runtime.jcState)) {
+        deptStats[dept].working++;
+      }
     }
   }
   return deptStats;
+}
+
+// ── 部署ホワイトボード (部署カルテ) ────────────────────────────
+// 2026-07-03 藤井 layout spec §3: WB クリック → 部署カルテパネル。
+// footprint はいずれも WHITEBOARD 2x2 (top-left 起点)。
+// default-layout-3.json の mkt-whiteboard-01(6,13) / res-whiteboard-01(18,13) /
+// eng-whiteboard-01(8,15) と同期必須 (skill: pixel-office-spatial-registry-map)。
+const DEPT_BOARD_TILES: Array<{ department: string; col: number; row: number }> = [
+  { department: 'marketing', col: 6, row: 13 },
+  { department: 'research', col: 18, row: 13 },
+  { department: 'engineering', col: 8, row: 15 },
+];
+
+/** タイルが部署ホワイトボード上なら department 名を返す (exact footprint match) */
+export function jcGetDeptBoardAtTile(col: number, row: number): string | null {
+  for (const b of DEPT_BOARD_TILES) {
+    if (col >= b.col && col <= b.col + 1 && row >= b.row && row <= b.row + 1) {
+      return b.department;
+    }
+  }
+  return null;
 }
 
 /** Get member runtime by ID */
@@ -450,6 +483,58 @@ export function jcGetActiveLiaisons(): typeof activeLiaisons {
     }
   }
   return activeLiaisons;
+}
+
+// ── R5 ✉️メール飛翔エフェクト (依頼発行=委任の実イベント駆動) ─────────
+// jcMailFly メッセージ (event-watcher handleDelegate / browserMock delegate) から
+// のみ発火する — ダミー発火なし。位置解決は描画側 (jc-overlay) が毎フレーム行う。
+const activeMailFlights: Array<{
+  fromMemberId: string;
+  toMemberId: string;
+  startTime: number;
+  duration: number;
+}> = [];
+
+/** 依頼発行 (delegate) の封筒フライトを発火する */
+export function jcTriggerMailFlight(
+  fromMemberId: string,
+  toMemberId: string,
+  duration: number,
+): void {
+  if (!fromMemberId || !toMemberId) return;
+  activeMailFlights.push({ fromMemberId, toMemberId, startTime: Date.now(), duration });
+}
+
+/** 進行中の封筒フライト (期限切れは prune) */
+export function jcGetActiveMailFlights(): typeof activeMailFlights {
+  const now = Date.now();
+  for (let i = activeMailFlights.length - 1; i >= 0; i--) {
+    if (now - activeMailFlights[i].startTime > activeMailFlights[i].duration) {
+      activeMailFlights.splice(i, 1);
+    }
+  }
+  return activeMailFlights;
+}
+
+// ── R4 本棚 = 完了アーカイブ (保存ボックス) ──────────────────────
+// 本棚クリック → 完了しごとの履歴ブラウザ。footprint は default-layout-3.json の
+// 本棚3点と同期必須 (skill: pixel-office-spatial-registry-map の3点同期の罠):
+//   eng-bookshelf-01 BOOKSHELF (10,14) 2x1 / eng-dblbook-01 DOUBLE_BOOKSHELF (1,13) 2x2 /
+//   poker-shelf-01 WHISKEY_SHELF (14,14) 1x1
+const BOOKSHELF_TILES: Array<{ col: number; row: number; w: number; h: number }> = [
+  { col: 10, row: 14, w: 2, h: 1 },
+  { col: 1, row: 13, w: 2, h: 2 },
+  { col: 14, row: 14, w: 1, h: 1 },
+];
+
+/** タイルが本棚 (完了アーカイブ) 上か (exact footprint match) */
+export function jcIsBookshelfAtTile(col: number, row: number): boolean {
+  for (const b of BOOKSHELF_TILES) {
+    if (col >= b.col && col < b.col + b.w && row >= b.row && row < b.row + b.h) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function getMemberDeskId(memberId: string): string {

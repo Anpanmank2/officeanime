@@ -84,9 +84,8 @@ export interface CharacterSprites {
 
 const spriteCache = new Map<string, CharacterSprites>();
 
-/** Apply hue shift to every sprite in a CharacterSprites set */
-function hueShiftSprites(sprites: CharacterSprites, hueShift: number): CharacterSprites {
-  const color: FloorColor = { h: hueShift, s: 0, b: 0, c: 0 };
+/** Apply an HSL adjustment to every sprite in a CharacterSprites set */
+function adjustCharacterSprites(sprites: CharacterSprites, color: FloorColor): CharacterSprites {
   const shift = (s: SpriteData) => adjustSprite(s, color);
   const shiftWalk = (
     arr: [SpriteData, SpriteData, SpriteData, SpriteData],
@@ -146,8 +145,18 @@ function emptySprite(w: number, h: number): SpriteData {
   return rows;
 }
 
-export function getCharacterSprites(paletteIndex: number, hueShift = 0): CharacterSprites {
-  const cacheKey = `${paletteIndex}:${hueShift}`;
+/** 出社アイドルの彩度落ち量 (2026-07-03 藤井 dashboard spec §2(a): s:-50 / b:-10) */
+const IDLE_VARIANT_ADJUST: FloorColor = { h: 0, s: -50, b: -10, c: 0 };
+
+export function getCharacterSprites(
+  paletteIndex: number,
+  hueShift = 0,
+  variant: 'idle' | null = null,
+): CharacterSprites {
+  // cache key: `palette:hueShift` / idle variant は `palette:hueShift:idle`
+  const cacheKey = variant
+    ? `${paletteIndex}:${hueShift}:${variant}`
+    : `${paletteIndex}:${hueShift}`;
   const cached = spriteCache.get(cacheKey);
   if (cached) return cached;
 
@@ -249,7 +258,12 @@ export function getCharacterSprites(paletteIndex: number, hueShift = 0): Charact
 
   // Apply hue shift if non-zero
   if (hueShift !== 0) {
-    sprites = hueShiftSprites(sprites, hueShift);
+    sprites = adjustCharacterSprites(sprites, { h: hueShift, s: 0, b: 0, c: 0 });
+  }
+
+  // 出社アイドル: 彩度-50 / 明度-10 の色落ちスプライト (§2(a))
+  if (variant === 'idle') {
+    sprites = adjustCharacterSprites(sprites, IDLE_VARIANT_ADJUST);
   }
 
   spriteCache.set(cacheKey, sprites);

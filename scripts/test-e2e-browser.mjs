@@ -186,6 +186,26 @@ async function run() {
     const eng01Arrive = logs.find((l) => l.includes('Member arriving: eng-01'));
     assert(!!eng01Arrive, 'eng-01 arrived after delegate event');
 
+    // Test 6.5: R1 稼働復元 — reload 直後に jc-events 履歴から状態が戻る (AC-1)
+    // 差戻し主因「reload後のチップは新イベントまで0/x」の regression guard。
+    // 上の delegate は完了イベントが無い = eng-01 は未完了しごと保有 → reload 後
+    // ただちに復元ログ (+ 出社/稼働状態) が出ること。
+    console.log('  [Test 6.5] Workload restore after reload (R1 / AC-1)');
+    const logCountBeforeReload = logs.length;
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.waitForTimeout(3000);
+    const restoreLog = logs
+      .slice(logCountBeforeReload)
+      .find((l) => l.includes('Workload restore') && l.includes('eng-01'));
+    assert(
+      !!restoreLog,
+      `Reload restores eng-01 open work from history (${restoreLog ?? 'no restore log'})`,
+    );
+    const reArrive = logs
+      .slice(logCountBeforeReload)
+      .find((l) => l.includes('Member arriving: eng-01'));
+    assert(!!reArrive, 'eng-01 re-arrives from history (not 0/x) after reload');
+
     // Test 7: Request-flow textarea keystroke regression (charloss guard)
     // Regression for 2026-07-02: controlled textarea driven by a store whose
     // notify is deferred via requestAnimationFrame dropped fast / IME input.
@@ -307,7 +327,7 @@ async function run() {
     console.log('  [Test 9] Request cards ×4 + dept-specific templates');
     try {
       // Close any flow left open by Test 7/8 (ESC-less: click ✕ if present).
-      const closeBtn = page.locator('[data-request-flow] button[title="閉じる"]');
+      const closeBtn = page.locator('[data-request-flow] button[title*="閉じる"]');
       if ((await closeBtn.count()) > 0) {
         await closeBtn.click();
         await page.waitForTimeout(200);
@@ -331,7 +351,7 @@ async function run() {
         docText.includes('何を伝えたい？') &&
         docText.includes('どんな形にする？');
       assert(docLabelsOk, '資料 template shows doc 3項目 labels');
-      await page.locator('[data-request-flow] button[title="閉じる"]').click();
+      await page.locator('[data-request-flow] button[title*="閉じる"]').click();
       await page.waitForTimeout(200);
 
       // 市場調査(market) card opens with the research-style (marketing例題) labels.
@@ -343,7 +363,7 @@ async function run() {
         mkText.includes('何のために調べる？') && mkText.includes('どの範囲を調べる？'),
         '市場調査 template shows market 3項目 labels',
       );
-      await page.locator('[data-request-flow] button[title="閉じる"]').click();
+      await page.locator('[data-request-flow] button[title*="閉じる"]').click();
       await page.waitForTimeout(200);
     } catch (e) {
       assert(false, `Request 4-cards test threw: ${e.message}`);
@@ -522,6 +542,121 @@ async function run() {
       await rp2.locator('button[title="閉じる"]').click();
     } catch (e) {
       assert(false, `Request result panel test threw: ${e.message}`);
+    }
+
+    // ── Test 12: 営業状態マシン (店じまい/営業中) — R1状態 + R2見た目 ──────────
+    // AC-1: 全員idle + 2h無活動 → CLOSED (dim>0)。AC-2: 新イベントで OPEN に戻る
+    // (reversible)。R2 §4: office_heartbeat で 最終確認(lastHeartbeat) 更新。
+    // __JC_OFFICE_QC = {state, dimAlpha, lastHeartbeat, ringActive} を assert。
+    console.log('  [Test 12] Office hours: CLOSED after 2h idle → REOPEN → heartbeat');
+    try {
+      const iso = (offsetMin) => new Date(Date.now() + offsetMin * 60000).toISOString();
+      const readOffice = () => page.evaluate(() => window.__JC_OFFICE_QC ?? null);
+
+      // 12.0: QC hook が公開されている
+      await page.waitForTimeout(500);
+      const q0 = await readOffice();
+      assert(
+        !!q0 && typeof q0.state === 'string',
+        `__JC_OFFICE_QC published (got ${JSON.stringify(q0)})`,
+      );
+
+      // 12.1: 3h前に開始・2.5h前に完了 = 全員非稼働 + 2h超 idle → CLOSED
+      writeFileSync(
+        EVENTS_FILE,
+        JSON.stringify({
+          version: 1,
+          events: [
+            { event: 'work_started', timestamp: iso(-180), from: 'eng-01', task: 'old' },
+            {
+              event: 'delegation_complete',
+              timestamp: iso(-150),
+              from: 'eng-01',
+              to: 'exec-sec',
+              task: 'old',
+            },
+          ],
+        }),
+      );
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForTimeout(3000); // dim フェードイン (1.2s) + tick(1s) 余裕
+      const qClosed = await readOffice();
+      assert(qClosed?.state === 'closed', `2h idle → state=closed (got ${qClosed?.state})`);
+      assert(
+        (qClosed?.dimAlpha ?? 0) >= 0.5,
+        `CLOSED 減光 dimAlpha>=0.5 (got ${qClosed?.dimAlpha})`,
+      );
+
+      // 12.2: 新しい依頼 (delegate) を append → HMR push → 即 REOPEN (dim 解除)
+      writeFileSync(
+        EVENTS_FILE,
+        JSON.stringify({
+          version: 1,
+          events: [
+            { event: 'work_started', timestamp: iso(-180), from: 'eng-01', task: 'old' },
+            {
+              event: 'delegation_complete',
+              timestamp: iso(-150),
+              from: 'eng-01',
+              to: 'exec-sec',
+              task: 'old',
+            },
+            {
+              event: 'delegate',
+              timestamp: new Date().toISOString(),
+              from: 'exec-sec',
+              to: ['eng-03'],
+              task: 'wake',
+              department: 'engineering',
+              message: '起きて',
+            },
+          ],
+        }),
+      );
+      await page.waitForTimeout(3500); // reopen アニメ (1.0s) + tick 余裕
+      const qOpen = await readOffice();
+      assert(qOpen?.state !== 'closed', `新イベントで CLOSED を脱する (got ${qOpen?.state})`);
+      assert(
+        (qOpen?.dimAlpha ?? 1) < 0.5,
+        `REOPEN で減光解除 dimAlpha<0.5 (got ${qOpen?.dimAlpha})`,
+      );
+
+      // 12.3: office_heartbeat → 最終確認(lastHeartbeat) が更新される
+      const hbTs = new Date().toISOString();
+      writeFileSync(
+        EVENTS_FILE,
+        JSON.stringify({
+          version: 1,
+          events: [
+            { event: 'work_started', timestamp: iso(-180), from: 'eng-01', task: 'old' },
+            {
+              event: 'delegation_complete',
+              timestamp: iso(-150),
+              from: 'eng-01',
+              to: 'exec-sec',
+              task: 'old',
+            },
+            {
+              event: 'delegate',
+              timestamp: iso(-1),
+              from: 'exec-sec',
+              to: ['eng-03'],
+              task: 'wake',
+              department: 'engineering',
+              message: '起きて',
+            },
+            { event: 'office_heartbeat', timestamp: hbTs, from: 'exec-sec' },
+          ],
+        }),
+      );
+      await page.waitForTimeout(2000);
+      const qHb = await readOffice();
+      assert(
+        qHb?.lastHeartbeat != null && Math.abs(qHb.lastHeartbeat - Date.parse(hbTs)) < 1000,
+        `office_heartbeat → 最終確認 更新 (got ${qHb?.lastHeartbeat})`,
+      );
+    } catch (e) {
+      assert(false, `Office hours test threw: ${e.message}`);
     }
   } finally {
     await browser.close();

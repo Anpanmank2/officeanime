@@ -320,7 +320,7 @@ export function TaskHistoryPanel({ isOpen, onClose }: { isOpen: boolean; onClose
         left: 0,
         width: 320,
         height: '100%',
-        background: 'rgba(8, 10, 25, 0.95)',
+        background: 'rgba(38, 43, 47, 0.95)',
         borderRight: '2px solid rgba(90, 140, 255, 0.3)',
         zIndex: 50,
         display: 'flex',

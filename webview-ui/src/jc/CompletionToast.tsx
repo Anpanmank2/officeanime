@@ -56,7 +56,7 @@ export function CompletionToast() {
         transform: 'translateX(-50%)',
         zIndex: 55, // above OfficeLog, below DialogBox
         pointerEvents: 'none',
-        background: 'rgba(8, 10, 25, 0.92)',
+        background: 'rgba(38, 43, 47, 0.94)',
         border: `2px solid ${color}`,
         boxShadow: '2px 2px 0px #0a0a14',
         borderRadius: 0,

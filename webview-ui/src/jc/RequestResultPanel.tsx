@@ -168,7 +168,7 @@ export function RequestResultPanel() {
           padding: '10px 12px 12px',
           fontSize: 14,
           lineHeight: 1.7,
-          color: isGateNotice ? '#f0d840' : '#e8e8f4',
+          color: isGateNotice ? '#E4C36E' : '#e8e8f4',
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
           overflowY: 'auto',

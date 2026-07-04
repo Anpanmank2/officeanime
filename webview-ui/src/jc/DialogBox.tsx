@@ -279,7 +279,7 @@ export function DialogBox({ memberId, memberName, onClose }: DialogBoxProps) {
             style={{
               ...btnBaseStyle,
               background: 'transparent',
-              borderColor: 'rgba(100, 140, 255, 0.3)',
+              borderColor: 'rgba(46, 158, 144, 0.4)',
               color: 'rgba(200, 210, 240, 0.7)',
             }}
             onClick={onClose}

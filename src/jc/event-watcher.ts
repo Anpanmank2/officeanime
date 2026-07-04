@@ -99,6 +99,19 @@ export class EventWatcher {
       EventWatcher.THOUGHT_INTERVAL_MS,
     );
 
+    // 部署カルテ (2026-07-03 藤井 §3): webview (再)接続時に履歴を全量 sync。
+    // lastProcessedIndex は再接続で戻らないため、jcHistoryEvent の逐次 push だけだと
+    // reload した webview の集計が空になる。bulk は store 側で冪等 (dedupe)。
+    try {
+      const raw = fs.readFileSync(eventFilePath, 'utf-8');
+      const file = JSON.parse(raw) as OfficeEventsFile;
+      if (Array.isArray(file.events)) {
+        this.webview.postMessage({ type: 'jcEventHistory', events: file.events });
+      }
+    } catch {
+      // ファイル無し/mid-write — 逐次 push に任せる
+    }
+
     // Initial read
     this.processEvents();
     console.log(`[JC-Events] Watching ${eventFilePath}`);
@@ -196,12 +209,24 @@ export class EventWatcher {
     this.lastProcessedIndex = file.events.length;
 
     for (const event of newEvents) {
-      this.handleEvent(event);
+      // ── R6 防御 (2026-07-03 差戻しv2): jc-events.json は複数 writer がいる。
+      // 1 つの malformed イベント (message 欠落等) がプロセスを殺さないよう
+      // per-event で隔離する。壊れたイベントは skip して次へ進む。
+      try {
+        this.handleEvent(event);
+      } catch (err) {
+        console.error('[JC-Events] handleEvent error — event skipped:', err);
+      }
     }
   }
 
   private handleEvent(event: OfficeEvent): void {
     if (!this.webview) return;
+
+    // ── 部署カルテ (2026-07-03 藤井 §3): 生イベントを webview の karte store へ
+    // 逐次 push する。演出メッセージと違い、集計用の履歴なので全種別を転送。
+    // (接続後クライアント向け。接続前の全量は client-init の jcEventHistory が担う)
+    this.webview.postMessage({ type: 'jcHistoryEvent', event });
 
     switch (event.event) {
       case 'task_received':
@@ -311,13 +336,15 @@ export class EventWatcher {
 
   private handleCrossDeptMessage(event: CrossDeptMessageEvent): void {
     // Speech bubble on sender
+    // R6 防御: message 欠落 (malformed writer) でも落とさない — 空文字 fallback。
+    const msgText = event.message ?? '';
     const from = this.config.members.find((m) => m.id === event.from);
-    if (from) {
+    if (from && msgText) {
       const bubble: SpeechBubble = {
         id: `msg-from-${Date.now()}`,
         memberId: event.from,
-        text: event.message.slice(0, 25),
-        fullText: event.message,
+        text: msgText.slice(0, 25),
+        fullText: msgText,
         department: event.from_dept,
         timestamp: Date.now(),
         duration: 3000,
@@ -588,13 +615,15 @@ export class EventWatcher {
       duration: beam.duration,
     });
 
+    // R6 防御: message 欠落でも落とさない (task へ fallback → 空なら bubble skip)。
+    const escText = event.message ?? '';
     const from = this.config.members.find((m) => m.id === event.from);
-    if (from) {
+    if (from && escText) {
       const bubble: SpeechBubble = {
         id: `escalate-${Date.now()}`,
         memberId: event.from,
-        text: event.message.slice(0, 25),
-        fullText: event.message,
+        text: escText.slice(0, 25),
+        fullText: escText,
         department: from.department,
         timestamp: Date.now(),
         duration: 3000,
@@ -648,16 +677,26 @@ export class EventWatcher {
         color: beam.color,
         duration: beam.duration,
       });
+
+      // ── R5 ✉️メール演出 (2026-07-03 差戻しv2): 依頼発行(委任)の実イベントに
+      // 1:1 で封筒フライトを発火する。ダミー発火なし — delegate イベント経由のみ。
+      this.webview!.postMessage({
+        type: 'jcMailFly',
+        fromMemberId: event.from,
+        toMemberId: memberId,
+      });
     }
 
     // Speech bubble on delegator
+    // R6 防御: message 欠落 (malformed writer) でも落とさない — task へ fallback。
+    const delegateText = event.message ?? event.task ?? '';
     const from = this.config.members.find((m) => m.id === event.from);
-    if (from) {
+    if (from && delegateText) {
       const bubble: SpeechBubble = {
         id: `delegate-${Date.now()}`,
         memberId: event.from,
-        text: event.message.slice(0, 25),
-        fullText: event.message,
+        text: delegateText.slice(0, 25),
+        fullText: delegateText,
         department: from.department,
         timestamp: Date.now(),
         duration: 3000,
@@ -679,13 +718,15 @@ export class EventWatcher {
     });
 
     // Speech bubble on completer
+    // R6 防御: message 欠落でも落とさない — task へ fallback、空なら bubble skip。
+    const completeText = event.message ?? event.task ?? '';
     const from = this.config.members.find((m) => m.id === event.from);
-    if (from) {
+    if (from && completeText) {
       const bubble: SpeechBubble = {
         id: `complete-${Date.now()}`,
         memberId: event.from,
-        text: event.message.slice(0, 25),
-        fullText: event.message,
+        text: completeText.slice(0, 25),
+        fullText: completeText,
         department: from.department,
         timestamp: Date.now(),
         duration: 2000,
@@ -715,13 +756,15 @@ export class EventWatcher {
     });
 
     // Speech bubble on secretary
+    // R6 防御: message 欠落でも落とさない — 空なら bubble skip。
+    const progressText = event.message ?? '';
     const from = this.config.members.find((m) => m.id === event.from);
-    if (from) {
+    if (from && progressText) {
       const bubble: SpeechBubble = {
         id: `progress-${Date.now()}`,
         memberId: event.from,
-        text: event.message.slice(0, 25),
-        fullText: event.message,
+        text: progressText.slice(0, 25),
+        fullText: progressText,
         department: from.department,
         timestamp: Date.now(),
         duration: 2000,
