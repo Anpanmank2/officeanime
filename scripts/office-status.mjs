@@ -89,6 +89,101 @@ function fmtHHMM(ms) {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+// ── STALL 誤検知 修正 (2026-07-23 eng-01, 実測: eng-04 TCG PF強者調査) ──────
+// 事実: karte-state.ts (R1 正本・webview 共有・改変禁止) は task_completed も
+// delegation_complete も既に COMPLETION_EVENTS として扱う。バグはそこではなく、
+// 「actor の完了イベントの task 文字列が未完了 item と完全一致しない場合、
+// **member の最古(FIFO)** 未完了にフォールバックして閉じる」設計にある。
+// 実運用は delegate と task_completed で task 文字列が食い違うことが多く
+// (例: delegate="TCG PF強者調査 正本ドキュメントPM検証" → task_completed="TCG PF強者調査 PM検証PASS")、
+// 完全一致しない完了が続くと「最古優先」が過去の (文字列不一致で一度も正確に
+// 閉じられなかった) backlog を延々掴み続け、直近の新規タスクが未完了のまま
+// 2h 後に STALL 誤検知される (実測: eng-04 に 07-13 以降 backlog 24件滞留)。
+// karte-state.ts 側は改変できないため、bulkSetKarteEvents に渡す**投入前の
+// イベント列そのもの**をここで補正する: 完了イベントが厳密一致しない場合、
+// 完了は通常「actor が今さっき受けた/始めた仕事」を指すという運用実態に基づき、
+// その actor の**直近(LIFO)**の未完了 item に task 文字列を書き換えてから渡す。
+// こうすると karte-state.ts 側は「1) 完全一致」分岐で正しく直近の item を閉じる
+// (二重定義を避け、投入データの補正のみで完結させる自己完結パッチ)。
+const RECONCILE_RECEIPT_EVENTS = new Set(['delegate', 'task_assigned']);
+const RECONCILE_COMPLETION_EVENTS = new Set(['task_completed', 'delegation_complete']);
+
+function reconcileActorOf(e) {
+  if (typeof e.from === 'string' && e.from) return e.from;
+  if (typeof e.agent === 'string' && e.agent) return e.agent; // work_started/task_completed の旧emitter対応
+  return '';
+}
+
+function reconcileHoldersOf(e) {
+  if (Array.isArray(e.to)) return e.to.filter((x) => typeof x === 'string' && x);
+  if (typeof e.to === 'string' && e.to) return [e.to];
+  return [];
+}
+
+/** karte-state.ts の openRank と同じ考え方 (同時刻は開くを先に処理) のローカル軽量版。 */
+function reconcileOpenRank(e) {
+  if (e.event === 'work_started' || RECONCILE_RECEIPT_EVENTS.has(e.event)) return 0;
+  if (RECONCILE_COMPLETION_EVENTS.has(e.event)) return 1;
+  return 2;
+}
+
+/**
+ * 完了イベントの task 文字列を、actor の直近(LIFO)未完了 item に補正した配列を返す。
+ * jc-events.json 自体は書き換えない (このプロセス内のメモリ上補正のみ)。
+ */
+function reconcileCompletionLinkage(raw) {
+  const withMeta = raw.map((e, i) => ({
+    e,
+    i,
+    at: e && typeof e.timestamp === 'string' ? Date.parse(e.timestamp) : NaN,
+  }));
+  const ordered = withMeta
+    .filter((x) => Number.isFinite(x.at))
+    .sort((a, b) => a.at - b.at || reconcileOpenRank(a.e) - reconcileOpenRank(b.e) || a.i - b.i);
+
+  const openByActor = new Map(); // actor → Map<task, true> (挿入順 = 古い→新しい)
+  const out = raw.slice();
+
+  for (const { e, i } of ordered) {
+    if (RECONCILE_COMPLETION_EVENTS.has(e.event)) {
+      const actor = reconcileActorOf(e);
+      if (!actor) continue;
+      const openTasks = openByActor.get(actor);
+      if (!openTasks || openTasks.size === 0) continue; // 未完了なし → 補正不要 (下流の graceful 無視に委ねる)
+      const task = typeof e.task === 'string' ? e.task : '';
+      if (openTasks.has(task)) {
+        openTasks.delete(task); // 精密一致 → 補正不要、そのまま消費
+        continue;
+      }
+      let lastTask = null;
+      for (const t of openTasks.keys()) lastTask = t; // Map 挿入順 → 最後 = 直近(LIFO)
+      if (lastTask === null) continue;
+      openTasks.delete(lastTask);
+      out[i] = { ...e, task: lastTask };
+      continue;
+    }
+    let holders = [];
+    if (e.event === 'work_started') {
+      const actor = reconcileActorOf(e);
+      if (actor) holders = [actor];
+    } else if (RECONCILE_RECEIPT_EVENTS.has(e.event)) {
+      holders = reconcileHoldersOf(e);
+    } else {
+      continue;
+    }
+    const task = typeof e.task === 'string' ? e.task : '';
+    for (const m of holders) {
+      let openTasks = openByActor.get(m);
+      if (!openTasks) {
+        openTasks = new Map();
+        openByActor.set(m, openTasks);
+      }
+      if (!openTasks.has(task)) openTasks.set(task, true);
+    }
+  }
+  return out;
+}
+
 function fmtAgo(ms, now) {
   if (ms === null || ms === undefined) return '';
   const min = Math.floor((now - ms) / 60000);
@@ -128,7 +223,7 @@ function main() {
     console.error(`ERROR: jc-events.json 読込失敗 (${eventsPath}): ${e.message}`);
     process.exit(2);
   }
-  bulkSetKarteEvents(rawEvents);
+  bulkSetKarteEvents(reconcileCompletionLinkage(rawEvents));
 
   // 3. R1 共有ロジックで判定 (webview と同一関数)
   const snap = readOfficeSnapshot(now);
