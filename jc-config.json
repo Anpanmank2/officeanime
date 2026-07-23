@@ -14,7 +14,16 @@
       "palette": 0,
       "deskId": "dev-desk-01",
       "accentColor": "#185FA5",
-      "breakBehavior": "arcade"
+      "breakBehavior": "arcade",
+      "persona": {
+        "personality": "静かに全体を見渡す設計者。派手さより、崩れない土台を好む。",
+        "philosophy": "なぜ作るかが決まらないうちは、手を動かさない。",
+        "career": "現場のコードから設計へ。今はチームの背骨。",
+        "strengths": "設計 · コードレビュー · 判断",
+        "weaknesses": "詰めが長い",
+        "mainWork": "技術統括 · 設計レビュー",
+        "specialty": 90
+      }
     },
     {
       "id": "eng-02",
@@ -42,7 +51,16 @@
       "palette": 2,
       "deskId": "dev-desk-03",
       "accentColor": "#534AB7",
-      "breakBehavior": "bookshelf"
+      "breakBehavior": "bookshelf",
+      "persona": {
+        "personality": "画面の手触りに一番こだわる職人。小さなズレが気になって直してしまう。",
+        "philosophy": "初めて触る人が迷わないなら、それが正解。",
+        "career": "デザインとコードの境目を行き来してここへ。",
+        "strengths": "UI実装 · 操作性 · 細部の詰め",
+        "weaknesses": "凝りすぎる",
+        "mainWork": "画面実装 · インタラクション",
+        "specialty": 75
+      }
     },
     {
       "id": "eng-04",
@@ -56,7 +74,16 @@
       "palette": 3,
       "deskId": "exec-desk-pm",
       "accentColor": "#D85A30",
-      "breakBehavior": "meeting"
+      "breakBehavior": "meeting",
+      "persona": {
+        "personality": "全員の進み具合を見て、詰まりをそっと外して回るまとめ役。",
+        "philosophy": "動いた気になるより、本当に動くかを見る。",
+        "career": "作る側から、束ねる側へ。",
+        "strengths": "進行管理 · 検証 · 優先順位付け",
+        "weaknesses": "心配性",
+        "mainWork": "進捗管理 · 品質チェック",
+        "specialty": 80
+      }
     },
     {
       "id": "eng-05",
@@ -70,7 +97,15 @@
       "palette": 4,
       "deskId": "dev-desk-05",
       "accentColor": "#D4537E",
-      "breakBehavior": "sofa"
+      "breakBehavior": "sofa",
+      "persona": {
+        "personality": "世界観づくりに没頭する職人肌。細部の手触りにこだわる。",
+        "philosophy": "完璧を待つより、まず触れるものを。",
+        "career": "美大でグラフィック → 制作の現場 → いまここ。",
+        "strengths": "世界観設計 · UIパターン · 図版",
+        "mainWork": "画面デザイン · スタイルガイド",
+        "specialty": 70
+      }
     },
     {
       "id": "eng-06",
@@ -98,7 +133,16 @@
       "palette": 0,
       "deskId": "mkt-desk-01",
       "accentColor": "#A32D2D",
-      "breakBehavior": "sofa"
+      "breakBehavior": "sofa",
+      "persona": {
+        "personality": "数字と人の気持ちの両方を見る戦略家。勝ち筋を淡々と探す。",
+        "philosophy": "届けたい相手の一日から逆算する。",
+        "career": "現場の集客から、部を率いる立場へ。",
+        "strengths": "戦略設計 · 数値分析 · 施策設計",
+        "weaknesses": "理屈っぽい",
+        "mainWork": "マーケ統括 · 施策設計",
+        "specialty": 85
+      }
     },
     {
       "id": "mkt-02",
@@ -266,7 +310,16 @@
       "palette": 5,
       "deskId": "res-desk-01",
       "accentColor": "#4A2D8C",
-      "breakBehavior": "bookshelf"
+      "breakBehavior": "bookshelf",
+      "persona": {
+        "personality": "気になったら裏を取るまで気が済まない探究者。まず疑う。",
+        "philosophy": "本当かどうかは、反証してから決める。",
+        "career": "調べ物ばかりしていたら、いつのまにか研究長。",
+        "strengths": "調査 · 検証 · 構造化",
+        "weaknesses": "掘りすぎる",
+        "mainWork": "リサーチ統括 · 事実確認",
+        "specialty": 90
+      }
     },
     {
       "id": "res-02",
@@ -392,7 +445,16 @@
       "palette": 2,
       "deskId": "exec-desk-sec",
       "accentColor": "#FFD700",
-      "breakBehavior": "coffee"
+      "breakBehavior": "coffee",
+      "persona": {
+        "personality": "オフィスの空気を読んで、誰より先に次の一手を用意する司令塔。",
+        "philosophy": "段取り八分。整えてから走り出す。",
+        "career": "小さな受付から、気づけばみんなのハブに。",
+        "strengths": "段取り · 記録 · 交通整理",
+        "weaknesses": "つい抱え込む",
+        "mainWork": "受付 · 手配 · メモ整理",
+        "specialty": 70
+      }
     }
   ],
   "exec": [

@@ -448,6 +448,26 @@ export const SPEECH_BUBBLE_MAX_MS = 8000;
 export const TICKER_MAX_ENTRIES = 5; // 最新5件 (藤井 spec §3)
 export const TICKER_MAX_CHARS = 40; // 40字超のみ「…」+ title で全文
 
+// ── 社員カルテ v2 ステータスバー (2026-07-04 藤井 spec §3・eng-03 実装) ──────
+// プロフィールタブの RPG ステ 5 本を「0-100 の同一物差し」に正規化する定数群。
+// 正規化は全て絶対固定 cap (相対 max-member 禁止・spec must_fix#3) — 1 名だけ稼働で
+// 全員が 100% に張り付く/潰れるのを防ぐ。マジックナンバーは全てここに集約する
+// (source へのインライン禁止・repo 規約)。
+/** 経験バー: layer → 素質 0-100 (不変・固定)。L1 ほど熟練。 */
+export const LAYER_EXPERIENCE: Record<string, number> = { L1: 100, L2: 80, L3: 60, L4: 40 };
+/** layer 不明時の経験フロア (空バー回避・0 にしない)。 */
+export const EXPERIENCE_FLOOR = 20;
+/** 作業量バー: 通算完了件数の線形 cap (現最大 ≈21 の少し上)。 */
+export const THROUGHPUT_BAR_CAP = 25;
+/** 会話量バー: log1p 正規化の cap (秘書外れ値を飽和で吸収)。 */
+export const CONVERSATION_BAR_CAP = 60;
+/** 勢いバー: 半減期 (直近1日で活発なら飽和)。唯一 時間で減衰するバー。 */
+export const MOMENTUM_HALFLIFE_MS = 24 * 60 * 60 * 1000;
+/** 勢いバー: 半減期加重和の cap。 */
+export const MOMENTUM_BAR_CAP = 8;
+/** ステータスバーの段数 (filled = round(pct/10))。5 本共通。 */
+export const STAT_BAR_SEGMENTS = 10;
+
 // ── Confidence Badge Colors (eng-05 spec) ───────────────────────
 export const CONFIDENCE_COLORS: Record<string, string> = {
   confirmed: '#5ac88c',

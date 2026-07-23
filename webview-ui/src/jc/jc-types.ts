@@ -32,6 +32,30 @@ export type ZoneType =
   | 'research'
   | 'ops';
 
+/**
+ * プロフィールタブの人物像 (2026-07-04 藤井 spec §7・eng-03 実装)。
+ * ⚠ 全て jc-config.json への **手書き public-safe 創作バイオ** (ピクセルオフィスという
+ * ゲーム世界のキャラ付け)。実在の社内ルーティング/案件名/判断軸は書かない。team.md /
+ * profiles を parse して焼き込むスクリプトは作らない (officeanime は public リポ・OPSEC)。
+ * ★プロフィールの性格/思想は待機ぼやき persona-lines.ts とは別系統 (混同禁止)。
+ */
+export interface JCPersona {
+  /** 性格 (公開安全な創作・1-2文) */
+  personality: string;
+  /** 思想 / 仕事観 (同上) */
+  philosophy: string;
+  /** 簡易キャリア (架空・1行、実社歴を書かない) */
+  career: string;
+  /** 得意 (中黒区切り・チップ表示) */
+  strengths: string;
+  /** 不得意 (無ければ省略 → 行ごと非表示) */
+  weaknesses?: string;
+  /** 主な業務 (無ければ config.role で fallback) */
+  mainWork: string;
+  /** 専門性バー 0-100 (authored・spec §3(2)・無ければグレー空バー) */
+  specialty?: number;
+}
+
 /** Member config (subset needed by webview) */
 export interface JCMemberConfig {
   id: string;
@@ -39,12 +63,16 @@ export interface JCMemberConfig {
   nameEn: string;
   role: string;
   department: string;
+  /** 職位レイヤー (L1/L2/L3…). jc-config.json payload に実在。optional で、無ければ非表示。 */
+  layer?: string;
   zone: ZoneType;
   hueShift: number;
   palette?: number;
   deskId: string;
   accentColor?: string;
   breakBehavior?: 'coffee' | 'sofa' | 'arcade' | 'bookshelf' | 'meeting';
+  /** 人物像 (プロフィールタブ・手書き public-safe・spec §7)。無ければ「未設定」を優雅に表示。 */
+  persona?: JCPersona;
 }
 
 /** Exec config */

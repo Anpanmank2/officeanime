@@ -37,6 +37,21 @@ export type Department = 'engineering' | 'marketing' | 'research' | 'exec';
 /** Layer level */
 export type Layer = 'L1' | 'L2' | 'L3' | 'L4';
 
+/**
+ * プロフィールタブの人物像 (2026-07-04 藤井 spec §7・eng-03 実装)。
+ * webview jc-types.ts JCPersona の mirror。全て jc-config.json への手書き
+ * public-safe 創作バイオ (実在の社内ルーティング/案件名/判断軸は書かない・OPSEC)。
+ */
+export interface JCPersona {
+  personality: string;
+  philosophy: string;
+  career: string;
+  strengths: string;
+  weaknesses?: string;
+  mainWork: string;
+  specialty?: number;
+}
+
 /** Member definition from jc-config.json */
 export interface JCMember {
   id: string;
@@ -49,6 +64,8 @@ export interface JCMember {
   hueShift: number;
   palette?: number;
   deskId: string;
+  /** 人物像 (プロフィールタブ・手書き public-safe・spec §7)。optional で後方互換。 */
+  persona?: JCPersona;
 }
 
 /** Exec member (icon-only display) */

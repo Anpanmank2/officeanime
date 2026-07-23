@@ -16,7 +16,7 @@
 // dedupe: bulk 直後に同一イベントが incremental でも届き得るため
 // key = timestamp|event|from|task で冪等 (skill: replay-prone-event-log 準拠)。
 
-import { WORK_ABANDON_MS, WORK_STALL_MS } from './jc-constants.js';
+import { MOMENTUM_HALFLIFE_MS, WORK_ABANDON_MS, WORK_STALL_MS } from './jc-constants.js';
 import { jcGetAllMembers, jcGetMemberRuntime } from './jc-state.js';
 
 /** jc-events.json の生イベント (必要フィールドのみ、timestamp は ISO 文字列) */
@@ -441,4 +441,78 @@ export function computeCompletionArchive(): CompletionRecord[] {
   }
   out.sort((a, b) => b.completedAt - a.completedAt);
   return out;
+}
+
+// ── 社員カルテ v2 ステータスバー導出 (2026-07-04 藤井 spec §4・eng-03) ──────────
+// 既存 events[] (jcEventHistory bulk + jcHistoryEvent incremental で全型 from/to 付き
+// 同期済) を **読み取りのみ** 再利用する。新規 store / postMessage channel は増やさない。
+// ⚠ 共有 events[] は絶対に並べ替えない (computeOpenWork 等 他 reader との不変共有を守る)。
+
+// 会話量: 委任/受け渡し/部署間/進捗確認 の from|to 出現数。★task_received は from=user
+//   固定で member 信号ゼロ + phantom 'user' を増やすため必ず除外 (spec must_fix#2)。
+//   cross_dept_message は現ログ0件 / progress_check は1件だが、将来 emit 増で自動反映
+//   するため集合に含める。
+const CONVERSATION_EVENTS = new Set([
+  'delegate',
+  'delegation_complete',
+  'cross_dept_message',
+  'progress_check',
+]);
+
+// 勢い: member 自身が actor(from) の活動イベント。task_received(from=user) は集合外なので
+//   no-op で無害 (from=user は下の `!e.from || ...has()` で弾かれる)。
+const MOMENTUM_ACTIVITY = new Set([
+  'work_started',
+  'delegate',
+  'delegation_complete',
+  'task_completed',
+  'review_requested',
+  'review_completed',
+  'cross_dept_message',
+  'skill_created',
+]);
+
+// 累積・時間非依存 → revision のみで memo。
+let convoMemo: { revision: number; value: Map<string, number> } | null = null;
+
+/**
+ * 会話量 (生カウント): member が from または to[] に出る CONVERSATION_EVENTS の出現数。
+ * panel が log1p + CONVERSATION_BAR_CAP で正規化する (相対 max 正規化でない)。
+ */
+export function computeConversationVolume(): Map<string, number> {
+  if (convoMemo && convoMemo.revision === revision) return convoMemo.value;
+  const counts = new Map<string, number>();
+  const bump = (m: string) => {
+    if (m) counts.set(m, (counts.get(m) ?? 0) + 1);
+  };
+  for (const e of events) {
+    if (!CONVERSATION_EVENTS.has(e.event)) continue;
+    bump(e.from); // 送り手 +1 (委任/進捗確認)
+    for (const t of e.to) bump(t); // 受け手 各 +1 (e.to は normalize 済 string[] 保証)
+  }
+  convoMemo = { revision, value: counts };
+  return counts;
+}
+
+// 揮発・now 依存 → revision × 1s バケットで memo (rAF 毎フレーム再計算のちらつき防止)。
+let momentumMemo: { revision: number; bucket: number; value: Map<string, number> } | null = null;
+
+/**
+ * 勢い (生スコア): member 自身の活動 (from===id かつ event∈MOMENTUM_ACTIVITY) の
+ * 半減期(24h)加重和。panel が /MOMENTUM_BAR_CAP で正規化。5 本で唯一 時間で 0 へ減衰する。
+ * ⚠ now は 1s バケットで memo — rAF 毎フレーム呼ばれてもバーが毎フレーム揺れない。
+ */
+export function computeMemberMomentum(now: number = Date.now()): Map<string, number> {
+  const bucket = Math.floor(now / 1000);
+  if (momentumMemo && momentumMemo.revision === revision && momentumMemo.bucket === bucket) {
+    return momentumMemo.value;
+  }
+  const scores = new Map<string, number>();
+  for (const e of events) {
+    if (!e.from || !MOMENTUM_ACTIVITY.has(e.event)) continue;
+    const w = Math.pow(0.5, (now - e.at) / MOMENTUM_HALFLIFE_MS);
+    scores.set(e.from, (scores.get(e.from) ?? 0) + w);
+  }
+  momentumMemo = { revision, bucket, value: scores };
+  return scores;
 }

@@ -839,6 +839,7 @@ function AppContent() {
           containerRef={containerRef}
           zoom={editor.zoom}
           panRef={editor.panRef}
+          onOpenArchive={() => setArchivePanel({ position: { x: window.innerWidth / 2, y: 40 } })}
         />
       )}
 
