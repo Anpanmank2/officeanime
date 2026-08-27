@@ -145,34 +145,6 @@
       }
     },
     {
-      "id": "mkt-02",
-      "name": "清水 夏希",
-      "nameEn": "Natsuki Shimizu",
-      "role": "Strategic Advisor / Systematic",
-      "department": "marketing",
-      "layer": "L2",
-      "zone": "marketing",
-      "hueShift": 50,
-      "palette": 1,
-      "deskId": "mkt-desk-02",
-      "accentColor": "#854F0B",
-      "breakBehavior": "coffee"
-    },
-    {
-      "id": "mkt-03",
-      "name": "トマス・ベガ",
-      "nameEn": "Tomás Vega",
-      "role": "Strategic Advisor / Empathy",
-      "department": "marketing",
-      "layer": "L2",
-      "zone": "marketing",
-      "hueShift": 55,
-      "palette": 2,
-      "deskId": "mkt-desk-03",
-      "accentColor": "#854F0B",
-      "breakBehavior": "sofa"
-    },
-    {
       "id": "mkt-04",
       "name": "サーシャ・ブレナン",
       "nameEn": "Sasha Brennan",
@@ -187,34 +159,6 @@
       "breakBehavior": "coffee"
     },
     {
-      "id": "mkt-05",
-      "name": "足立 賢治",
-      "nameEn": "Kenji Adachi",
-      "role": "Strategic Advisor / Purpose",
-      "department": "marketing",
-      "layer": "L2",
-      "zone": "marketing",
-      "hueShift": 60,
-      "palette": 4,
-      "deskId": "mkt-desk-05",
-      "accentColor": "#854F0B",
-      "breakBehavior": "sofa"
-    },
-    {
-      "id": "mkt-06",
-      "name": "高橋 里奈",
-      "nameEn": "Rina Takahashi",
-      "role": "Operations Manager / 部署PM",
-      "department": "marketing",
-      "layer": "L2",
-      "zone": "marketing",
-      "hueShift": 10,
-      "palette": 5,
-      "deskId": "mkt-desk-06",
-      "accentColor": "#993C1D",
-      "breakBehavior": "meeting"
-    },
-    {
       "id": "mkt-07",
       "name": "谷口 芽依",
       "nameEn": "Mei Taniguchi",
@@ -227,20 +171,6 @@
       "deskId": "mkt-desk-07",
       "accentColor": "#3B6D11",
       "breakBehavior": "coffee"
-    },
-    {
-      "id": "mkt-08",
-      "name": "ジェイク・フローレス＝太田",
-      "nameEn": "Jake Flores-Ota",
-      "role": "Campaign Architect",
-      "department": "marketing",
-      "layer": "L3",
-      "zone": "marketing",
-      "hueShift": 130,
-      "palette": 1,
-      "deskId": "mkt-desk-08",
-      "accentColor": "#3B6D11",
-      "breakBehavior": "arcade"
     },
     {
       "id": "mkt-09",

@@ -65,13 +65,8 @@ const DESK_POSITIONS: Record<string, { col: number; row: number; facingDir: numb
 
   // ── Marketing — Marketing Zone (cols 1-12, rows 6-13) ──
   'mkt-desk-01': { col: 2, row: 8, facingDir: 3 }, // Ryo.K (Dir)
-  'mkt-desk-02': { col: 4, row: 8, facingDir: 3 }, // Natsuki
-  'mkt-desk-03': { col: 6, row: 8, facingDir: 3 }, // Tomás
   'mkt-desk-04': { col: 8, row: 8, facingDir: 3 }, // Sasha
-  'mkt-desk-05': { col: 10, row: 8, facingDir: 3 }, // Kenji
-  'mkt-desk-06': { col: 2, row: 12, facingDir: 3 }, // Rina
   'mkt-desk-07': { col: 4, row: 12, facingDir: 3 }, // Mei
-  'mkt-desk-08': { col: 6, row: 12, facingDir: 3 }, // Jake
   'mkt-desk-09': { col: 8, row: 12, facingDir: 3 }, // Hana
   'mkt-desk-10': { col: 10, row: 12, facingDir: 3 }, // Daichi
   'mkt-desk-11': { col: 2, row: 10, facingDir: 1 }, // Lena
