@@ -11,6 +11,7 @@ import { useEditorKeyboard } from './hooks/useEditorKeyboard.js';
 import { useExtensionMessages } from './hooks/useExtensionMessages.js';
 import { AbsentStatusPopup } from './jc/AbsentStatusPopup.js';
 import { ApprovalTray } from './jc/ApprovalTray.js';
+import { CompanyActivationBoard } from './jc/CompanyActivationBoard.js';
 import { CompletedArchivePanel } from './jc/CompletedArchivePanel.js';
 import { CompletionToast } from './jc/CompletionToast.js';
 import { DelegationDock } from './jc/DelegationDock.js';
@@ -48,6 +49,8 @@ import { getLogEntries, subscribeLog } from './jc/office-log-state.js';
 import { OfficeLog } from './jc/OfficeLog.js';
 import { OWNER_AGENT_ID } from './jc/owner-avatar-constants.js';
 import { OwnerAvatar } from './jc/OwnerAvatar.js';
+import { jcGetPet } from './jc/pet-state.js';
+import { PetStatusPanel } from './jc/PetStatusPanel.js';
 import { flashPlansForMember, getPlans } from './jc/plan-state.js';
 import { getRequestFlow, setRequestFlowHidden } from './jc/request-flow-state.js';
 import { RequestFlowPanel } from './jc/RequestFlowPanel.js';
@@ -192,7 +195,7 @@ function formatHeartbeatHHMM(ms: number | null): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function CommandBoard() {
+function CommandBoard({ onToggleBoard }: { onToggleBoard: () => void }) {
   const [tickerEntries, setTickerEntries] = useState(selectTickerEntries);
   const [companyScore, setCompanyScore] = useState(() => gameGetCompanyScore());
   const [todayCount, setTodayCount] = useState(() => gameGetTodayCount());
@@ -292,6 +295,8 @@ function CommandBoard() {
           左上退避 (藤井 spec §2): ティッカー下・マップ左の暗部余白。中央の
           キャラ/デスクに被らない。ゼロ状態は数字でなく誘い文言 2 行。 */}
       <div
+        onClick={onToggleBoard}
+        title="クリックして全社稼働可視化ボードを開く"
         style={{
           position: 'absolute',
           top: 48,
@@ -303,7 +308,8 @@ function CommandBoard() {
           minWidth: 200,
           maxWidth: 280,
           textAlign: 'left',
-          pointerEvents: 'none',
+          pointerEvents: 'auto',
+          cursor: 'pointer',
         }}
       >
         {/* 見出し行: タイトル + 営業状態 pill (右端・§1) */}
@@ -508,9 +514,20 @@ function AppContent() {
     position: { x: number; y: number };
   } | null>(null);
 
+  // 全社稼働可視化ボード (2026-07-25 藤井spec): 会社ボード ミニパネルのクリックのみで開閉
+  const [isBoardOpen, setIsBoardOpen] = useState(false);
+
+  // 相棒カルテ (agent-pet ステータス画面): 卵クリックで開閉
+  const [petPanel, setPetPanel] = useState<{ position: { x: number; y: number } } | null>(null);
+
   const handleBookshelfClick = useCallback((screenPos: { x: number; y: number }) => {
     // 再クリックはトグルで閉じる
     setArchivePanel((prev) => (prev ? null : { position: screenPos }));
+  }, []);
+
+  // 相棒カルテ (agent-pet): 卵クリックで開閉。相棒不在なら発火しない
+  const handlePetClick = useCallback((screenPos: { x: number; y: number }) => {
+    setPetPanel((prev) => (prev ? null : { position: screenPos }));
   }, []);
 
   const handleDeptBoardClick = useCallback(
@@ -661,6 +678,7 @@ function AppContent() {
         onDeskCardOpen={handleDeskCardOpen}
         onDeptBoardClick={handleDeptBoardClick}
         onBookshelfClick={handleBookshelfClick}
+        onPetClick={handlePetClick}
         isEditMode={editor.isEditMode}
         editorState={editorState}
         onEditorTileAction={editor.handleEditorTileAction}
@@ -745,7 +763,7 @@ function AppContent() {
       />
 
       {/* ── Command Mode: operation board placeholder + ticker (DEFER: mode fixed to command) ── */}
-      <CommandBoard />
+      <CommandBoard onToggleBoard={() => setIsBoardOpen((prev) => !prev)} />
 
       {/* ── Task History (left slide-in) ── */}
       <TaskHistoryPanel isOpen={isTaskHistoryOpen} onClose={() => setIsTaskHistoryOpen(false)} />
@@ -888,6 +906,22 @@ function AppContent() {
           onClose={() => setArchivePanel(null)}
         />
       )}
+
+      {/* ── 全社稼働可視化ボード (会社ボード ミニパネルクリック / 2026-07-25 藤井spec) ── */}
+      {isBoardOpen && <CompanyActivationBoard onClose={() => setIsBoardOpen(false)} />}
+
+      {/* ── 相棒カルテ (卵クリック / agent-pet 不在時は開かない) ── */}
+      {petPanel &&
+        (() => {
+          const pet = jcGetPet();
+          return pet ? (
+            <PetStatusPanel
+              pet={pet}
+              position={petPanel.position}
+              onClose={() => setPetPanel(null)}
+            />
+          ) : null;
+        })()}
 
       {/* ── Owner Avatar (always mounted when active, renders via canvas) ── */}
       {ownerAvatarState.active && <OwnerAvatar officeState={officeState} onExited={() => {}} />}

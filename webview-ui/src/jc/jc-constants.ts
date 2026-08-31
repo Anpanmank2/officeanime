@@ -463,6 +463,111 @@ export const MOMENTUM_BAR_CAP = 8;
 /** ステータスバーの段数 (filled = round(pct/10))。5 本共通。 */
 export const STAT_BAR_SEGMENTS = 10;
 
+// ── コンペバッジ (2026-07-25 藤井design v1 §3・古賀design §6 反映・eng-03 実装) ──
+// 全社稼働可視化ボード (CompanyActivationBoard) のロースター行に表示する絶対件数
+// バッジ。%表示・相対順位は一切実装しない (古賀design §6「相対max禁止」思想を踏襲)。
+// 報酬=演出のみ (評価接続ロジックは一切実装しない・2026-07-25 Owner GO)。
+/** 3件到達で🥉。古賀design §3 例値をそのまま暫定採用 (Owner未決・値はここで独立差替え可)。 */
+export const COMP_BADGE_BRONZE = 3;
+/** 7件到達で🥈。 */
+export const COMP_BADGE_SILVER = 7;
+/** 15件到達で🥇。 */
+export const COMP_BADGE_GOLD = 15;
+/** バッジ対象外 (既定=除外・古賀design §5「二重インセンティブ回避・PM中立性維持」):
+ *  Lead 3名 (eng-01/mkt-01/res-01)・PM (eng-04)・秘書 (exec-sec)。
+ *  行表示 (顔/名前/状態dot) は維持し、badge 列のみ固定表示に差し替える。 */
+export const COMP_BADGE_EXCLUDED_IDS: ReadonlySet<string> = new Set([
+  'eng-01',
+  'mkt-01',
+  'res-01',
+  'eng-04',
+  'exec-sec',
+]);
+/** バッジ対象外 member の badge 列 固定表示ラベル。 */
+export const COMP_BADGE_EXCLUDED_LABEL = '対象外';
+/** 一度も jc-events に登場しない member の badge 列 固定表示 (「0件」の数字は出さない)。 */
+export const COMP_BADGE_NONE_GLYPH = '─';
+/** badge tooltip 固定免責文言 — 匿名workflow経由の作業は集計に含まれない限界を全員に常時明示 (N=0でも表示)。 */
+export const COMP_BADGE_TOOLTIP_DISCLAIMER = '※匿名workflow経由の作業は含まれません';
+
+// ── 相棒カルテ (agent-pet ステータス画面) ────────────────────────
+// 設計正本: .company/secretary/owner-ventures/agent-tamagotchi/status-panel-ux-v1.md
+// 3系統 (愛着 / 実用 / 期待) の計器盤。期待系は「距離は見せる・中身は伏せる」。
+// 数値はすべて表示専用。育成データ本体 (agent-pet/) は一切変更しない。
+
+/** 相棒が居る執務室のタイル (卵の描画位置 = クリック判定位置)。 */
+export const PET_TILE = { col: 10, row: 4 } as const;
+
+/** 段階 0〜5 の呼び名。生データの stage 数値は画面に出さない。 */
+/** ⚠ 呼び名も正本は agent-pet/scripts/lib/stages.mjs の STAGE_LABELS。ここは写し。 */
+export const PET_STAGE_LABELS: readonly string[] = [
+  '卵',
+  'ひな',
+  '見習い',
+  '個性が出た',
+  '一人前',
+  '相棒',
+];
+
+/** 段階 0〜5 の見出し絵文字（カルテのヘッダー）。姿の変化を字でも伝える。 */
+export const PET_STAGE_GLYPHS: readonly string[] = ['🥚', '🐣', '🐥', '🐤', '🐔', '🕊️'];
+
+/** 得意分野の表示名。growth.json の traits キーと 1:1。 */
+export const PET_TRAIT_LABELS: Readonly<Record<string, string>> = {
+  code: 'コード・実装',
+  research: '調べもの',
+  writing: '文章・資料',
+  chat: '雑談・相談',
+  numbers: '数字・集計',
+};
+
+/** 得意分野バーの表示順 (traits キー)。 */
+export const PET_TRAIT_ORDER: readonly string[] = [
+  'code',
+  'research',
+  'writing',
+  'chat',
+  'numbers',
+];
+
+/** 昇段しきい値が参照する数字の種類。 */
+export type PetStageMetric = 'bond' | 'topTrait' | 'learned';
+
+export interface PetStageRule {
+  /** この規則を満たすと到達する段階 (1〜5)。 */
+  stage: number;
+  /** どの数字を見るか。 */
+  metric: PetStageMetric;
+  /** 到達に必要な値。 */
+  target: number;
+  /** 条件の平易な言い方 (画面にそのまま出す)。 */
+  label: string;
+  /** 数え方の単位。 */
+  unit: string;
+}
+
+/**
+ * 段階のしきい値。
+ *
+ * ★ 正本は agent-pet 側 — `agent-pet/scripts/lib/stages.mjs` の `STAGE_RULES`。
+ *   実際に stage を書き換えるのは agent-pet の朝の処理 (pet-day-start.mjs) だけで、
+ *   ここは「あと◯」を出すための **同値の写し** に過ぎない。
+ *   **片方だけ変えないこと**。数値を変えるときは必ず両方を同じ値にする。
+ *
+ * 由来: 骨子§5「見た目の成長段階」
+ *   (.company/secretary/owner-ventures/agent-tamagotchi/v1-skeleton-draft.md)
+ */
+export const PET_STAGE_RULES: readonly PetStageRule[] = [
+  { stage: 1, metric: 'bond', target: 2, label: 'いっしょに過ごした日数', unit: '日' },
+  { stage: 2, metric: 'bond', target: 5, label: 'いっしょに過ごした日数', unit: '日' },
+  { stage: 3, metric: 'topTrait', target: 10, label: 'いちばん得意な分野の経験', unit: '' },
+  { stage: 4, metric: 'learned', target: 5, label: 'おぼえた作法', unit: '件' },
+  { stage: 5, metric: 'bond', target: 30, label: 'いっしょに過ごした日数', unit: '日' },
+];
+
+/** 次にもらえるものは伏せる (設計原則A: 距離は見せる・中身は伏せる)。 */
+export const PET_NEXT_REWARD_GLYPH = '？';
+
 // ── Confidence Badge Colors (eng-05 spec) ───────────────────────
 export const CONFIDENCE_COLORS: Record<string, string> = {
   confirmed: '#5ac88c',

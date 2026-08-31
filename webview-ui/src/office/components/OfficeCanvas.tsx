@@ -19,6 +19,7 @@ import {
   jcIsBookshelfAtTile,
 } from '../../jc/jc-state.js';
 import type { AbsenceInfo } from '../../jc/jc-types.js';
+import { jcIsPetTile } from '../../jc/pet-state.js';
 import { isPinned } from '../../jc/pin-store.js';
 import { pickBestMember, resolveRoutingTarget } from '../../jc/routing-target.js';
 import { unlockAudio } from '../../notificationSound.js';
@@ -54,6 +55,8 @@ interface OfficeCanvasProps {
   onDeptBoardClick?: (department: string, screenPos: { x: number; y: number }) => void;
   /** 本棚クリック → 完了アーカイブ (R4 保存ボックス) */
   onBookshelfClick?: (screenPos: { x: number; y: number }) => void;
+  /** 相棒 (agent-pet) の卵クリック → 相棒カルテ。相棒不在時は発火しない。 */
+  onPetClick?: (screenPos: { x: number; y: number }) => void;
   onDeskContextMenu?: (
     memberId: string,
     memberName: string,
@@ -80,6 +83,7 @@ export function OfficeCanvas({
   onDeskCardOpen,
   onDeptBoardClick,
   onBookshelfClick,
+  onPetClick,
   onDeskContextMenu,
   isEditMode,
   editorState,
@@ -875,6 +879,30 @@ export function OfficeCanvas({
         }
       }
 
+      // 相棒 (agent-pet) の卵 = 相棒カルテ: 1タイル exact 判定。相棒が居ない
+      // 環境では jcIsPetTile が常に false を返すため、既存挙動は一切変わらない。
+      if (onPetClick) {
+        const tile = screenToTile(e.clientX, e.clientY);
+        if (tile && jcIsPetTile(tile.col, tile.row)) {
+          const el = containerRef.current;
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const canvasW = Math.round(rect.width * dpr);
+            const canvasH = Math.round(rect.height * dpr);
+            const layout = officeState.getLayout();
+            const mapW = layout.cols * TILE_SIZE * zoom;
+            const mapH = layout.rows * TILE_SIZE * zoom;
+            const deviceOffsetX = Math.floor((canvasW - mapW) / 2) + Math.round(panRef.current.x);
+            const deviceOffsetY = Math.floor((canvasH - mapH) / 2) + Math.round(panRef.current.y);
+            const screenX = (deviceOffsetX + (tile.col + 0.5) * TILE_SIZE * zoom) / dpr;
+            const screenY = (deviceOffsetY + (tile.row + 1) * TILE_SIZE * zoom) / dpr;
+            onPetClick({ x: screenX, y: screenY });
+            return;
+          }
+        }
+      }
+
       // R4 本棚 = 完了アーカイブ: exact footprint で判定し、デスクカード等の
       // ±1 近傍判定に吸われないよう早期 return する (dept board と同じ規約)。
       if (onBookshelfClick) {
@@ -957,6 +985,7 @@ export function OfficeCanvas({
       onDeskCardOpen,
       onDeptBoardClick,
       onBookshelfClick,
+      onPetClick,
       screenToWorld,
       screenToTile,
       isEditMode,

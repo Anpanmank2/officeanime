@@ -6,6 +6,8 @@ import * as path from 'path';
 import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
 
+import { readAgentPet } from './agent-pet.js';
+
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
   '.js': 'application/javascript',
@@ -17,6 +19,9 @@ const MIME_TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml',
   '.woff2': 'font/woff2',
 };
+
+/** Endpoint serving the optional agent-pet record (see agent-pet.ts). */
+const PET_ENDPOINT = 'jc-pet.json';
 
 export interface BrowserServer {
   port: number;
@@ -41,6 +46,14 @@ export function startBrowserServer(
       if (qIdx >= 0) urlPath = urlPath.slice(0, qIdx);
 
       if (urlPath === '/') urlPath = '/index.html';
+
+      // Optional companion (agent-pet). Always answers JSON; `null` when the
+      // user has no pet, so the client can degrade to "render nothing".
+      if (urlPath === `/${PET_ENDPOINT}`) {
+        res.writeHead(200, { 'Content-Type': MIME_TYPES['.json'] });
+        res.end(JSON.stringify(readAgentPet()));
+        return;
+      }
 
       // Try webview root first, then assets fallback, then extension root
       let filePath = path.join(webviewRoot, urlPath);
