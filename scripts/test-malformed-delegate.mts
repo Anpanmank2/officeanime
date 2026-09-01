@@ -120,5 +120,69 @@ ok(
   posted.some((m) => (m as { type?: string }).type === 'jcMailFly'),
 );
 
+// ── R6追加: task 欠落の malformed イベント防御（message欠落防御と同型の横展開）
+// 差戻し前の HEAD では event.task.slice(0,20/15) が task_received / task_assigned の
+// 2箇所で TypeError（message欠落と同型・per-event try/catch で握りつぶされ実害なし
+// だったが根本原因は未修正だった）。
+console.log('R6追加: task 欠落の malformed イベントで handleEvent が落ちない');
+
+ok(
+  'task_received (task欠落=フィールド無し)',
+  handle({ event: 'task_received', from: 'user' }),
+);
+ok(
+  'task_received (task=null)',
+  handle({ event: 'task_received', from: 'user', task: null }),
+);
+ok(
+  'task_assigned (task欠落=フィールド無し)',
+  handle({ event: 'task_assigned', from: 'exec-sec', to: ['res-01'], department: 'research' }),
+);
+ok(
+  'task_assigned (task=null)',
+  handle({
+    event: 'task_assigned',
+    from: 'exec-sec',
+    to: ['res-01'],
+    department: 'research',
+    task: null,
+  }),
+);
+
+// 正常な task は防御化後も落とさず本文に反映される (防御化で機能を殺していない)
+posted.length = 0;
+ok(
+  'task_received (task正常) は通常動作',
+  handle({ event: 'task_received', from: 'user', task: '資料のドラフトを確認' }),
+);
+ok(
+  '正常 task_received は task 本文を含む speech bubble を出す',
+  posted.some(
+    (m) =>
+      (m as { type?: string; bubble?: { fullText?: string } }).type === 'jcSpeechBubble' &&
+      (m as { bubble?: { fullText?: string } }).bubble?.fullText?.includes('資料のドラフトを確認'),
+  ),
+);
+
+posted.length = 0;
+ok(
+  'task_assigned (task正常) は通常動作',
+  handle({
+    event: 'task_assigned',
+    from: 'exec-sec',
+    to: ['res-01'],
+    department: 'research',
+    task: '資料のドラフトを確認',
+  }),
+);
+ok(
+  '正常 task_assigned は task 本文を含む speech bubble を出す',
+  posted.some(
+    (m) =>
+      (m as { type?: string; bubble?: { fullText?: string } }).type === 'jcSpeechBubble' &&
+      (m as { bubble?: { fullText?: string } }).bubble?.fullText?.includes('資料のドラフトを確認'),
+  ),
+);
+
 console.log(`\n=== Malformed-event defense (R6): ${pass} passed, ${fail} failed ===`);
 if (fail > 0) process.exit(1);

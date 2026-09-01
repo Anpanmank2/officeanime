@@ -273,13 +273,15 @@ export class EventWatcher {
 
   private handleTaskReceived(event: TaskReceivedEvent): void {
     // Secretary receives task — show speech bubble on Secretary
+    // R6 防御: task 欠落 (malformed writer) でも落とさない — 空文字 fallback。
+    const taskText = event.task ?? '';
     const secretary = this.config.members.find((m) => m.role === 'Secretary');
     if (secretary) {
       const bubble: SpeechBubble = {
         id: `task-recv-${Date.now()}`,
         memberId: secretary.id,
-        text: `受領: ${event.task.slice(0, 20)}`,
-        fullText: `受領: ${event.task}`,
+        text: `受領: ${taskText.slice(0, 20)}`,
+        fullText: `受領: ${taskText}`,
         department: 'exec',
         timestamp: Date.now(),
         duration: 3000,
@@ -319,13 +321,15 @@ export class EventWatcher {
     }
 
     // Speech bubble on assigner
+    // R6 防御: task 欠落 (malformed writer) でも落とさない — 空文字 fallback。
+    const assignTaskText = event.task ?? '';
     const from = this.config.members.find((m) => m.id === event.from);
     if (from) {
       const bubble: SpeechBubble = {
         id: `assign-from-${Date.now()}`,
         memberId: event.from,
-        text: `${event.task.slice(0, 15)}をお願い`,
-        fullText: `${event.task}をお願い`,
+        text: `${assignTaskText.slice(0, 15)}をお願い`,
+        fullText: `${assignTaskText}をお願い`,
         department: from.department,
         timestamp: Date.now(),
         duration: 3000,
