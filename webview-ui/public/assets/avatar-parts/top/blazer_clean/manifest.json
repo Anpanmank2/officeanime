@@ -1,0 +1,11 @@
+{
+  "id": "blazer_clean",
+  "slot": "top",
+  "name": "Clean Blazer",
+  "file": "blazer_clean.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

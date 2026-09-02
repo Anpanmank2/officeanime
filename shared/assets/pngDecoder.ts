@@ -11,6 +11,8 @@ import {
   CHAR_FRAME_H,
   CHAR_FRAME_W,
   CHAR_FRAMES_PER_ROW,
+  AVATAR_ATLAS_HEIGHT,
+  AVATAR_ATLAS_WIDTH,
   CHARACTER_DIRECTIONS,
   FLOOR_TILE_SIZE,
   PNG_ALPHA_THRESHOLD,
@@ -104,11 +106,16 @@ export function parseWallPng(pngBuffer: Buffer): string[][][] {
 }
 
 /**
- * Decode a single character PNG (112×96) into direction-keyed frame arrays.
- * Each PNG has 3 direction rows (down, up, right) × 7 frames (16×32 each).
+ * Decode a character or avatar-part atlas into direction-keyed frame arrays.
+ * Every atlas has 3 direction rows (down, up, right) × 11 frames (16×32 each).
  */
 export function decodeCharacterPng(pngBuffer: Buffer): CharacterDirectionSprites {
   const png = PNG.sync.read(pngBuffer);
+  if (png.width !== AVATAR_ATLAS_WIDTH || png.height !== AVATAR_ATLAS_HEIGHT) {
+    throw new Error(
+      `Character atlas must be ${AVATAR_ATLAS_WIDTH}×${AVATAR_ATLAS_HEIGHT}; got ${png.width}×${png.height}`,
+    );
+  }
   const charData: CharacterDirectionSprites = { down: [], up: [], right: [] };
 
   for (let dirIdx = 0; dirIdx < CHARACTER_DIRECTIONS.length; dirIdx++) {

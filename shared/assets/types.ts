@@ -9,11 +9,39 @@ export interface CharacterDirectionSprites {
   right: string[][][];
 }
 
+export const AvatarSlot = {
+  BASE: 'base',
+  BOTTOM: 'bottom',
+  TOP: 'top',
+  FACE: 'face',
+  HAIR: 'hair',
+  ACCESSORY: 'accessory',
+} as const;
+export type AvatarSlot = (typeof AvatarSlot)[keyof typeof AvatarSlot];
+
+export interface AvatarPartManifest {
+  id: string;
+  slot: AvatarSlot;
+  name: string;
+  file?: string;
+  width: number;
+  height: number;
+  frames: number;
+  colorable: boolean;
+  zOverride?: number | null;
+}
+
+export interface AvatarPartAsset extends AvatarPartManifest {
+  file: string;
+  avatarPath: string;
+}
+
 export interface AssetIndex {
   floors: string[];
   walls: string[];
   characters: string[];
   defaultLayout: string | null;
+  defaultAvatars: string | null;
 }
 
 export interface CatalogEntry {

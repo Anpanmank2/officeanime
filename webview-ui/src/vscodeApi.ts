@@ -5,6 +5,26 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 // ── Connection status for browser mode ───────────────────────────
 type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting';
 const connectionListeners = new Set<(status: ConnectionStatus) => void>();
+const pendingInboundMessages: unknown[] = [];
+let browserMessageTargetReady = false;
+
+function dispatchInboundMessage(data: unknown): void {
+  if (!browserMessageTargetReady) {
+    pendingInboundMessages.push(data);
+    return;
+  }
+  window.dispatchEvent(new MessageEvent('message', { data }));
+}
+
+/**
+ * BrowserMock sends bundled defaults first; queued WebSocket state is then
+ * replayed on top so persisted extension state remains authoritative.
+ */
+export function markBrowserMessageTargetReady(): void {
+  if (!isBrowserRuntime || browserMessageTargetReady) return;
+  browserMessageTargetReady = true;
+  for (const data of pendingInboundMessages.splice(0)) dispatchInboundMessage(data);
+}
 
 /** Subscribe to WebSocket connection status changes (browser mode only) */
 export function onConnectionStatusChange(listener: (status: ConnectionStatus) => void): () => void {
@@ -58,7 +78,7 @@ function createBrowserApi(): { postMessage(msg: unknown): void } {
     ws.onmessage = (event) => {
       try {
         const parsed = JSON.parse(event.data as string) as unknown;
-        window.dispatchEvent(new MessageEvent('message', { data: parsed }));
+        dispatchInboundMessage(parsed);
       } catch {
         console.warn('[WS] Failed to parse message:', event.data);
       }

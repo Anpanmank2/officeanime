@@ -1,0 +1,11 @@
+{
+  "id": "hair_ponytail_neat",
+  "slot": "hair",
+  "name": "Neat Ponytail",
+  "file": "hair_ponytail_neat.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

@@ -65,7 +65,7 @@ import { OfficeState } from './office/engine/officeState.js';
 import { isRotatable } from './office/layout/furnitureCatalog.js';
 import { EditTool } from './office/types.js';
 import { isBrowserRuntime } from './runtime.js';
-import { vscode } from './vscodeApi.js';
+import { markBrowserMessageTargetReady, vscode } from './vscodeApi.js';
 
 // Game state lives outside React — updated imperatively by message handlers
 const officeStateRef = { current: null as OfficeState | null };
@@ -438,7 +438,10 @@ function AppContent() {
   // useExtensionMessages listener has been registered.
   useEffect(() => {
     if (isBrowserRuntime) {
-      void import('./browserMock.js').then(({ dispatchMockMessages }) => dispatchMockMessages());
+      void import('./browserMock.js').then(({ dispatchMockMessages }) => {
+        dispatchMockMessages();
+        markBrowserMessageTargetReady();
+      });
     }
   }, []);
 

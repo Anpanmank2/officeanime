@@ -1,0 +1,11 @@
+{
+  "id": "gaming_headset",
+  "slot": "accessory",
+  "name": "Gaming Headset",
+  "file": "gaming_headset.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

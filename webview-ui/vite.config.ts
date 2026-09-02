@@ -4,8 +4,13 @@ import * as path from 'path';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vite';
 
-import { buildAssetIndex, buildFurnitureCatalog } from '../shared/assets/build.ts';
 import {
+  buildAssetIndex,
+  buildAvatarPartCatalog,
+  buildFurnitureCatalog,
+} from '../shared/assets/build.ts';
+import {
+  decodeAllAvatarParts,
   decodeAllCharacters,
   decodeAllFloors,
   decodeAllFurniture,
@@ -16,6 +21,7 @@ import {
 
 interface DecodedCache {
   characters: ReturnType<typeof decodeAllCharacters> | null;
+  avatarParts: ReturnType<typeof decodeAllAvatarParts> | null;
   floors: ReturnType<typeof decodeAllFloors> | null;
   walls: ReturnType<typeof decodeAllWalls> | null;
   furniture: ReturnType<typeof decodeAllFurniture> | null;
@@ -27,10 +33,17 @@ function browserMockAssetsPlugin(): Plugin {
   const assetsDir = path.resolve(__dirname, 'public/assets');
   const distAssetsDir = path.resolve(__dirname, '../dist/webview/assets');
 
-  const cache: DecodedCache = { characters: null, floors: null, walls: null, furniture: null };
+  const cache: DecodedCache = {
+    characters: null,
+    avatarParts: null,
+    floors: null,
+    walls: null,
+    furniture: null,
+  };
 
   function clearCache(): void {
     cache.characters = null;
+    cache.avatarParts = null;
     cache.floors = null;
     cache.walls = null;
     cache.furniture = null;
@@ -51,12 +64,21 @@ function browserMockAssetsPlugin(): Plugin {
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify(buildAssetIndex(assetsDir)));
       });
+      server.middlewares.use(`${base}/assets/avatar-parts-catalog.json`, (_req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(buildAvatarPartCatalog(assetsDir)));
+      });
 
       // Pre-decoded sprites (new — eliminates browser-side PNG decoding)
       server.middlewares.use(`${base}/assets/decoded/characters.json`, (_req, res) => {
         cache.characters ??= decodeAllCharacters(assetsDir);
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify(cache.characters));
+      });
+      server.middlewares.use(`${base}/assets/decoded/avatar-parts.json`, (_req, res) => {
+        cache.avatarParts ??= decodeAllAvatarParts(assetsDir, buildAvatarPartCatalog(assetsDir));
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(cache.avatarParts));
       });
       server.middlewares.use(`${base}/assets/decoded/floors.json`, (_req, res) => {
         cache.floors ??= decodeAllFloors(assetsDir);
@@ -113,13 +135,16 @@ function browserMockAssetsPlugin(): Plugin {
 
       // Hot-reload on asset file changes (PNGs, manifests, layouts)
       server.watcher.add(assetsDir);
-      server.watcher.on('change', (file) => {
+      const onAssetTreeChange = (file: string): void => {
         if (file.startsWith(assetsDir)) {
           console.log(`[browser-mock-assets] Asset changed: ${path.relative(assetsDir, file)}`);
           clearCache();
           server.ws.send({ type: 'full-reload' });
         }
-      });
+      };
+      for (const event of ['change', 'add', 'addDir', 'unlink', 'unlinkDir'] as const) {
+        server.watcher.on(event, onAssetTreeChange);
+      }
 
       // ── jc-events.json HMR push ─────────────────────────────────────────
       // Watch jc-events.json and push new events to the browser via HMR
@@ -174,8 +199,9 @@ function browserMockAssetsPlugin(): Plugin {
 
       // Use fs.watch with debounce for rapid writes
       let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+      let eventsWatcher: fs.FSWatcher | null = null;
       try {
-        fs.watch(eventsPath, () => {
+        eventsWatcher = fs.watch(eventsPath, () => {
           if (debounceTimer) clearTimeout(debounceTimer);
           debounceTimer = setTimeout(readAndPushNewEvents, 100);
         });
@@ -183,7 +209,7 @@ function browserMockAssetsPlugin(): Plugin {
       } catch {
         // File doesn't exist yet — watch the directory for creation
         const dirPath = path.dirname(eventsPath);
-        fs.watch(dirPath, (_eventType, filename) => {
+        eventsWatcher = fs.watch(dirPath, (_eventType, filename) => {
           if (filename === 'jc-events.json') {
             if (debounceTimer) clearTimeout(debounceTimer);
             debounceTimer = setTimeout(readAndPushNewEvents, 100);
@@ -191,13 +217,27 @@ function browserMockAssetsPlugin(): Plugin {
         });
         console.log(`[jc-events-hmr] Watching directory ${dirPath} for jc-events.json creation`);
       }
+
+      // Vite cannot dispose an untracked raw fs watcher. Closing it with the
+      // dev server keeps tests, restarts, and embedded browser sessions leak-free.
+      server.httpServer?.once('close', () => {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = null;
+        eventsWatcher?.close();
+        eventsWatcher = null;
+      });
     },
     // Build output includes lightweight metadata consumed by browser runtime.
     closeBundle() {
       fs.mkdirSync(distAssetsDir, { recursive: true });
 
       const catalog = buildFurnitureCatalog(assetsDir);
+      const avatarCatalog = buildAvatarPartCatalog(assetsDir);
       fs.writeFileSync(path.join(distAssetsDir, 'furniture-catalog.json'), JSON.stringify(catalog));
+      fs.writeFileSync(
+        path.join(distAssetsDir, 'avatar-parts-catalog.json'),
+        JSON.stringify(avatarCatalog),
+      );
       fs.writeFileSync(
         path.join(distAssetsDir, 'asset-index.json'),
         JSON.stringify(buildAssetIndex(assetsDir)),

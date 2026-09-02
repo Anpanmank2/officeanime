@@ -9,7 +9,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-import type { CatalogEntry } from './types.js';
+import {
+  AVATAR_ATLAS_HEIGHT,
+  AVATAR_ATLAS_WIDTH,
+  AVATAR_PARTS_DIR,
+  CHAR_FRAMES_PER_ROW,
+  DEFAULT_AVATARS_FILE_NAME,
+} from './constants.js';
+import { AvatarSlot } from './types.js';
+import type { AvatarPartAsset, AvatarPartManifest, CatalogEntry } from './types.js';
 import type { FurnitureManifest, InheritedProps, ManifestGroup } from './manifestUtils.js';
 import { flattenManifest } from './manifestUtils.js';
 
@@ -93,6 +101,72 @@ export function buildFurnitureCatalog(assetsDir: string): CatalogEntry[] {
   return catalog;
 }
 
+// ── Avatar part catalog ──────────────────────────────────────────────────────
+
+export function buildAvatarPartCatalog(assetsDir: string): AvatarPartAsset[] {
+  const avatarDir = path.join(assetsDir, AVATAR_PARTS_DIR);
+  if (!fs.existsSync(avatarDir)) return [];
+
+  const slots = Object.values(AvatarSlot);
+  const catalog: AvatarPartAsset[] = [];
+  const seen = new Set<string>();
+
+  for (const slot of slots) {
+    const slotDir = path.join(avatarDir, slot);
+    if (!fs.existsSync(slotDir)) continue;
+    const partDirs = fs
+      .readdirSync(slotDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
+
+    for (const folderName of partDirs) {
+      const manifestPath = path.join(slotDir, folderName, 'manifest.json');
+      if (!fs.existsSync(manifestPath)) continue;
+      try {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as AvatarPartManifest;
+        if (
+          typeof manifest.id !== 'string' ||
+          manifest.id.length === 0 ||
+          typeof manifest.name !== 'string' ||
+          manifest.name.length === 0 ||
+          typeof manifest.colorable !== 'boolean' ||
+          manifest.slot !== slot ||
+          seen.has(manifest.id) ||
+          manifest.width !== AVATAR_ATLAS_WIDTH ||
+          manifest.height !== AVATAR_ATLAS_HEIGHT ||
+          manifest.frames !== CHAR_FRAMES_PER_ROW ||
+          (manifest.zOverride !== undefined && manifest.zOverride !== null)
+        ) {
+          console.warn(`[avatar-parts] Invalid manifest: ${manifestPath}`);
+          continue;
+        }
+        const file = manifest.file ?? `${manifest.id}.png`;
+        const partDir = path.resolve(slotDir, folderName);
+        const filePath = path.resolve(partDir, file);
+        if (
+          (!filePath.startsWith(`${partDir}${path.sep}`) && filePath !== partDir) ||
+          !fs.existsSync(filePath)
+        ) {
+          console.warn(`[avatar-parts] Missing or unsafe PNG path: ${filePath}`);
+          continue;
+        }
+        seen.add(manifest.id);
+        catalog.push({
+          ...manifest,
+          file,
+          avatarPath: `${AVATAR_PARTS_DIR}/${slot}/${folderName}/${file}`,
+        });
+      } catch (err) {
+        // Malformed avatar manifests fail soft so legacy sprites remain available.
+        console.warn(`[avatar-parts] Failed to read ${manifestPath}:`, err);
+      }
+    }
+  }
+
+  return catalog;
+}
+
 // ── Asset index ───────────────────────────────────────────────────────────────
 
 export function buildAssetIndex(assetsDir: string) {
@@ -132,5 +206,8 @@ export function buildAssetIndex(assetsDir: string) {
     walls: listSorted('walls', /^wall_\d+\.png$/i),
     characters: listSorted('characters', /^char_\d+\.png$/i),
     defaultLayout,
+    defaultAvatars: fs.existsSync(path.join(assetsDir, DEFAULT_AVATARS_FILE_NAME))
+      ? DEFAULT_AVATARS_FILE_NAME
+      : null,
   };
 }

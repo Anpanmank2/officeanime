@@ -16,7 +16,12 @@ import { fileURLToPath } from 'node:url';
 import type { ViteDevServer } from 'vite';
 import { createServer } from 'vite';
 
-import type { AssetIndex, CatalogEntry } from '../../shared/assets/types.ts';
+import type {
+  AssetIndex,
+  AvatarPartAsset,
+  CatalogEntry,
+  CharacterDirectionSprites,
+} from '../../shared/assets/types.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -61,6 +66,12 @@ async function verifyAssetUrls(baseUrl: string, basePath: string): Promise<void>
   const catalog = await fetchJson<CatalogEntry[]>(
     assetUrl(baseUrl, basePath, 'furniture-catalog.json'),
   );
+  const avatarCatalog = await fetchJson<AvatarPartAsset[]>(
+    assetUrl(baseUrl, basePath, 'avatar-parts-catalog.json'),
+  );
+  const decodedAvatarParts = await fetchJson<Record<string, CharacterDirectionSprites>>(
+    assetUrl(baseUrl, basePath, 'decoded/avatar-parts.json'),
+  );
 
   await assertUrlOk(assetUrl(baseUrl, basePath, 'decoded/characters.json'));
   await assertUrlOk(assetUrl(baseUrl, basePath, 'decoded/floors.json'));
@@ -71,6 +82,14 @@ async function verifyAssetUrls(baseUrl: string, basePath: string): Promise<void>
   assert.ok(assetIndex.walls.length > 0, 'walls index should not be empty');
   assert.ok(assetIndex.characters.length > 0, 'characters index should not be empty');
   assert.ok(catalog.length > 0, 'furniture catalog should not be empty');
+  assert.ok(avatarCatalog.length > 0, 'avatar part catalog should not be empty');
+  assert.ok(assetIndex.defaultAvatars, 'default avatar config should be indexed');
+
+  const sampleAvatar = avatarCatalog[0];
+  assert.ok(decodedAvatarParts[sampleAvatar.id], 'sample avatar part should be decoded by id');
+  assert.equal(decodedAvatarParts[sampleAvatar.id].down.length, sampleAvatar.frames);
+  assert.equal(decodedAvatarParts[sampleAvatar.id].up.length, sampleAvatar.frames);
+  assert.equal(decodedAvatarParts[sampleAvatar.id].right.length, sampleAvatar.frames);
 
   await assertUrlOk(assetUrl(baseUrl, basePath, indexedPath('floors', assetIndex.floors[0])));
   await assertUrlOk(assetUrl(baseUrl, basePath, indexedPath('walls', assetIndex.walls[0])));
@@ -78,10 +97,12 @@ async function verifyAssetUrls(baseUrl: string, basePath: string): Promise<void>
     assetUrl(baseUrl, basePath, indexedPath('characters', assetIndex.characters[0])),
   );
   await assertUrlOk(assetUrl(baseUrl, basePath, catalog[0].furniturePath));
+  await assertUrlOk(assetUrl(baseUrl, basePath, sampleAvatar.avatarPath));
 
   if (assetIndex.defaultLayout) {
     await assertUrlOk(assetUrl(baseUrl, basePath, assetIndex.defaultLayout));
   }
+  await assertUrlOk(assetUrl(baseUrl, basePath, assetIndex.defaultAvatars!));
 }
 
 test('asset-index.json is accessible without a subpath (base: /)', async () => {

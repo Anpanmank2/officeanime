@@ -1,0 +1,11 @@
+{
+  "id": "glasses_oversize",
+  "slot": "accessory",
+  "name": "Oversized Glasses",
+  "file": "glasses_oversize.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

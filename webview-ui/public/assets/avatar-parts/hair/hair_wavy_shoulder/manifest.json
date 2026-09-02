@@ -1,0 +1,11 @@
+{
+  "id": "hair_wavy_shoulder",
+  "slot": "hair",
+  "name": "Shoulder-Length Waves",
+  "file": "hair_wavy_shoulder.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

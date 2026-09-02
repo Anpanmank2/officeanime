@@ -1,0 +1,11 @@
+{
+  "id": "face_calm",
+  "slot": "face",
+  "name": "Calm Face",
+  "file": "face_calm.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

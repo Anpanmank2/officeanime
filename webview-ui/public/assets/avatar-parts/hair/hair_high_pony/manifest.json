@@ -1,0 +1,11 @@
+{
+  "id": "hair_high_pony",
+  "slot": "hair",
+  "name": "High Ponytail",
+  "file": "hair_high_pony.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

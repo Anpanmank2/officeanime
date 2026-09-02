@@ -1,0 +1,11 @@
+{
+  "id": "hair_sidepart_neat",
+  "slot": "hair",
+  "name": "Neat Side Part",
+  "file": "hair_sidepart_neat.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

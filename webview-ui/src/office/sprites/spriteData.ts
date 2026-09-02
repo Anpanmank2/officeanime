@@ -1,6 +1,12 @@
-import { adjustSprite } from '../colorize.js';
+import type {
+  AvatarPartAsset,
+  CharacterDirectionSprites,
+} from '../../../../shared/assets/types.js';
+import { adjustSprite, clearColorizeCache } from '../colorize.js';
 import type { Direction, FloorColor, SpriteData } from '../types.js';
 import { Direction as Dir } from '../types.js';
+import { avatarConfigCacheKey, composeAvatar } from './avatarComposite.js';
+import type { AvatarConfigFile, LoadedAvatarParts } from './avatarTypes.js';
 import bubblePermissionData from './bubble-permission.json';
 import bubbleWaitingData from './bubble-waiting.json';
 
@@ -57,12 +63,49 @@ interface LoadedCharacterData {
 }
 
 let loadedCharacters: LoadedCharacterData[] | null = null;
+let loadedAvatarParts: LoadedAvatarParts | null = null;
+let loadedAvatarConfigs: AvatarConfigFile | null = null;
+let avatarSpriteRevision = 0;
+const avatarSpriteListeners = new Set<() => void>();
+
+function bumpAvatarSpriteRevision(): void {
+  avatarSpriteRevision += 1;
+  for (const listener of avatarSpriteListeners) listener();
+}
+
+export function subscribeAvatarSprites(listener: () => void): () => void {
+  avatarSpriteListeners.add(listener);
+  return () => avatarSpriteListeners.delete(listener);
+}
+
+export function getAvatarSpriteRevision(): number {
+  return avatarSpriteRevision;
+}
 
 /** Set pre-colored character sprites loaded from PNG assets. Call this when characterSpritesLoaded message arrives. */
 export function setCharacterTemplates(data: LoadedCharacterData[]): void {
   loadedCharacters = data;
   // Clear cache so sprites are rebuilt from loaded data
   spriteCache.clear();
+  clearColorizeCache();
+  bumpAvatarSpriteRevision();
+}
+
+export function setAvatarParts(
+  catalog: AvatarPartAsset[],
+  sprites: Record<string, CharacterDirectionSprites>,
+): void {
+  loadedAvatarParts = { catalog, sprites: new Map(Object.entries(sprites)) };
+  spriteCache.clear();
+  clearColorizeCache();
+  bumpAvatarSpriteRevision();
+}
+
+export function setAvatarConfigs(config: AvatarConfigFile): void {
+  loadedAvatarConfigs = config;
+  spriteCache.clear();
+  clearColorizeCache();
+  bumpAvatarSpriteRevision();
 }
 
 /** Flip a SpriteData horizontally (for generating left sprites from right) */
@@ -152,17 +195,26 @@ export function getCharacterSprites(
   paletteIndex: number,
   hueShift = 0,
   variant: 'idle' | null = null,
+  avatarKey?: string,
 ): CharacterSprites {
-  // cache key: `palette:hueShift` / idle variant は `palette:hueShift:idle`
-  const cacheKey = variant
-    ? `${paletteIndex}:${hueShift}:${variant}`
+  const avatarConfig = avatarKey ? loadedAvatarConfigs?.avatars[avatarKey] : undefined;
+  const canComposeAvatar = !!(
+    avatarConfig && loadedAvatarParts?.sprites.has(avatarConfig.base.part)
+  );
+  const baseCacheKey = canComposeAvatar
+    ? `avatar:${avatarConfigCacheKey(avatarConfig)}`
     : `${paletteIndex}:${hueShift}`;
+  const cacheKey = variant ? `${baseCacheKey}:${variant}` : baseCacheKey;
   const cached = spriteCache.get(cacheKey);
   if (cached) return cached;
 
   let sprites: CharacterSprites;
+  let usedAvatar = false;
 
-  if (loadedCharacters) {
+  if (canComposeAvatar && avatarConfig && loadedAvatarParts) {
+    sprites = composeAvatar(avatarConfig, loadedAvatarParts);
+    usedAvatar = true;
+  } else if (loadedCharacters) {
     // Use pre-colored character sprites directly (no palette swapping)
     const char = loadedCharacters[paletteIndex % loadedCharacters.length];
     const d = char.down;
@@ -257,7 +309,7 @@ export function getCharacterSprites(
   }
 
   // Apply hue shift if non-zero
-  if (hueShift !== 0) {
+  if (!usedAvatar && hueShift !== 0) {
     sprites = adjustCharacterSprites(sprites, { h: hueShift, s: 0, b: 0, c: 0 });
   }
 

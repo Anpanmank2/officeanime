@@ -1,0 +1,11 @@
+{
+  "id": "pants_relaxed_sneakers",
+  "slot": "bottom",
+  "name": "Relaxed Pants and Sneakers",
+  "file": "pants_relaxed_sneakers.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

@@ -1,0 +1,11 @@
+{
+  "id": "phone_ringlight",
+  "slot": "accessory",
+  "name": "Phone Ring Light",
+  "file": "phone_ringlight.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

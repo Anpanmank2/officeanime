@@ -1,0 +1,11 @@
+{
+  "id": "handheld_pad",
+  "slot": "accessory",
+  "name": "Handheld Pad",
+  "file": "handheld_pad.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

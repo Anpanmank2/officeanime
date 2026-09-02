@@ -1,0 +1,11 @@
+{
+  "id": "shirt_rolled",
+  "slot": "top",
+  "name": "Rolled-Sleeve Shirt",
+  "file": "shirt_rolled.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

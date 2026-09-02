@@ -1,3 +1,4 @@
+import type { AvatarSlot as AvatarSlotType } from '../../shared/assets/types.js';
 import type { FloorColor } from './office/types.js';
 
 // ── Grid & Layout ────────────────────────────────────────────
@@ -115,6 +116,21 @@ export const INACTIVE_SEAT_TIMER_RANGE_SEC = 2.0;
 export const PALETTE_COUNT = 6;
 export const HUE_SHIFT_MIN_DEG = 45;
 export const HUE_SHIFT_RANGE_DEG = 271;
+// Mirrors shared/assets/constants.ts. The webview keeps runtime copies because
+// it is an ESM package while the extension host's shared package is CommonJS;
+// the avatar integrity gate asserts both sides stay on the 16×32×11 contract.
+export const AVATAR_FRAME_WIDTH = 16;
+export const AVATAR_FRAME_HEIGHT = 32;
+export const AVATAR_FRAMES_PER_ROW = 11;
+export const AVATAR_ACCESSORY_MAX = 2;
+export const AvatarSlot = {
+  BASE: 'base',
+  BOTTOM: 'bottom',
+  TOP: 'top',
+  FACE: 'face',
+  HAIR: 'hair',
+  ACCESSORY: 'accessory',
+} as const satisfies Record<string, AvatarSlotType>;
 export const AUTO_ON_FACING_DEPTH = 3;
 export const AUTO_ON_SIDE_DEPTH = 2;
 export const CHARACTER_HIT_HALF_WIDTH = 8;

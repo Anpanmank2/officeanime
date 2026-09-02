@@ -1,0 +1,11 @@
+{
+  "id": "earbud_single",
+  "slot": "accessory",
+  "name": "Single Earbud",
+  "file": "earbud_single.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

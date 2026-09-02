@@ -1,0 +1,11 @@
+{
+  "id": "can_cup",
+  "slot": "accessory",
+  "name": "Drink Can or Cup",
+  "file": "can_cup.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

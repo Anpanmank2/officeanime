@@ -14,17 +14,22 @@ import {
 } from './agentManager.js';
 import type { LoadedAssets } from './assetLoader.js';
 import {
+  loadAvatarParts,
   loadCharacterSprites,
+  loadDefaultAvatars,
   loadDefaultLayout,
   loadFloorTiles,
   loadFurnitureAssets,
   loadWallTiles,
   mergeLoadedAssets,
   sendAssetsToWebview,
+  sendAvatarPartsToWebview,
   sendCharacterSpritesToWebview,
   sendFloorTilesToWebview,
   sendWallTilesToWebview,
 } from './assetLoader.js';
+import type { AvatarWatcher } from './avatarPersistence.js';
+import { migrateAndLoadAvatars, watchAvatarFile, writeAvatarsToFile } from './avatarPersistence.js';
 import { readConfig, writeConfig } from './configPersistence.js';
 import {
   GLOBAL_KEY_ALWAYS_SHOW_LABELS,
@@ -49,6 +54,7 @@ import {
   isJCActive,
   onAgentCreated as jcOnAgentCreated,
   onAgentRemoved as jcOnAgentRemoved,
+  restoreAgentMapping as jcRestoreAgentMapping,
   sendJCConfig,
   setLaunchFunction,
   submitTask,
@@ -93,6 +99,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 
   // Cross-window layout sync
   layoutWatcher: LayoutWatcher | null = null;
+  avatarWatcher: AvatarWatcher | null = null;
 
   // Browser viewing
   private browserServer: BrowserServer | null = null;
@@ -183,6 +190,8 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
       } else if (message.type === 'saveLayout') {
         this.layoutWatcher?.markOwnWrite();
         writeLayoutToFile(message.layout as Record<string, unknown>);
+      } else if (message.type === 'saveAvatars') {
+        this.saveAvatarConfig(message.avatars);
       } else if (message.type === 'setSoundEnabled') {
         this.context.globalState.update(GLOBAL_KEY_SOUND_ENABLED, message.enabled);
       } else if (message.type === 'setLastSeenVersion') {
@@ -249,6 +258,13 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           this.webview,
           this.persistAgents,
         );
+        const restoredAgentMeta = this.context.workspaceState.get<
+          Record<string, { memberId?: string }>
+        >(WORKSPACE_KEY_AGENT_SEATS, {});
+        for (const agentId of this.agents.keys()) {
+          const memberId = restoredAgentMeta[String(agentId)]?.memberId;
+          if (memberId) jcRestoreAgentMapping(agentId, memberId);
+        }
         // Send persisted settings to webview
         const soundEnabled = this.context.globalState.get<boolean>(GLOBAL_KEY_SOUND_ENABLED, true);
         const lastSeenVersion = this.context.globalState.get<string>(
@@ -404,6 +420,16 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
               console.log('[Extension] Character sprites loaded, sending to webview');
               sendCharacterSpritesToWebview(this.webview, charSprites);
             }
+
+            const avatarParts = await loadAvatarParts(assetsRoot);
+            if (avatarParts && this.webview) {
+              sendAvatarPartsToWebview(this.webview, avatarParts);
+            }
+            const avatars = migrateAndLoadAvatars(loadDefaultAvatars(assetsRoot));
+            if (avatars && this.webview) {
+              this.webview.postMessage({ type: 'avatarsLoaded', avatars });
+            }
+            this.startAvatarWatcher();
 
             // Load floor tiles
             const floorTiles = await loadFloorTiles(assetsRoot);
@@ -780,12 +806,37 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private startAvatarWatcher(): void {
+    if (this.avatarWatcher) return;
+    this.avatarWatcher = watchAvatarFile((avatars) => {
+      console.log('[Pixel Agents] External avatar change — pushing to webview');
+      this.pushAvatarConfig(avatars);
+    });
+  }
+
+  private pushAvatarConfig(avatars: Record<string, unknown>): void {
+    const message = { type: 'avatarsLoaded', avatars };
+    // postMessage is intercepted when the panel exists, so it also refreshes
+    // browser clients and their replay buffer exactly once.
+    if (this.webview) this.webview.postMessage(message);
+    else this.trackMessage(message);
+  }
+
+  private saveAvatarConfig(value: unknown): boolean {
+    const avatars = value as Record<string, unknown>;
+    if (!writeAvatarsToFile(avatars)) return false;
+    this.avatarWatcher?.markOwnWrite(avatars);
+    this.pushAvatarConfig(avatars);
+    return true;
+  }
+
   /** Track a message for potential browser replay */
   private trackMessage(data: unknown): void {
     const msg = data as { type?: string };
     if (msg.type) {
       this.sentMessages.set(msg.type, data);
     }
+    this.messageBridge?.remember(data);
     // Also forward to browser clients if server is active
     this.browserServer?.broadcast(data);
   }
@@ -807,9 +858,28 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
     try {
       const extensionPath = this.extensionUri.fsPath;
 
+      // The browser can be opened before the panel has initialized and sent
+      // any tracked messages. Seed the user-level avatar state independently;
+      // browserMock supplies bundled defaults as a fail-soft baseline.
+      const bundledAssetsRoot = path.join(extensionPath, 'dist');
+      const developmentAssetsRoot = path.join(extensionPath, 'webview-ui', 'public');
+      const browserAssetsRoot =
+        this.assetsRoot ??
+        (fs.existsSync(path.join(bundledAssetsRoot, 'assets'))
+          ? bundledAssetsRoot
+          : fs.existsSync(path.join(developmentAssetsRoot, 'assets'))
+            ? developmentAssetsRoot
+            : null);
+      if (browserAssetsRoot) {
+        const avatars = migrateAndLoadAvatars(loadDefaultAvatars(browserAssetsRoot));
+        if (avatars) this.sentMessages.set('avatarsLoaded', { type: 'avatarsLoaded', avatars });
+        this.startAvatarWatcher();
+      }
+
       // Create command dispatcher and wire context
       const dispatcher = createCommandDispatcher();
       dispatcher.setContext({
+        saveAvatars: (avatars) => this.saveAvatarConfig(avatars),
         sendToTerminal: (agentId, text) => {
           const agent = this.agents.get(agentId);
           if (agent?.terminalRef) {
@@ -932,6 +1002,8 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
     this.commandDispatcher = null;
     this.layoutWatcher?.dispose();
     this.layoutWatcher = null;
+    this.avatarWatcher?.dispose();
+    this.avatarWatcher = null;
     for (const id of [...this.agents.keys()]) {
       removeAgent(
         id,

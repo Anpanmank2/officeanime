@@ -1,0 +1,11 @@
+{
+  "id": "hair_business_gray",
+  "slot": "hair",
+  "name": "Business Cut with Gray Temples",
+  "file": "hair_business_gray.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

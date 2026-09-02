@@ -1,0 +1,11 @@
+{
+  "id": "statement_earrings",
+  "slot": "accessory",
+  "name": "Statement Earrings",
+  "file": "statement_earrings.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

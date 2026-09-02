@@ -1,0 +1,11 @@
+{
+  "id": "face_focused",
+  "slot": "face",
+  "name": "Focused Face",
+  "file": "face_focused.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

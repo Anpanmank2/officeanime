@@ -123,6 +123,13 @@ async function run() {
     );
     assert(!!jcConfigLog, 'JC config loaded in browser');
 
+    // Persona avatars must travel through the real browser message path, not
+    // merely exist on disk while the canvas silently uses legacy characters.
+    const avatarPartsLog = logs.find((l) => l.includes('Received 41 avatar parts'));
+    const avatarConfigsLog = logs.find((l) => l.includes('Received 23 avatar configs'));
+    assert(!!avatarPartsLog, '41 avatar parts loaded into the webview');
+    assert(!!avatarConfigsLog, 'All 23 persona avatar configs loaded into the webview');
+
     // Test 4: Permanent residents dispatched
     console.log('  [Test 4] Permanent residents');
     const residentsLog = logs.find((l) => l.includes('permanent residents dispatched'));

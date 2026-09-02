@@ -1,0 +1,1255 @@
+{
+  "version": 1,
+  "avatarRevision": 1,
+  "avatars": {
+    "eng-01": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 0,
+          "s": 0,
+          "b": 0,
+          "c": 0
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": -150,
+            "s": 36,
+            "b": -14,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "shirt_button",
+          "color": {
+            "h": -150,
+            "s": 48,
+            "b": -2,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_calm",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_sidepart_neat",
+          "color": {
+            "h": 12,
+            "s": 12,
+            "b": -18,
+            "c": 4
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "glasses_thin",
+          "color": null
+        }
+      ]
+    },
+    "eng-02": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 3,
+          "s": -7,
+          "b": 8,
+          "c": -2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_relaxed_sneakers",
+          "color": {
+            "h": 0,
+            "s": 8,
+            "b": -25,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "hoodie_plain",
+          "color": {
+            "h": 170,
+            "s": 42,
+            "b": -4,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_focused",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_crop_plain",
+          "color": {
+            "h": 0,
+            "s": -18,
+            "b": -20,
+            "c": 5
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "earbud_single",
+          "color": null
+        }
+      ]
+    },
+    "eng-03": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": -2,
+          "s": -10,
+          "b": -28,
+          "c": 5
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_relaxed_sneakers",
+          "color": {
+            "h": -145,
+            "s": 20,
+            "b": -12,
+            "c": 3
+          }
+        },
+        {
+          "slot": "top",
+          "part": "streetwear_oversized",
+          "color": {
+            "h": -82,
+            "s": 43,
+            "b": -2,
+            "c": 3
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_bright",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_bob_streak",
+          "color": null
+        },
+        {
+          "slot": "accessory",
+          "part": "earbud_single",
+          "color": null
+        }
+      ]
+    },
+    "eng-04": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": -4,
+          "s": -4,
+          "b": -12,
+          "c": 2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": 0,
+            "s": 8,
+            "b": -25,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "blazer_clean",
+          "color": {
+            "h": 12,
+            "s": 48,
+            "b": 2,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_focused",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_ponytail_neat",
+          "color": {
+            "h": 12,
+            "s": 12,
+            "b": -18,
+            "c": 4
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "handheld_pad",
+          "color": null
+        },
+        {
+          "slot": "accessory",
+          "part": "chest_pen",
+          "color": null
+        }
+      ]
+    },
+    "eng-05": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 2,
+          "s": -5,
+          "b": -7,
+          "c": 2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": -66,
+            "s": 34,
+            "b": -8,
+            "c": 3
+          }
+        },
+        {
+          "slot": "top",
+          "part": "outfit_layered",
+          "color": {
+            "h": -24,
+            "s": 38,
+            "b": 2,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_calm",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_wavy_shoulder",
+          "color": {
+            "h": 18,
+            "s": 28,
+            "b": -2,
+            "c": 3
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "swatch_strap",
+          "color": null
+        }
+      ]
+    },
+    "eng-06": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 0,
+          "s": -9,
+          "b": 11,
+          "c": -2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_relaxed_sneakers",
+          "color": {
+            "h": 0,
+            "s": 8,
+            "b": -25,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "hoodie_plain",
+          "color": {
+            "h": 36,
+            "s": 52,
+            "b": 2,
+            "c": 3
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_bright",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_tousled_medium",
+          "color": {
+            "h": 0,
+            "s": -18,
+            "b": -20,
+            "c": 5
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "token_charm",
+          "color": null
+        }
+      ]
+    },
+    "mkt-01": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 0,
+          "s": 0,
+          "b": 0,
+          "c": 0
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": 0,
+            "s": 8,
+            "b": -25,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "shirt_rolled",
+          "color": {
+            "h": 0,
+            "s": 48,
+            "b": -5,
+            "c": 3
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_focused",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_business_sharp",
+          "color": {
+            "h": 12,
+            "s": 12,
+            "b": -18,
+            "c": 4
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "token_charm",
+          "color": null
+        }
+      ]
+    },
+    "mkt-04": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": -4,
+          "s": -4,
+          "b": -12,
+          "c": 2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": 0,
+            "s": 8,
+            "b": -25,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "blazer_clean",
+          "color": {
+            "h": 36,
+            "s": 52,
+            "b": 2,
+            "c": 3
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_bright",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_wavy_gathered",
+          "color": {
+            "h": 8,
+            "s": 38,
+            "b": -2,
+            "c": 3
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "statement_earrings",
+          "color": null
+        },
+        {
+          "slot": "accessory",
+          "part": "chest_pen",
+          "color": null
+        }
+      ]
+    },
+    "mkt-07": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 0,
+          "s": 0,
+          "b": 0,
+          "c": 0
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": -145,
+            "s": 20,
+            "b": -12,
+            "c": 3
+          }
+        },
+        {
+          "slot": "top",
+          "part": "blouse_clean",
+          "color": {
+            "h": 105,
+            "s": 38,
+            "b": -5,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_focused",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_medium_straight",
+          "color": {
+            "h": 12,
+            "s": 12,
+            "b": -18,
+            "c": 4
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "glasses_oversize",
+          "color": null
+        },
+        {
+          "slot": "accessory",
+          "part": "chest_pen",
+          "color": null
+        }
+      ]
+    },
+    "mkt-09": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": -2,
+          "s": -10,
+          "b": -28,
+          "c": 5
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_relaxed_sneakers",
+          "color": {
+            "h": -82,
+            "s": 43,
+            "b": -2,
+            "c": 3
+          }
+        },
+        {
+          "slot": "top",
+          "part": "streetwear_oversized",
+          "color": {
+            "h": 170,
+            "s": 42,
+            "b": -4,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_bright",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_high_pony",
+          "color": {
+            "h": 8,
+            "s": 38,
+            "b": -2,
+            "c": 3
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "phone_ringlight",
+          "color": null
+        }
+      ]
+    },
+    "mkt-10": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": -4,
+          "s": -4,
+          "b": -12,
+          "c": 2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_relaxed_sneakers",
+          "color": {
+            "h": 0,
+            "s": 8,
+            "b": -25,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "jacket_field",
+          "color": {
+            "h": 105,
+            "s": 38,
+            "b": -5,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_bright",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_crop_plain",
+          "color": {
+            "h": 12,
+            "s": 12,
+            "b": -18,
+            "c": 4
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "walkie_lanyard",
+          "color": null
+        }
+      ]
+    },
+    "mkt-11": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 2,
+          "s": -5,
+          "b": -7,
+          "c": 2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": -150,
+            "s": 36,
+            "b": -14,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "blazer_clean",
+          "color": {
+            "h": 170,
+            "s": 42,
+            "b": -4,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_focused",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_long_straight",
+          "color": {
+            "h": 0,
+            "s": -18,
+            "b": -20,
+            "c": 5
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "handheld_pad",
+          "color": null
+        }
+      ]
+    },
+    "mkt-12": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 0,
+          "s": -9,
+          "b": 11,
+          "c": -2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": -145,
+            "s": 20,
+            "b": -12,
+            "c": 3
+          }
+        },
+        {
+          "slot": "top",
+          "part": "blouse_clean",
+          "color": {
+            "h": -150,
+            "s": 48,
+            "b": -2,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_calm",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_medium_straight",
+          "color": {
+            "h": 18,
+            "s": 28,
+            "b": -2,
+            "c": 3
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "handheld_pad",
+          "color": null
+        },
+        {
+          "slot": "accessory",
+          "part": "swatch_strap",
+          "color": null
+        }
+      ]
+    },
+    "res-01": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 0,
+          "s": -9,
+          "b": 11,
+          "c": -2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": 0,
+            "s": 8,
+            "b": -25,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "blazer_clean",
+          "color": {
+            "h": -82,
+            "s": 43,
+            "b": -2,
+            "c": 3
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_calm",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_sidepart_neat",
+          "color": {
+            "h": 12,
+            "s": 12,
+            "b": -18,
+            "c": 4
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "handheld_pad",
+          "color": null
+        }
+      ]
+    },
+    "res-02": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 0,
+          "s": 0,
+          "b": 0,
+          "c": 0
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_relaxed_sneakers",
+          "color": {
+            "h": 0,
+            "s": 8,
+            "b": -25,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "hoodie_plain",
+          "color": {
+            "h": 12,
+            "s": 48,
+            "b": 2,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_bright",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_short_spiky",
+          "color": {
+            "h": 0,
+            "s": -18,
+            "b": -20,
+            "c": 5
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "can_cup",
+          "color": null
+        }
+      ]
+    },
+    "res-03": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 3,
+          "s": -7,
+          "b": 8,
+          "c": -2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_relaxed_sneakers",
+          "color": {
+            "h": 170,
+            "s": 42,
+            "b": -4,
+            "c": 2
+          }
+        },
+        {
+          "slot": "top",
+          "part": "outfit_layered",
+          "color": {
+            "h": -24,
+            "s": 38,
+            "b": 2,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_calm",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_wavy_shoulder",
+          "color": {
+            "h": 26,
+            "s": 30,
+            "b": -6,
+            "c": 3
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "handheld_pad",
+          "color": null
+        }
+      ]
+    },
+    "res-04": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": -2,
+          "s": -10,
+          "b": -28,
+          "c": 5
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_relaxed_sneakers",
+          "color": {
+            "h": 0,
+            "s": 8,
+            "b": -25,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "streetwear_oversized",
+          "color": {
+            "h": -82,
+            "s": 43,
+            "b": -2,
+            "c": 3
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_bright",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_short_spiky",
+          "color": {
+            "h": 12,
+            "s": 12,
+            "b": -18,
+            "c": 4
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "gaming_headset",
+          "color": null
+        },
+        {
+          "slot": "accessory",
+          "part": "handheld_pad",
+          "color": null
+        }
+      ]
+    },
+    "res-05": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": -4,
+          "s": -4,
+          "b": -12,
+          "c": 2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": -66,
+            "s": 34,
+            "b": -8,
+            "c": 3
+          }
+        },
+        {
+          "slot": "top",
+          "part": "blazer_clean",
+          "color": {
+            "h": 38,
+            "s": 12,
+            "b": 18,
+            "c": -2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_calm",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_updo",
+          "color": {
+            "h": 0,
+            "s": -18,
+            "b": -20,
+            "c": 5
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "glasses_thin",
+          "color": null
+        },
+        {
+          "slot": "accessory",
+          "part": "book_binder",
+          "color": null
+        }
+      ]
+    },
+    "res-06": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 2,
+          "s": -5,
+          "b": -7,
+          "c": 2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": 0,
+            "s": 8,
+            "b": -25,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "shirt_button",
+          "color": {
+            "h": 170,
+            "s": 42,
+            "b": -4,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_focused",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_crop_plain",
+          "color": {
+            "h": 12,
+            "s": 12,
+            "b": -18,
+            "c": 4
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "handheld_pad",
+          "color": null
+        }
+      ]
+    },
+    "res-07": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 3,
+          "s": -7,
+          "b": 8,
+          "c": -2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": 0,
+            "s": 8,
+            "b": -25,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "blazer_clean",
+          "color": {
+            "h": 105,
+            "s": 38,
+            "b": -5,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_calm",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_business_gray",
+          "color": null
+        },
+        {
+          "slot": "accessory",
+          "part": "token_charm",
+          "color": null
+        }
+      ]
+    },
+    "res-08": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": -4,
+          "s": -4,
+          "b": -12,
+          "c": 2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": -145,
+            "s": 20,
+            "b": -12,
+            "c": 3
+          }
+        },
+        {
+          "slot": "top",
+          "part": "blouse_clean",
+          "color": {
+            "h": -66,
+            "s": 34,
+            "b": -8,
+            "c": 3
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_focused",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_long_straight",
+          "color": {
+            "h": 0,
+            "s": -18,
+            "b": -20,
+            "c": 5
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "book_binder",
+          "color": null
+        }
+      ]
+    },
+    "res-09": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": 0,
+          "s": -9,
+          "b": 11,
+          "c": -2
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": 0,
+            "s": 8,
+            "b": -25,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "blazer_clean",
+          "color": {
+            "h": 105,
+            "s": 38,
+            "b": -5,
+            "c": 2
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_calm",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_medium_straight",
+          "color": {
+            "h": 12,
+            "s": 12,
+            "b": -18,
+            "c": 4
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "handheld_pad",
+          "color": null
+        },
+        {
+          "slot": "accessory",
+          "part": "chest_pen",
+          "color": null
+        }
+      ]
+    },
+    "exec-sec": {
+      "base": {
+        "part": "body_neutral",
+        "color": {
+          "h": -2,
+          "s": -10,
+          "b": -28,
+          "c": 5
+        }
+      },
+      "layers": [
+        {
+          "slot": "bottom",
+          "part": "pants_tailored",
+          "color": {
+            "h": -150,
+            "s": 36,
+            "b": -14,
+            "c": 4
+          }
+        },
+        {
+          "slot": "top",
+          "part": "blouse_clean",
+          "color": {
+            "h": 36,
+            "s": 52,
+            "b": 2,
+            "c": 3
+          }
+        },
+        {
+          "slot": "face",
+          "part": "face_focused",
+          "color": null
+        },
+        {
+          "slot": "hair",
+          "part": "hair_medium_straight",
+          "color": {
+            "h": 18,
+            "s": 28,
+            "b": -2,
+            "c": 3
+          }
+        },
+        {
+          "slot": "accessory",
+          "part": "handheld_pad",
+          "color": null
+        },
+        {
+          "slot": "accessory",
+          "part": "chest_pen",
+          "color": null
+        }
+      ]
+    }
+  }
+}

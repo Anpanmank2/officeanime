@@ -1,0 +1,11 @@
+{
+  "id": "walkie_lanyard",
+  "slot": "accessory",
+  "name": "Walkie and Pass Lanyard",
+  "file": "walkie_lanyard.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

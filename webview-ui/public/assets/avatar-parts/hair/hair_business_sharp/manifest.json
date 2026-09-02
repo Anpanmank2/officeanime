@@ -1,0 +1,11 @@
+{
+  "id": "hair_business_sharp",
+  "slot": "hair",
+  "name": "Sharp Business Cut",
+  "file": "hair_business_sharp.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

@@ -1,0 +1,11 @@
+{
+  "id": "outfit_layered",
+  "slot": "top",
+  "name": "Layered Outfit",
+  "file": "outfit_layered.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}
