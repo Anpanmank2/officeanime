@@ -58,6 +58,8 @@ export interface CommandContext {
   }) => { entries: unknown[]; hasMore: boolean };
   /** Broadcast a message to all connected clients */
   broadcast?: (data: unknown) => void;
+  /** Persist and rebroadcast a validated avatar configuration. */
+  saveAvatars?: (avatars: Record<string, unknown>) => boolean;
 }
 
 export interface CommandDispatcher {
@@ -75,6 +77,11 @@ export function createCommandDispatcher(): CommandDispatcher {
     console.log(`[JC-CMD] Dispatching: ${cmd.type}`);
 
     switch (cmd.type) {
+      case 'saveAvatars': {
+        const success = context.saveAvatars?.(cmd.avatars as Record<string, unknown>) ?? false;
+        respond?.({ type: 'command:ack', commandType: cmd.type, success });
+        break;
+      }
       // ── JC-specific commands ──
       case 'agent:instruct': {
         const { agentId, text } = cmd as { type: string; agentId: number; text: string };

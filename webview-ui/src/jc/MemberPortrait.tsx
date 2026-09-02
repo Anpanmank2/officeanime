@@ -3,9 +3,13 @@
 // spriteCache と同じピクセルデータ (getCharacterSprites) を使うだけ — 新アセット/IPC/
 // postMessage は 1 つも増やさない (spec §3 exists*: webview 内の軽微 helper のみ)。
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useSyncExternalStore } from 'react';
 
-import { getCharacterSprites } from '../office/sprites/spriteData.js';
+import {
+  getAvatarSpriteRevision,
+  getCharacterSprites,
+  subscribeAvatarSprites,
+} from '../office/sprites/spriteData.js';
 import type { SpriteData } from '../office/types.js';
 import { Direction } from '../office/types.js';
 
@@ -40,6 +44,7 @@ function contentBounds(sprite: SpriteData): {
 }
 
 export interface MemberPortraitProps {
+  memberId: string;
   palette: number;
   hueShift: number;
   /** 不在なら彩度を落として dim 表示する (spec §4.3 不在=portrait dim)。 */
@@ -47,13 +52,18 @@ export interface MemberPortraitProps {
 }
 
 /** 立ち姿の顔グラ。palette / hueShift はキャラ本体と同一 → canvas のキャラと同じ見た目。 */
-export function MemberPortrait({ palette, hueShift, present }: MemberPortraitProps) {
+export function MemberPortrait({ memberId, palette, hueShift, present }: MemberPortraitProps) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const spriteRevision = useSyncExternalStore(
+    subscribeAvatarSprites,
+    getAvatarSpriteRevision,
+    getAvatarSpriteRevision,
+  );
 
   useEffect(() => {
     const canvas = ref.current;
     if (!canvas) return;
-    const sprites = getCharacterSprites(palette, hueShift);
+    const sprites = getCharacterSprites(palette, hueShift, null, memberId);
     const frame = sprites.walk[Direction.DOWN][1]; // walk2 = 正面立ち姿
     const b = contentBounds(frame);
     const cols = b.maxC - b.minC + 1;
@@ -77,7 +87,7 @@ export function MemberPortrait({ palette, hueShift, present }: MemberPortraitPro
         );
       }
     }
-  }, [palette, hueShift]);
+  }, [memberId, palette, hueShift, spriteRevision]);
 
   return (
     <canvas

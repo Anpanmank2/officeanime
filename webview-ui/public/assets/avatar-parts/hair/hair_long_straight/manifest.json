@@ -1,0 +1,11 @@
+{
+  "id": "hair_long_straight",
+  "slot": "hair",
+  "name": "Long Straight Hair",
+  "file": "hair_long_straight.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

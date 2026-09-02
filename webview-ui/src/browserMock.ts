@@ -22,12 +22,17 @@ import {
 } from '../../shared/assets/constants.ts';
 import type {
   AssetIndex,
+  AvatarPartAsset,
   CatalogEntry,
   CharacterDirectionSprites,
 } from '../../shared/assets/types.ts';
+import { loadAvailableAvatarParts, withAvatarFallback } from './browserAvatarFailsoft.js';
 
 interface MockPayload {
   characters: CharacterDirectionSprites[];
+  avatarPartCatalog: AvatarPartAsset[];
+  avatarPartSprites: Record<string, CharacterDirectionSprites>;
+  avatarConfig: unknown;
   floorSprites: string[][][];
   wallSets: string[][][][];
   furnitureCatalog: CatalogEntry[];
@@ -119,6 +124,70 @@ function getIndexedAssetPath(kind: 'characters' | 'floors' | 'walls', relPath: s
   return relPath.startsWith(`${kind}/`) ? relPath : `${kind}/${relPath}`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isAvatarPartAsset(value: unknown): value is AvatarPartAsset {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === 'string' &&
+    value.id.length > 0 &&
+    ['base', 'bottom', 'top', 'face', 'hair', 'accessory'].includes(String(value.slot)) &&
+    typeof value.name === 'string' &&
+    typeof value.file === 'string' &&
+    typeof value.avatarPath === 'string' &&
+    Number.isInteger(value.width) &&
+    (value.width as number) > 0 &&
+    Number.isInteger(value.height) &&
+    (value.height as number) > 0 &&
+    Number.isInteger(value.frames) &&
+    (value.frames as number) > 0 &&
+    typeof value.colorable === 'boolean'
+  );
+}
+
+function parseAvatarPartCatalog(value: unknown): AvatarPartAsset[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isAvatarPartAsset);
+}
+
+function isSpriteFrame(value: unknown): value is string[][] {
+  return (
+    Array.isArray(value) &&
+    value.length === CHAR_FRAME_H &&
+    value.every(
+      (row) =>
+        Array.isArray(row) &&
+        row.length === CHAR_FRAME_W &&
+        row.every((pixel) => typeof pixel === 'string'),
+    )
+  );
+}
+
+function validAvatarParts(
+  value: unknown,
+  catalog: AvatarPartAsset[],
+): { catalog: AvatarPartAsset[]; sprites: Record<string, CharacterDirectionSprites> } {
+  const sprites: Record<string, CharacterDirectionSprites> = {};
+  if (!isRecord(value)) return { catalog: [], sprites };
+  const validCatalog = catalog.filter((entry) => {
+    const part = value[entry.id];
+    if (!isRecord(part)) return false;
+    const valid = CHARACTER_DIRECTIONS.every((direction) => {
+      const frames = part[direction];
+      return (
+        Array.isArray(frames) &&
+        frames.length === CHAR_FRAMES_PER_ROW &&
+        frames.every(isSpriteFrame)
+      );
+    });
+    if (valid) sprites[entry.id] = part as unknown as CharacterDirectionSprites;
+    return valid;
+  });
+  return { catalog: validCatalog, sprites };
+}
+
 async function decodeCharactersFromPng(
   base: string,
   index: AssetIndex,
@@ -141,6 +210,100 @@ async function decodeCharactersFromPng(
     sprites.push(byDir);
   }
   return sprites;
+}
+
+async function decodeAvatarPartsFromPng(
+  base: string,
+  catalog: AvatarPartAsset[],
+): Promise<Record<string, CharacterDirectionSprites>> {
+  return loadAvailableAvatarParts(
+    catalog,
+    async (entry) => {
+      const png = await decodePng(`${base}assets/${entry.avatarPath}`);
+      const byDir: CharacterDirectionSprites = { down: [], up: [], right: [] };
+      for (let dirIdx = 0; dirIdx < CHARACTER_DIRECTIONS.length; dirIdx++) {
+        const direction = CHARACTER_DIRECTIONS[dirIdx];
+        const frames: string[][][] = [];
+        for (let frame = 0; frame < CHAR_FRAMES_PER_ROW; frame++) {
+          frames.push(
+            readSprite(
+              png,
+              CHAR_FRAME_W,
+              CHAR_FRAME_H,
+              frame * CHAR_FRAME_W,
+              dirIdx * CHAR_FRAME_H,
+            ),
+          );
+        }
+        byDir[direction] = frames;
+      }
+      return byDir;
+    },
+    (entry, error) => {
+      console.warn(`[BrowserMock] Skipping unavailable avatar part ${entry.id}`, error);
+    },
+  );
+}
+
+interface OptionalAvatarAssets {
+  catalog: AvatarPartAsset[];
+  sprites: Record<string, CharacterDirectionSprites>;
+  source: 'decoded-json' | 'browser-png-decode' | 'unavailable';
+}
+
+/**
+ * Avatar assets are an enhancement over the legacy character sheets. A bad
+ * optional part must never reject browser initialization and leave React
+ * unmounted, so this loader has its own failure boundary.
+ */
+export async function loadOptionalAvatarAssets(
+  base: string,
+  catalog: AvatarPartAsset[],
+  shouldTryDecoded: boolean,
+): Promise<OptionalAvatarAssets> {
+  const unavailable: OptionalAvatarAssets = {
+    catalog: [],
+    sprites: {},
+    source: 'unavailable',
+  };
+  if (catalog.length === 0) {
+    return unavailable;
+  }
+
+  return withAvatarFallback(
+    async () => {
+      let decodedPartial: OptionalAvatarAssets | null = null;
+      if (shouldTryDecoded) {
+        const decoded = await fetchJsonOptional<unknown>(`${base}assets/decoded/avatar-parts.json`);
+        const available = validAvatarParts(decoded, catalog);
+        if (available.catalog.length === catalog.length) {
+          return { ...available, source: 'decoded-json' };
+        }
+        if (available.catalog.length > 0) {
+          decodedPartial = { ...available, source: 'decoded-json' };
+        }
+      }
+
+      const sprites = await decodeAvatarPartsFromPng(base, catalog);
+      const available = validAvatarParts(sprites, catalog);
+      if (available.catalog.length > 0) {
+        return { ...available, source: 'browser-png-decode' };
+      }
+      if (decodedPartial) return decodedPartial;
+      throw new Error('No avatar part sprites could be decoded');
+    },
+    unavailable,
+    (error) => {
+      console.warn('[BrowserMock] Avatar parts unavailable; using legacy character sprites', error);
+    },
+  );
+}
+
+export async function loadOptionalAvatarConfig(
+  base: string,
+  relativePath: string | null,
+): Promise<unknown | null> {
+  return relativePath ? fetchJsonOptional<unknown>(`${base}assets/${relativePath}`) : null;
 }
 
 async function decodeFloorsFromPng(base: string, index: AssetIndex): Promise<string[][][]> {
@@ -214,10 +377,15 @@ export async function initBrowserMock(): Promise<void> {
     // JC config not available — skip permanent residents
   }
 
-  const [assetIndex, catalog] = await Promise.all([
+  const [assetIndex, catalog, rawAvatarPartCatalog] = await Promise.all([
     fetch(`${base}assets/asset-index.json`).then((r) => r.json()) as Promise<AssetIndex>,
     fetch(`${base}assets/furniture-catalog.json`).then((r) => r.json()) as Promise<CatalogEntry[]>,
+    fetchJsonOptional<unknown>(`${base}assets/avatar-parts-catalog.json`),
   ]);
+  const avatarPartCatalog = parseAvatarPartCatalog(rawAvatarPartCatalog);
+  if (rawAvatarPartCatalog !== null && avatarPartCatalog.length === 0) {
+    console.warn('[BrowserMock] Ignoring malformed avatar part catalog');
+  }
 
   const shouldTryDecoded = import.meta.env.DEV;
   const [decodedCharacters, decodedFloors, decodedWalls, decodedFurniture] = shouldTryDecoded
@@ -248,12 +416,18 @@ export async function initBrowserMock(): Promise<void> {
         decodeFurnitureFromPng(base, catalog),
       ]);
 
+  const avatarAssets = await loadOptionalAvatarAssets(base, avatarPartCatalog, shouldTryDecoded);
+
   const layout = assetIndex.defaultLayout
     ? await fetch(`${base}assets/${assetIndex.defaultLayout}`).then((r) => r.json())
     : null;
+  const avatarConfig = await loadOptionalAvatarConfig(base, assetIndex.defaultAvatars);
 
   mockPayload = {
     characters,
+    avatarPartCatalog: avatarAssets.catalog,
+    avatarPartSprites: avatarAssets.sprites,
+    avatarConfig,
     floorSprites,
     wallSets,
     furnitureCatalog: catalog,
@@ -262,7 +436,7 @@ export async function initBrowserMock(): Promise<void> {
   };
 
   console.log(
-    `[BrowserMock] Ready (${hasDecoded ? 'decoded-json' : 'browser-png-decode'}) — ${characters.length} chars, ${floorSprites.length} floors, ${wallSets.length} wall sets, ${catalog.length} furniture items`,
+    `[BrowserMock] Ready (${hasDecoded ? 'decoded-json' : 'browser-png-decode'}) — ${characters.length} chars, ${avatarAssets.catalog.length} avatar parts (${avatarAssets.source}), ${floorSprites.length} floors, ${wallSets.length} wall sets, ${catalog.length} furniture items`,
   );
 }
 
@@ -273,8 +447,17 @@ export async function initBrowserMock(): Promise<void> {
 export function dispatchMockMessages(): void {
   if (!mockPayload) return;
 
-  const { characters, floorSprites, wallSets, furnitureCatalog, furnitureSprites, layout } =
-    mockPayload;
+  const {
+    characters,
+    avatarPartCatalog,
+    avatarPartSprites,
+    avatarConfig,
+    floorSprites,
+    wallSets,
+    furnitureCatalog,
+    furnitureSprites,
+    layout,
+  } = mockPayload;
 
   function dispatch(data: unknown): void {
     window.dispatchEvent(new MessageEvent('message', { data }));
@@ -288,6 +471,8 @@ export function dispatchMockMessages(): void {
   // Must match the load order defined in CLAUDE.md:
   // characterSpritesLoaded → floorTilesLoaded → wallTilesLoaded → furnitureAssetsLoaded → layoutLoaded
   dispatch({ type: 'characterSpritesLoaded', characters });
+  dispatch({ type: 'avatarPartsLoaded', catalog: avatarPartCatalog, sprites: avatarPartSprites });
+  if (avatarConfig) dispatch({ type: 'avatarsLoaded', avatars: avatarConfig });
   dispatch({ type: 'floorTilesLoaded', sprites: floorSprites });
   dispatch({ type: 'wallTilesLoaded', sets: wallSets });
   dispatch({ type: 'furnitureAssetsLoaded', catalog: furnitureCatalog, sprites: furnitureSprites });

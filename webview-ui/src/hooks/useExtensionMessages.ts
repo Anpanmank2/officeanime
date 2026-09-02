@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
+import type { AvatarPartAsset, CharacterDirectionSprites } from '../../../shared/assets/types.js';
 import {
   gameClearMember,
   gameSetCompanyScore,
@@ -53,7 +54,12 @@ import type { OfficeState } from '../office/engine/officeState.js';
 import { setFloorSprites } from '../office/floorTiles.js';
 import { buildDynamicCatalog } from '../office/layout/furnitureCatalog.js';
 import { migrateLayoutColors } from '../office/layout/layoutSerializer.js';
-import { setCharacterTemplates } from '../office/sprites/spriteData.js';
+import { parseAvatarConfigFile } from '../office/sprites/avatarTypes.js';
+import {
+  setAvatarConfigs,
+  setAvatarParts,
+  setCharacterTemplates,
+} from '../office/sprites/spriteData.js';
 import { extractToolName } from '../office/toolUtils.js';
 import {
   CharacterState,
@@ -211,10 +217,18 @@ function resolveSeatUid(os: OfficeState, deskId: string): string | null {
 }
 
 function saveAgentSeats(os: OfficeState): void {
-  const seats: Record<number, { palette: number; hueShift: number; seatId: string | null }> = {};
+  const seats: Record<
+    number,
+    { palette: number; hueShift: number; seatId: string | null; memberId?: string }
+  > = {};
   for (const ch of os.characters.values()) {
     if (ch.isSubagent) continue;
-    seats[ch.id] = { palette: ch.palette, hueShift: ch.hueShift, seatId: ch.seatId };
+    seats[ch.id] = {
+      palette: ch.palette,
+      hueShift: ch.hueShift,
+      seatId: ch.seatId,
+      memberId: ch.jcMemberId,
+    };
   }
   vscode.postMessage({ type: 'saveAgentSeats', seats });
 }
@@ -256,6 +270,7 @@ export function useExtensionMessages(
       hueShift?: number;
       seatId?: string;
       folderName?: string;
+      memberId?: string;
     }> = [];
 
     // Buffer JC member arrivals until layout is loaded (seats must exist first)
@@ -289,6 +304,8 @@ export function useExtensionMessages(
         // Add buffered agents now that layout (and seats) are correct
         for (const p of pendingAgents) {
           os.addAgent(p.id, p.palette, p.hueShift, p.seatId, true, p.folderName);
+          const restored = os.characters.get(p.id);
+          if (restored && p.memberId) restored.jcMemberId = p.memberId;
         }
         pendingAgents = [];
         // Process buffered JC member arrivals — place directly at desk
@@ -415,19 +432,36 @@ export function useExtensionMessages(
         const incoming = msg.agents as number[];
         const meta = (msg.agentMeta || {}) as Record<
           number,
-          { palette?: number; hueShift?: number; seatId?: string }
+          { palette?: number; hueShift?: number; seatId?: string; memberId?: string }
         >;
         const folderNames = (msg.folderNames || {}) as Record<number, string>;
-        // Buffer agents — they'll be added in layoutLoaded after seats are built
+        // Buffer only until the first layout. Browser replay and reconnects may
+        // legitimately deliver existingAgents after layoutLoaded.
         for (const id of incoming) {
           const m = meta[id];
-          pendingAgents.push({
+          const persisted = {
             id,
             palette: m?.palette,
             hueShift: m?.hueShift,
             seatId: m?.seatId,
             folderName: folderNames[id],
-          });
+            memberId: m?.memberId,
+          };
+          if (layoutReadyRef.current) {
+            os.addAgent(
+              persisted.id,
+              persisted.palette,
+              persisted.hueShift,
+              persisted.seatId,
+              true,
+              persisted.folderName,
+            );
+            const restored = os.characters.get(persisted.id);
+            if (restored && persisted.memberId) restored.jcMemberId = persisted.memberId;
+          } else {
+            pendingAgents = pendingAgents.filter((agent) => agent.id !== id);
+            pendingAgents.push(persisted);
+          }
         }
         setAgents((prev) => {
           const ids = new Set(prev);
@@ -615,6 +649,19 @@ export function useExtensionMessages(
         }>;
         console.log(`[Webview] Received ${characters.length} pre-colored character sprites`);
         setCharacterTemplates(characters);
+      } else if (msg.type === 'avatarPartsLoaded') {
+        const catalog = msg.catalog as AvatarPartAsset[];
+        const sprites = msg.sprites as Record<string, CharacterDirectionSprites>;
+        console.log(`[Webview] Received ${catalog.length} avatar parts`);
+        setAvatarParts(catalog, sprites);
+      } else if (msg.type === 'avatarsLoaded') {
+        const config = parseAvatarConfigFile(msg.avatars);
+        if (config) {
+          console.log(`[Webview] Received ${Object.keys(config.avatars).length} avatar configs`);
+          setAvatarConfigs(config);
+        } else {
+          console.warn('[Webview] Ignoring malformed avatar config payload');
+        }
       } else if (msg.type === 'floorTilesLoaded') {
         const sprites = msg.sprites as string[][][];
         console.log(`[Webview] Received ${sprites.length} floor tile patterns`);
@@ -733,7 +780,6 @@ export function useExtensionMessages(
               existing.dir = seat.facingDir;
             }
           }
-          saveAgentSeats(os);
         } else {
           // Create character at preferred seat, then walk from nearby tile
           os.addAgent(agentId, palette, hueShift, seatUid, true);
@@ -767,6 +813,7 @@ export function useExtensionMessages(
             }
           }
         }
+        saveAgentSeats(os);
       } else if (msg.type === 'jcMemberLeaving') {
         const agentId = msg.agentId as number;
         const memberId = msg.memberId as string;
@@ -936,7 +983,22 @@ export function useExtensionMessages(
         const color = msg.color as string | undefined;
         jcTriggerLiaison(fromMemberId, toMemberId, duration, color);
       } else if (msg.type === 'jcMappingUpdate') {
-        jcUpdateMappings(msg.mappings);
+        const mappings = msg.mappings as Record<number, string>;
+        jcUpdateMappings(mappings);
+        let appliedToCharacter = false;
+        for (const [rawAgentId, memberId] of Object.entries(mappings)) {
+          const agentId = Number(rawAgentId);
+          const character = os.characters.get(agentId);
+          if (character) {
+            character.jcMemberId = memberId;
+            appliedToCharacter = true;
+          }
+          const pending = pendingAgents.find((agent) => agent.id === agentId);
+          if (pending) pending.memberId = memberId;
+        }
+        // Persist fresh mappings immediately once the complete layout roster is
+        // present. Before first layout, its normal reconciliation save handles it.
+        if (layoutReadyRef.current && appliedToCharacter) saveAgentSeats(os);
       } else if (msg.type === 'jcAbsenceUpdate') {
         jcAbsenceUpdate(msg.payload as AbsenceInfo);
       } else if (msg.type === 'jcAbsenceBulkSync') {

@@ -1,0 +1,11 @@
+{
+  "id": "hair_medium_straight",
+  "slot": "hair",
+  "name": "Straight Medium Hair",
+  "file": "hair_medium_straight.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

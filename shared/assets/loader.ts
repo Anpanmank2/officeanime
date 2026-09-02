@@ -10,7 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { decodeCharacterPng, decodeFloorPng, parseWallPng, pngToSpriteData } from './pngDecoder.js';
-import type { CatalogEntry, CharacterDirectionSprites } from './types.js';
+import type { AvatarPartAsset, CatalogEntry, CharacterDirectionSprites } from './types.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -68,6 +68,29 @@ export function decodeAllFurniture(
       sprites[entry.id] = pngToSpriteData(pngBuffer, entry.width, entry.height);
     } catch (err) {
       console.warn(`[decodeAssets] Failed to decode ${entry.id}:`, err);
+    }
+  }
+  return sprites;
+}
+
+export function decodeAllAvatarParts(
+  assetsDir: string,
+  catalog: AvatarPartAsset[],
+): Record<string, CharacterDirectionSprites> {
+  const sprites: Record<string, CharacterDirectionSprites> = {};
+  const root = path.resolve(assetsDir);
+  for (const entry of catalog) {
+    try {
+      const filePath = path.resolve(root, entry.avatarPath);
+      if (
+        (!filePath.startsWith(`${root}${path.sep}`) && filePath !== root) ||
+        !fs.existsSync(filePath)
+      ) {
+        continue;
+      }
+      sprites[entry.id] = decodeCharacterPng(fs.readFileSync(filePath));
+    } catch (err) {
+      console.warn(`[decodeAssets] Failed to decode avatar part ${entry.id}:`, err);
     }
   }
   return sprites;

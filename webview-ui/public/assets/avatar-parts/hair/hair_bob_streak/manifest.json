@@ -1,0 +1,11 @@
+{
+  "id": "hair_bob_streak",
+  "slot": "hair",
+  "name": "Bob with Color Streak",
+  "file": "hair_bob_streak.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

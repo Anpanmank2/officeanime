@@ -1,0 +1,11 @@
+{
+  "id": "body_neutral",
+  "slot": "base",
+  "name": "Neutral Body",
+  "file": "body_neutral.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

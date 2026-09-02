@@ -465,7 +465,7 @@ export function sendExistingAgents(
 
   // Include persisted palette/seatId from separate key
   const agentMeta = context.workspaceState.get<
-    Record<string, { palette?: number; seatId?: string }>
+    Record<string, { palette?: number; hueShift?: number; seatId?: string; memberId?: string }>
   >(WORKSPACE_KEY_AGENT_SEATS, {});
 
   // Include folderName and isExternal per agent

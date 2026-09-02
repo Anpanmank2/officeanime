@@ -9,7 +9,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 
-import { CHAR_COUNT, CHAR_FRAMES_PER_ROW, WALL_BITMASK_COUNT } from '../shared/assets/constants.js';
+import { buildAvatarPartCatalog } from '../shared/assets/build.js';
+import {
+  CHAR_COUNT,
+  CHAR_FRAMES_PER_ROW,
+  DEFAULT_AVATARS_FILE_NAME,
+  WALL_BITMASK_COUNT,
+} from '../shared/assets/constants.js';
+import { decodeAllAvatarParts } from '../shared/assets/loader.js';
 import type {
   FurnitureAsset,
   FurnitureManifest,
@@ -23,12 +30,17 @@ import {
   parseWallPng,
   pngToSpriteData,
 } from '../shared/assets/pngDecoder.js';
-import type { CharacterDirectionSprites } from '../shared/assets/types.js';
+import type { AvatarPartAsset, CharacterDirectionSprites } from '../shared/assets/types.js';
 export type { CharacterDirectionSprites } from '../shared/assets/types.js';
 
 import { LAYOUT_REVISION_KEY } from './constants.js';
 
 export type { FurnitureAsset };
+
+export interface LoadedAvatarParts {
+  catalog: AvatarPartAsset[];
+  sprites: Map<string, CharacterDirectionSprites>;
+}
 
 export interface LoadedAssets {
   catalog: FurnitureAsset[];
@@ -42,6 +54,46 @@ export function mergeLoadedAssets(a: LoadedAssets, b: LoadedAssets): LoadedAsset
     catalog: [...dedupedA, ...b.catalog],
     sprites: new Map([...a.sprites, ...b.sprites]),
   };
+}
+
+export async function loadAvatarParts(assetsRoot: string): Promise<LoadedAvatarParts | null> {
+  try {
+    const assetsDir = path.join(assetsRoot, 'assets');
+    const catalog = buildAvatarPartCatalog(assetsDir);
+    if (catalog.length === 0) return null;
+    const decoded = decodeAllAvatarParts(assetsDir, catalog);
+    const sprites = new Map<string, CharacterDirectionSprites>(Object.entries(decoded));
+    console.log(`[AssetLoader] ✅ Loaded ${sprites.size} / ${catalog.length} avatar parts`);
+    return { catalog, sprites };
+  } catch (err) {
+    console.error(
+      `[AssetLoader] ❌ Error loading avatar parts: ${err instanceof Error ? err.message : err}`,
+    );
+    return null;
+  }
+}
+
+export function loadDefaultAvatars(assetsRoot: string): Record<string, unknown> | null {
+  const filePath = path.join(assetsRoot, 'assets', DEFAULT_AVATARS_FILE_NAME);
+  try {
+    if (!fs.existsSync(filePath)) return null;
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as Record<string, unknown>;
+  } catch (err) {
+    console.error(
+      `[AssetLoader] ❌ Error loading default avatars: ${err instanceof Error ? err.message : err}`,
+    );
+    return null;
+  }
+}
+
+export function sendAvatarPartsToWebview(
+  webview: vscode.Webview,
+  avatarParts: LoadedAvatarParts,
+): void {
+  const sprites: Record<string, CharacterDirectionSprites> = {};
+  for (const [id, sprite] of avatarParts.sprites) sprites[id] = sprite;
+  webview.postMessage({ type: 'avatarPartsLoaded', catalog: avatarParts.catalog, sprites });
+  console.log(`📤 Sent ${avatarParts.catalog.length} avatar parts to webview`);
 }
 
 /**
@@ -380,13 +432,13 @@ export function sendFloorTilesToWebview(
 // ── Character sprite loading ────────────────────────────────
 
 export interface LoadedCharacterSprites {
-  /** 6 pre-colored characters, each with 9 frames per direction */
+  /** 6 pre-colored characters, each with 11 frames per direction */
   characters: CharacterDirectionSprites[];
 }
 
 /**
- * Load pre-colored character sprites from assets/characters/ (6 PNGs, each 112×96).
- * Each PNG has 3 direction rows (down, up, right) × 7 frames (16×32 each).
+ * Load pre-colored character sprites from assets/characters/ (6 PNGs, each 176×96).
+ * Each PNG has 3 direction rows (down, up, right) × 11 frames (16×32 each).
  */
 export async function loadCharacterSprites(
   assetsRoot: string,

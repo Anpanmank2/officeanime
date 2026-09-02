@@ -1,0 +1,11 @@
+{
+  "id": "streetwear_oversized",
+  "slot": "top",
+  "name": "Oversized Streetwear",
+  "file": "streetwear_oversized.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

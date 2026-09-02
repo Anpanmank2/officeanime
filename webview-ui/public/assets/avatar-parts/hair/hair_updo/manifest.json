@@ -1,0 +1,11 @@
+{
+  "id": "hair_updo",
+  "slot": "hair",
+  "name": "Composed Updo",
+  "file": "hair_updo.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

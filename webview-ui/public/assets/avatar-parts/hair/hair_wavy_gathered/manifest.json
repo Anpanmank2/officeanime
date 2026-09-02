@@ -1,0 +1,11 @@
+{
+  "id": "hair_wavy_gathered",
+  "slot": "hair",
+  "name": "Loosely Gathered Waves",
+  "file": "hair_wavy_gathered.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

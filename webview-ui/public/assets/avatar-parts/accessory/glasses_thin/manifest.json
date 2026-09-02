@@ -1,0 +1,11 @@
+{
+  "id": "glasses_thin",
+  "slot": "accessory",
+  "name": "Thin Square Glasses",
+  "file": "glasses_thin.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

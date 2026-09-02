@@ -112,6 +112,16 @@ export function getJCConfig(): JCConfig | null {
   return jcConfig;
 }
 
+/** Restore a persisted agent/member association after extension-host reload. */
+export function restoreAgentMapping(agentId: number, memberId: string): boolean {
+  if (!jcEnabled || !jcConfig || !jcConfig.members.some((member) => member.id === memberId)) {
+    return false;
+  }
+  assignMapping(agentId, memberId);
+  absenceTracker?.onAgentCreated(memberId);
+  return true;
+}
+
 /**
  * Hook: called when a new agent is created.
  * Auto-maps or prompts for member assignment, then notifies webview.

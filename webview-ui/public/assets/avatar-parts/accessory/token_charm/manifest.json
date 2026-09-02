@@ -1,0 +1,11 @@
+{
+  "id": "token_charm",
+  "slot": "accessory",
+  "name": "Token Charm",
+  "file": "token_charm.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

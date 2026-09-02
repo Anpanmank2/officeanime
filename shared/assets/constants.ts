@@ -17,3 +17,11 @@ export const CHAR_FRAME_W = 16;
 export const CHAR_FRAME_H = 32;
 export const CHAR_FRAMES_PER_ROW = 11;
 export const CHAR_COUNT = 6;
+export const AVATAR_ATLAS_WIDTH = CHAR_FRAME_W * CHAR_FRAMES_PER_ROW;
+export const AVATAR_ATLAS_HEIGHT = CHAR_FRAME_H * CHARACTER_DIRECTIONS.length;
+export const AVATAR_PARTS_DIR = 'avatar-parts';
+export const DEFAULT_AVATARS_FILE_NAME = 'default-avatars.json';
+export const AVATAR_CONFIG_VERSION = 1;
+/** Bundled persona roster revision. Increment when default avatar assignments change. */
+export const AVATAR_DEFAULTS_REVISION = 1;
+export const AVATAR_ACCESSORY_MAX = 2;

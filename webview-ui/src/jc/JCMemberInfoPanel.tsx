@@ -443,7 +443,12 @@ export function JCMemberInfoPanel({
               justifyContent: 'center',
             }}
           >
-            <MemberPortrait palette={ch.palette} hueShift={ch.hueShift} present={isPresent} />
+            <MemberPortrait
+              memberId={config.id}
+              palette={ch.palette}
+              hueShift={ch.hueShift}
+              present={isPresent}
+            />
           </div>
 
           {/* 名前 / 役割 / 状態 */}

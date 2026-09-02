@@ -1,0 +1,11 @@
+{
+  "id": "pants_tailored",
+  "slot": "bottom",
+  "name": "Tailored Trousers",
+  "file": "pants_tailored.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

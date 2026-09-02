@@ -1,0 +1,11 @@
+{
+  "id": "hair_tousled_medium",
+  "slot": "hair",
+  "name": "Tousled Medium Hair",
+  "file": "hair_tousled_medium.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

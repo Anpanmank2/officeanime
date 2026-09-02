@@ -442,6 +442,7 @@ export function CompanyActivationBoard({ onClose }: CompanyActivationBoardProps)
                     }}
                   >
                     <MemberPortrait
+                      memberId={m.id}
                       palette={m.palette ?? 0}
                       hueShift={m.hueShift}
                       present={jcGetMemberRuntime(m.id)?.isPresent ?? false}

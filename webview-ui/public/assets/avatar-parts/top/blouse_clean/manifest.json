@@ -1,0 +1,11 @@
+{
+  "id": "blouse_clean",
+  "slot": "top",
+  "name": "Clean Blouse",
+  "file": "blouse_clean.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

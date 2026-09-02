@@ -1,0 +1,11 @@
+{
+  "id": "book_binder",
+  "slot": "accessory",
+  "name": "Book or Binder",
+  "file": "book_binder.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

@@ -1,0 +1,11 @@
+{
+  "id": "chest_pen",
+  "slot": "accessory",
+  "name": "Chest Pen",
+  "file": "chest_pen.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": false,
+  "zOverride": null
+}

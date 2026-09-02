@@ -1,0 +1,11 @@
+{
+  "id": "hoodie_plain",
+  "slot": "top",
+  "name": "Plain Hoodie",
+  "file": "hoodie_plain.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

@@ -1,0 +1,11 @@
+{
+  "id": "jacket_field",
+  "slot": "top",
+  "name": "Field Jacket",
+  "file": "jacket_field.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}

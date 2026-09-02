@@ -5,6 +5,8 @@ import type { WebSocket } from 'ws';
 /** Message types that should be replayed for new browser connections */
 const REPLAY_TYPES = new Set([
   'characterSpritesLoaded',
+  'avatarPartsLoaded',
+  'avatarsLoaded',
   'floorTilesLoaded',
   'wallTilesLoaded',
   'furnitureAssetsLoaded',
@@ -18,6 +20,8 @@ const REPLAY_TYPES = new Set([
 export interface MessageBridge {
   /** Seed the replay buffer with pre-existing data (for late start) */
   seedReplayBuffer: (messages: unknown[]) => void;
+  /** Remember the latest replayable message for future connections */
+  remember: (message: unknown) => void;
   /** Replay buffered init state to a newly connected WebSocket */
   sendInitialState: (ws: WebSocket) => void;
   /** Handle incoming message from a browser client */
@@ -30,19 +34,23 @@ export function createMessageBridge(options?: {
   /** Buffer of most recent message per type for replay */
   const replayBuffer = new Map<string, unknown>();
 
-  const seedReplayBuffer = (messages: unknown[]): void => {
-    for (const data of messages) {
-      const msg = data as { type?: string };
-      if (msg.type && REPLAY_TYPES.has(msg.type)) {
-        replayBuffer.set(msg.type, data);
-      }
+  const remember = (data: unknown): void => {
+    const msg = data as { type?: string };
+    if (msg.type && REPLAY_TYPES.has(msg.type)) {
+      replayBuffer.set(msg.type, data);
     }
+  };
+
+  const seedReplayBuffer = (messages: unknown[]): void => {
+    for (const data of messages) remember(data);
   };
 
   const sendInitialState = (ws: WebSocket): void => {
     // Send replay buffer in a sensible order
     const order = [
       'characterSpritesLoaded',
+      'avatarPartsLoaded',
+      'avatarsLoaded',
       'floorTilesLoaded',
       'wallTilesLoaded',
       'furnitureAssetsLoaded',
@@ -76,5 +84,5 @@ export function createMessageBridge(options?: {
     }
   };
 
-  return { seedReplayBuffer, sendInitialState, handleWsMessage };
+  return { seedReplayBuffer, remember, sendInitialState, handleWsMessage };
 }

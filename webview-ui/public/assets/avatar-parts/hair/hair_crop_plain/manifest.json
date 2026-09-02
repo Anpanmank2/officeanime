@@ -1,0 +1,11 @@
+{
+  "id": "hair_crop_plain",
+  "slot": "hair",
+  "name": "Plain Crop",
+  "file": "hair_crop_plain.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}
