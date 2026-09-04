@@ -62,6 +62,20 @@ Panels and UI (2026-09-03 snapshot — see the directory listing for the full se
 | `OfficeLog.tsx` / `DelegationChain.tsx` / `AbsentStatusPopup.tsx` | Event log, delegation flow, absent tracking |
 | `ModeSwitcher.tsx` / `OwnerAvatar.tsx` | Mode switch + Owner avatar |
 
+### Persona-Based Avatars (Paperdoll Composition)
+
+Each member can use a persona-based avatar assembled from layered base, clothing, face, hair, and accessory sprites.
+`webview-ui/src/office/sprites/avatarComposite.ts` exports `composeAvatar`, which orders and overlays configured parts into animation frames.
+Avatar configuration types and validation live in `webview-ui/src/office/sprites/avatarTypes.ts`; `webview-ui/src/office/sprites/spriteData.ts` selects composed sprites when parts and configuration are available.
+The 41 committed part PNGs are stored under `webview-ui/public/assets/avatar-parts/`, with default assignments in `webview-ui/public/assets/default-avatars.json`.
+`shared/assets/build.ts`, `shared/assets/loader.ts`, and `shared/assets/constants.ts` catalog, decode, and define the shared avatar assets.
+`src/assetLoader.ts` loads and sends avatar parts to the webview, while `src/avatarPersistence.ts` validates and preserves persisted avatar configurations.
+In standalone browser mode, `webview-ui/src/browserAvatarFailsoft.ts` keeps optional avatar-loading failures from preventing initialization.
+Run `scripts/generate-avatar-parts.mts` to regenerate the part PNGs and default avatar configurations.
+Run `scripts/render-avatar-gallery.mts` to render a gallery through the loader and `composeAvatar`; its committed output is `artifacts/persona-characters/avatar-gallery.png`.
+Run `scripts/capture-persona-office.mts` against a running standalone office to capture `artifacts/persona-characters/persona-office.png`.
+Coverage for composition, configuration, browser fallback, and development assets is in `webview-ui/test/avatarComposite.test.ts`, `webview-ui/test/avatarConfig.test.ts`, `webview-ui/test/browserMock-avatar-failsoft.test.ts`, and `webview-ui/test/dev-assets.test.ts`.
+
 ### Per-Member Idle Emojis & Emotion System
 
 Every member has an idle emoji reflecting their persona (e.g. secretary: pen, research lead: bar chart, tech lead: eyes). The map is `MEMBER_IDLE_EMOJIS` in `jc-constants.ts` — 23 entries as of 2026-09-03. After 10s idle the member's signature emoji appears in a blink cycle (5s on / 3s off). Emotion emojis (celebration, frustration, focus fire) trigger on state transitions.
