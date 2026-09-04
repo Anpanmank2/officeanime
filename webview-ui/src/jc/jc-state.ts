@@ -374,7 +374,7 @@ export function jcGetNameplates(): NameplateInfo[] {
     if (jcConfig) {
       const member = jcConfig.members.find((m) => m.deskId === deskId);
       if (member) {
-        text = member.nameEn ?? member.name;
+        text = member.vacant ? '空席' : (member.nameEn ?? member.name);
         const runtime = memberRuntimes.get(member.id);
         isPresent = runtime?.isPresent ?? false;
       }
@@ -384,6 +384,7 @@ export function jcGetNameplates(): NameplateInfo[] {
       col: pos.col,
       row: pos.row,
       isPresent,
+      vacant: jcConfig?.members.find((member) => member.deskId === deskId)?.vacant ?? false,
       zone: deskIdToZone(deskId),
     });
   }
@@ -794,7 +795,7 @@ export function jcGetMemberNames(): Map<string, string> {
 
 /** All member configs (id/name/department/deskId/…). Empty until config loads. */
 export function jcGetAllMembers(): ReadonlyArray<import('./jc-types.js').JCMemberConfig> {
-  return jcConfig ? jcConfig.members : [];
+  return jcConfig ? jcConfig.members.filter((member) => !member.vacant) : [];
 }
 
 // ── Dashboard helpers ─────────────────────────────────────────
@@ -865,6 +866,7 @@ export function jcGetDashboardMembers(
 
   const members: DashboardMember[] = [];
   for (const member of jcConfig.members) {
+    if (member.vacant) continue;
     const pos = DESK_POSITIONS[member.deskId];
     if (!pos) continue;
     const runtime = memberRuntimes.get(member.id);

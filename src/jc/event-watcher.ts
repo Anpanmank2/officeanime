@@ -109,7 +109,15 @@ export class EventWatcher {
       const raw = fs.readFileSync(eventFilePath, 'utf-8');
       const file = JSON.parse(raw) as OfficeEventsFile;
       if (Array.isArray(file.events)) {
-        this.webview.postMessage({ type: 'jcEventHistory', events: file.events });
+        const activeEvents = file.events.filter((event) => {
+          const vacantId = this.getVacantEventMemberId(event);
+          if (vacantId) {
+            console.warn(`[JC-Events] Ignoring ${event.event} for vacant member: ${vacantId}`);
+            return false;
+          }
+          return true;
+        });
+        this.webview.postMessage({ type: 'jcEventHistory', events: activeEvents });
       }
     } catch {
       // ファイル無し/mid-write — 逐次 push に任せる
@@ -243,6 +251,15 @@ export class EventWatcher {
       this.approvals.apply(approval);
     }
 
+    // A retained desk can still receive stale events from old JSONL sessions.
+    // Ignore the whole event before forwarding it so it cannot revive a vacant
+    // member in either the animation or the karte aggregates.
+    const vacantId = this.getVacantEventMemberId(event);
+    if (vacantId) {
+      console.warn(`[JC-Events] Ignoring ${event.event} for vacant member: ${vacantId}`);
+      return;
+    }
+
     // ── 部署カルテ (2026-07-03 藤井 §3): 生イベントを webview の karte store へ
     // 逐次 push する。演出メッセージと違い、集計用の履歴なので全種別を転送。
     // (接続後クライアント向け。接続前の全量は client-init の jcEventHistory が担う)
@@ -289,6 +306,20 @@ export class EventWatcher {
         // Forward raw event to webview
         this.webview.postMessage({ type: 'jcOfficeEvent', event });
     }
+  }
+
+  /** Return a referenced vacant member ID, if an event must be ignored. */
+  private getVacantEventMemberId(event: OfficeEvent): string | undefined {
+    const participantEvent = event as { from?: unknown; to?: unknown; agent?: unknown };
+    const ids = [
+      typeof participantEvent.from === 'string' ? participantEvent.from : undefined,
+      typeof participantEvent.to === 'string' ? participantEvent.to : undefined,
+      typeof participantEvent.agent === 'string' ? participantEvent.agent : undefined,
+      ...(Array.isArray(participantEvent.to) ? participantEvent.to : []),
+    ].filter((id): id is string => Boolean(id));
+    return ids.find((id) =>
+      this.config.members.some((member) => member.id === id && member.vacant),
+    );
   }
 
   private handleTaskReceived(event: TaskReceivedEvent): void {

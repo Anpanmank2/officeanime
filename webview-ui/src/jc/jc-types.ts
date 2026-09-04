@@ -71,6 +71,8 @@ export interface JCMemberConfig {
   deskId: string;
   accentColor?: string;
   breakBehavior?: 'coffee' | 'sofa' | 'arcade' | 'bookshelf' | 'meeting';
+  /** Retained desk whose former occupant is no longer in the active roster. */
+  vacant?: boolean;
   /** 人物像 (プロフィールタブ・手書き public-safe・spec §7)。無ければ「未設定」を優雅に表示。 */
   persona?: JCPersona;
 }
@@ -143,6 +145,7 @@ export interface NameplateInfo {
   col: number;
   row: number;
   isPresent: boolean;
+  vacant?: boolean;
   zone: ZoneType;
 }
 

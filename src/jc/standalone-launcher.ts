@@ -829,9 +829,12 @@ function buildClientInitMessages(respond: (msg: unknown) => void): void {
         hueShift: number;
         palette?: number;
         deskId: string;
+        vacant?: boolean;
       }>;
     };
-    const permanentMembers = (cfg.members ?? []).filter((m) => permanentRoles.includes(m.role));
+    const permanentMembers = (cfg.members ?? []).filter(
+      (m) => permanentRoles.includes(m.role) && !m.vacant,
+    );
     permanentMembers.forEach((member, idx) => {
       respond({
         type: 'jcMemberArriving',
@@ -939,15 +942,23 @@ async function main(): Promise<void> {
   // Extract JC members for auto-mapping
   if (jcConfig) {
     const cfg = jcConfig as {
-      members?: Array<{ id: string; hueShift: number; palette?: number; deskId: string }>;
+      members?: Array<{
+        id: string;
+        hueShift: number;
+        palette?: number;
+        deskId: string;
+        vacant?: boolean;
+      }>;
     };
     if (cfg.members) {
-      jcMembers = cfg.members.map((m) => ({
-        id: m.id,
-        hueShift: m.hueShift,
-        palette: m.palette,
-        deskId: m.deskId,
-      }));
+      jcMembers = cfg.members
+        .filter((m) => !m.vacant)
+        .map((m) => ({
+          id: m.id,
+          hueShift: m.hueShift,
+          palette: m.palette,
+          deskId: m.deskId,
+        }));
     }
   }
 

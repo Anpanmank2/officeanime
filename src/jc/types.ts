@@ -64,6 +64,8 @@ export interface JCMember {
   hueShift: number;
   palette?: number;
   deskId: string;
+  /** Retained desk whose former occupant is no longer in the active roster. */
+  vacant?: boolean;
   /** 人物像 (プロフィールタブ・手書き public-safe・spec §7)。optional で後方互換。 */
   persona?: JCPersona;
 }

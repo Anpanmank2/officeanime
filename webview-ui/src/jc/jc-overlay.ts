@@ -858,15 +858,15 @@ function renderHoverNameplate(
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(bgX + 1, bgY + 1, bgW, bgH);
 
-  // Background: dark glass
-  ctx.fillStyle = 'rgba(10, 15, 35, 0.92)';
+  // Vacant desks retain their physical marker, but deliberately recede.
+  ctx.fillStyle = np.vacant ? 'rgba(10, 10, 16, 0.45)' : 'rgba(10, 15, 35, 0.92)';
   ctx.fillRect(bgX, bgY, bgW, bgH);
 
   // Neon border
   const zoneNeon = DEPT_NEON[np.zone];
   const borderColor = zoneNeon ? zoneNeon.primary : 'rgba(255,255,255,0.25)';
   ctx.strokeStyle = borderColor;
-  ctx.globalAlpha = np.isPresent ? 0.8 : 0.3;
+  ctx.globalAlpha = np.vacant ? 0.18 : np.isPresent ? 0.8 : 0.3;
   ctx.lineWidth = 1;
   ctx.strokeRect(bgX, bgY, bgW, bgH);
   ctx.globalAlpha = 1;
@@ -879,7 +879,7 @@ function renderHoverNameplate(
   }
 
   // Text
-  const stateColor = np.isPresent ? '#00ff88' : '#555566';
+  const stateColor = np.vacant ? '#42424e' : np.isPresent ? '#00ff88' : '#555566';
   ctx.fillStyle = stateColor;
   ctx.fillText(text, x, y);
 
