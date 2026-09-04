@@ -1,7 +1,7 @@
 // ── 全社稼働可視化ボード (マクロ層ロースター＋コンペバッジ) ────────────────────
 // 設計正本: .company/engineering/docs/2026-07-25-pixel-office-activation-board-spec-fujii.md
 // 個人カルテ (JCMemberInfoPanel・ミクロ) / 部署カルテ (DeptKartePanel・メゾ) に対する
-// マクロ層 = 全28名を1画面で俯瞰する新パネル。
+// マクロ層 = 全メンバーを1画面で俯瞰する新パネル。
 // トリガー: 左上「会社ボード」ミニパネル (App.tsx CommandBoard) のクリックのみ。
 // 表示項目は全て既存 karte-state.ts の3関数 (computeMemberWorkloads /
 // computeDeptOccupancy / computeCompletionArchive) + computeOpenWork /
@@ -244,8 +244,7 @@ export function CompanyActivationBoard({ onClose }: CompanyActivationBoardProps)
         maxHeight: '80vh',
         overflowY: 'auto',
         // 既存帯: DeskCard/RequestFlowPanel/DeptKartePanel/CompletedArchivePanel = 62-65、
-        // AbsentStatusPopup=100、DialogBox=200 (2026-07-25 実装時 grep 再確認)。
-        // マクロ層ボードは常時それらより手前 (spec §1 案どおり 70 を採用)。
+        // AbsentStatusPopup=100。マクロ層ボードはパネル帯より手前 (70)。
         zIndex: 70,
         pointerEvents: 'auto',
         background: PANEL_BG,

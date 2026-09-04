@@ -149,7 +149,7 @@ function panelStyle(accent: string): React.CSSProperties {
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    zIndex: 62, // above ApprovalTray(61)/ResearchResultPanel(60), below DialogBox(65+)
+    zIndex: 62, // above ApprovalTray(61) and ResearchResultPanel(60)
     width: 'min(560px, 82%)',
     maxHeight: '78%',
     display: 'flex',

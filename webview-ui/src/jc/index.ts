@@ -6,9 +6,6 @@ export { filterByDept } from './dept-filter.js';
 export { DeptFilterChips } from './DeptFilterChips.js';
 export type { DeskCardProps } from './DeskCard.js';
 export { DeskCard } from './DeskCard.js';
-// DEFER: DialogBox (individual delegation form) — front usage removed; dock-only delegation.
-// export type { DialogBoxProps } from './DialogBox.js';
-// export { DialogBox } from './DialogBox.js';
 export { formatFreshness } from './freshness.js';
 export {
   BUBBLE_EMOJIS,

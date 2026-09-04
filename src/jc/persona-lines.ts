@@ -5,7 +5,7 @@
 // they give a clear DONE reaction + a one-line result flavor.
 //
 // Source of the voices: real personas (口調 / 口癖) for the visible / resident
-// members from `.company/{engineering,marketing,research}/team.md` +
+// members, distilled into this public configuration.
 // `.company/secretary/profiles/`. Members without an explicit voice fall back to
 // a department × tier ARCHETYPE (DEV rethink allows this — persona-fit, not
 // generic). Nothing here is randomised across processes: given (member, tier,
@@ -140,6 +140,48 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['ひとまず完了', '本来は別担当が適任'],
     },
   },
+  // mkt-02 清水 夏希 — 系統立てて反証を探す
+  'mkt-02': {
+    react: {
+      great: ['仮説を崩せるか見ます'],
+      ok: ['抜けを点検します'],
+      bad: ['前提から確認します'],
+    },
+    think: ['反例はないか…', '前提を分解しよう', '検証順を整える'],
+    done: {
+      great: ['反証まで確認できました'],
+      ok: ['論点を整理しました'],
+      bad: ['懸念を残して共有します'],
+    },
+  },
+  // mkt-03 トマス・ベガ — 相手の受け取り方から検証する
+  'mkt-03': {
+    react: {
+      great: ['受け手の目線で見ます'],
+      ok: ['相手の気持ちを追います'],
+      bad: ['まず声を想像します'],
+    },
+    think: ['誰が置いていかれる？', 'この言葉はどう響く？', '不安はどこにある？'],
+    done: {
+      great: ['受け手の納得まで届きました'],
+      ok: ['視点を補いました'],
+      bad: ['気になる声を共有します'],
+    },
+  },
+  // mkt-05 足立 賢治 — 目的からズレを見つける
+  'mkt-05': {
+    react: {
+      great: ['目的に照らして進めます'],
+      ok: ['何のためか確認します'],
+      bad: ['目的から戻りましょう'],
+    },
+    think: ['目的に近づく？', '手段が先になってないか', '誰のためだったか'],
+    done: {
+      great: ['目的に沿う形です'],
+      ok: ['狙いを整えました'],
+      bad: ['目的とのズレを残します'],
+    },
+  },
   // mkt-04 サーシャ・ブレナン — 辛辣だが愛がある、Craft
   'mkt-04': {
     react: {
@@ -182,6 +224,38 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['一応まとめた', '本領は分析で'],
     },
   },
+  'res-02': {
+    react: { great: ['流れを追います'], ok: ['話題を確認します'], bad: ['一次情報から見ます'] },
+    think: ['今、何が動いてる？', '反応の温度は？'],
+    done: { great: ['動きをつかみました'], ok: ['要点をまとめました'], bad: ['変化を共有します'] },
+  },
+  'res-03': {
+    react: {
+      great: ['画面の空気を読みます'],
+      ok: ['投稿を見比べます'],
+      bad: ['見え方から確認します'],
+    },
+    think: ['何が目を止める？', '色の流れは？'],
+    done: {
+      great: ['視覚の示唆が出ました'],
+      ok: ['傾向を整理しました'],
+      bad: ['観察結果を共有します'],
+    },
+  },
+  'res-04': {
+    react: { great: ['フックを分解します'], ok: ['伸び方を見ます'], bad: ['まず動画を追います'] },
+    think: ['最初の一秒は？', 'なぜ止まる？'],
+    done: {
+      great: ['型を見つけました'],
+      ok: ['ポイントをまとめました'],
+      bad: ['仮説を共有します'],
+    },
+  },
+  'res-05': {
+    react: { great: ['根拠まで確認します'], ok: ['資料を当たります'], bad: ['出典から追います'] },
+    think: ['証拠は十分？', '条件は何か？'],
+    done: { great: ['根拠を確認しました'], ok: ['検証をまとめました'], bad: ['留保を添えます'] },
+  },
   // res-06 島田 悠斗 — 寡黙で正確、データの職人
   'res-06': {
     react: {
@@ -208,6 +282,15 @@ const VOICES: Record<string, PersonaVoice> = {
       great: ['構造まで読み切った', '示唆の効く結論です'],
       ok: ['分析完了です', 'まとめました'],
       bad: ['ひとまず完了', '本領は業界分析で'],
+    },
+  },
+  'res-09': {
+    react: { great: ['全体像にまとめます'], ok: ['論点を並べます'], bad: ['構造から見直します'] },
+    think: ['つながりはどこ？', '順番を整えよう'],
+    done: {
+      great: ['一枚の筋にできました'],
+      ok: ['構造化しました'],
+      bad: ['論点を残して共有します'],
     },
   },
 };

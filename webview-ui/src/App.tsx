@@ -545,7 +545,7 @@ function AppContent() {
 
   const handleDeskCardOpen = useCallback(
     (memberId: string, screenPos: { x: number; y: number }) => {
-      // In owner avatar mode, DialogBox takes priority — skip DeskCard
+      // In owner avatar mode, skip the DeskCard.
       if (jcGetOwnerAvatarState().active) return;
       setDeskCard({ memberId, position: screenPos });
     },
@@ -586,8 +586,7 @@ function AppContent() {
     vscode.postMessage({ type: 'closeAgent', id });
   }, []);
 
-  // Character click → focus agent (peek). DEFER: individual delegation form (DialogBox)
-  // removed — delegation is dock-only (Owner decision B).
+  // Character click → focus agent (peek). Delegation is dock-only (Owner decision B).
   const handleClick = useCallback((agentId: number) => {
     const os = getOfficeState();
     const meta = os.subagentMeta.get(agentId);

@@ -27,6 +27,7 @@
     },
     {
       "id": "eng-02",
+      "vacant": true,
       "name": "佐藤 涼",
       "nameEn": "Ryo Sato",
       "role": "Backend Specialist",
@@ -41,6 +42,7 @@
     },
     {
       "id": "eng-03",
+      "vacant": true,
       "name": "中村 陽菜",
       "nameEn": "Hina Nakamura",
       "role": "Frontend Specialist",
@@ -66,7 +68,7 @@
       "id": "eng-04",
       "name": "山本 真帆",
       "nameEn": "Maho Yamamoto",
-      "role": "PM / Director",
+      "role": "PM",
       "department": "engineering",
       "layer": "L2",
       "zone": "exec",
@@ -87,6 +89,7 @@
     },
     {
       "id": "eng-05",
+      "vacant": true,
       "name": "藤井 蓮",
       "nameEn": "Ren Fujii",
       "role": "Web Designer",
@@ -109,6 +112,7 @@
     },
     {
       "id": "eng-06",
+      "vacant": true,
       "name": "黒田 翔太",
       "nameEn": "Shota Kuroda",
       "role": "Game Designer",
@@ -120,6 +124,34 @@
       "deskId": "dev-desk-06",
       "accentColor": "#BA7517",
       "breakBehavior": "arcade"
+    },
+    {
+      "id": "mkt-02",
+      "name": "清水 夏希",
+      "nameEn": "Natsuki Shimizu",
+      "role": "反証係 / Systematicレンズ",
+      "department": "marketing",
+      "layer": "L2",
+      "zone": "marketing",
+      "hueShift": 90,
+      "palette": 1,
+      "deskId": "mkt-desk-02",
+      "accentColor": "#3B6D11",
+      "breakBehavior": "coffee"
+    },
+    {
+      "id": "mkt-03",
+      "name": "トマス・ベガ",
+      "nameEn": "Tomás Vega",
+      "role": "反証係 / Empathyレンズ",
+      "department": "marketing",
+      "layer": "L2",
+      "zone": "marketing",
+      "hueShift": 150,
+      "palette": 2,
+      "deskId": "mkt-desk-03",
+      "accentColor": "#0F6E56",
+      "breakBehavior": "sofa"
     },
     {
       "id": "mkt-01",
@@ -148,7 +180,7 @@
       "id": "mkt-04",
       "name": "サーシャ・ブレナン",
       "nameEn": "Sasha Brennan",
-      "role": "Strategic Advisor / Craft",
+      "role": "反証係 / Craftレンズ",
       "department": "marketing",
       "layer": "L2",
       "zone": "marketing",
@@ -160,6 +192,7 @@
     },
     {
       "id": "mkt-07",
+      "vacant": true,
       "name": "谷口 芽依",
       "nameEn": "Mei Taniguchi",
       "role": "CRM Strategist",
@@ -174,6 +207,7 @@
     },
     {
       "id": "mkt-09",
+      "vacant": true,
       "name": "北川 花",
       "nameEn": "Hana Kitagawa",
       "role": "Content & Social Lead",
@@ -188,6 +222,7 @@
     },
     {
       "id": "mkt-10",
+      "vacant": true,
       "name": "森 大地",
       "nameEn": "Daichi Mori",
       "role": "Event Marketing Lead",
@@ -202,6 +237,7 @@
     },
     {
       "id": "mkt-11",
+      "vacant": true,
       "name": "レナ・パク",
       "nameEn": "Lena Park",
       "role": "Media & Growth Planner",
@@ -216,9 +252,9 @@
     },
     {
       "id": "mkt-12",
-      "name": "ラングレー葵",
+      "name": "ラングレー 葵",
       "nameEn": "Aoi Langley",
-      "role": "Template Librarian",
+      "role": "Document Production Specialist",
       "department": "marketing",
       "layer": "L4",
       "zone": "marketing",
@@ -227,6 +263,20 @@
       "deskId": "mkt-desk-12",
       "accentColor": "#0F6E56",
       "breakBehavior": "coffee"
+    },
+    {
+      "id": "mkt-05",
+      "name": "足立 賢治",
+      "nameEn": "Kenji Adachi",
+      "role": "反証係 / Purposeレンズ",
+      "department": "marketing",
+      "layer": "L2",
+      "zone": "marketing",
+      "hueShift": 330,
+      "palette": 4,
+      "deskId": "mkt-desk-05",
+      "accentColor": "#854F0B",
+      "breakBehavior": "meeting"
     },
     {
       "id": "res-01",
@@ -253,7 +303,7 @@
     },
     {
       "id": "res-02",
-      "name": "Sora Miyake",
+      "name": "三宅 空",
       "nameEn": "Sora Miyake",
       "role": "X/Twitter Specialist",
       "department": "research",
@@ -267,7 +317,7 @@
     },
     {
       "id": "res-03",
-      "name": "Marina Ríos-Delgado",
+      "name": "マリナ・リオス=デルガド",
       "nameEn": "Marina Ríos-Delgado",
       "role": "Instagram Specialist",
       "department": "research",
@@ -281,7 +331,7 @@
     },
     {
       "id": "res-04",
-      "name": "Kai Nakamura-Chen",
+      "name": "中村=陳 海",
       "nameEn": "Kai Nakamura-Chen",
       "role": "TikTok Specialist",
       "department": "research",
@@ -295,7 +345,7 @@
     },
     {
       "id": "res-05",
-      "name": "Dr. Priya Okonkwo-Singh",
+      "name": "プリヤ・オコンクォ=シン博士",
       "nameEn": "Dr. Priya Okonkwo-Singh",
       "role": "YouTube Specialist",
       "department": "research",
@@ -309,6 +359,7 @@
     },
     {
       "id": "res-06",
+      "vacant": true,
       "name": "島田 悠斗",
       "nameEn": "Yuto Shimada",
       "role": "Data/Analytics Specialist",
@@ -323,9 +374,9 @@
     },
     {
       "id": "res-07",
-      "name": "マーカス Wei-Tanaka",
+      "name": "ウェイ=田中 マーカス",
       "nameEn": "Marcus Wei-Tanaka",
-      "role": "Poker Industry Economist",
+      "role": "Macro / Industry Intelligence",
       "department": "research",
       "layer": "L2",
       "zone": "research",
@@ -337,6 +388,7 @@
     },
     {
       "id": "res-08",
+      "vacant": true,
       "name": "望月 綾音",
       "nameEn": "Ayane Mochizuki",
       "role": "SEO Specialist",
@@ -353,7 +405,7 @@
       "id": "res-09",
       "name": "藤沢 蓮",
       "nameEn": "Ren Fujisawa",
-      "role": "Structure Analyst",
+      "role": "Report Synthesis Specialist",
       "department": "research",
       "layer": "L3",
       "zone": "research",

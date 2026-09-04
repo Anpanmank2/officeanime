@@ -53,7 +53,7 @@ export function RequestResultPanel() {
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        zIndex: 60, // same layer as ResearchResultPanel (below DialogBox 65+)
+        zIndex: 60, // same layer as ResearchResultPanel
         width: 'min(560px, 78%)',
         maxHeight: '72%',
         display: 'flex',

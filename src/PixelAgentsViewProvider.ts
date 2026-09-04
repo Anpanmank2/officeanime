@@ -501,7 +501,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           submitTask(memberId, prompt, priority, workingDirectory);
         }
       } else if (message.type === 'jcOwnerDelegate') {
-        // JC: Owner delegation via DialogBox — write task_received + delegate events to jc-events.json
+        // JC: Owner delegation — write task_received + delegate events to jc-events.json
         const {
           memberId,
           memberName,

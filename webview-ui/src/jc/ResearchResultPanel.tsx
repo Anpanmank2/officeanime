@@ -56,7 +56,7 @@ export function ResearchResultPanel() {
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        zIndex: 60, // above CommandBoard/OfficeLog, below DialogBox(65+)
+        zIndex: 60, // above CommandBoard and OfficeLog
         width: 'min(560px, 78%)',
         maxHeight: '72%',
         display: 'flex',

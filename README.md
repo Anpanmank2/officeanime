@@ -2,7 +2,7 @@
 
 > Forked from [pablodelucca/pixel-agents](https://github.com/pablodelucca/pixel-agents) — a pixel art VS Code extension where AI agents become animated office characters.
 
-**JC Virtual Office** extends Pixel Agents with a full virtual company simulation. The roster is data-driven from `jc-config.json` — as of 2026-09-03 it holds 23 members across 3 departments (engineering 6 / marketing 7 / research 9, plus 1 exec-zone seat) and 3 exec seats (Owner, Secretary, PM). Members are visualized in a pixel art office with real-time state tracking driven by `jc-events.json` orchestration events.
+**JC Virtual Office** extends Pixel Agents with a full virtual company simulation. The roster is data-driven from `jc-config.json`; current membership totals and department breakdowns are derived from that file. Members are visualized in a pixel art office with real-time state tracking driven by `jc-events.json` orchestration events.
 
 ## What This Fork Adds
 
@@ -78,7 +78,7 @@ Coverage for composition, configuration, browser fallback, and development asset
 
 ### Per-Member Idle Emojis & Emotion System
 
-Every member has an idle emoji reflecting their persona (e.g. secretary: pen, research lead: bar chart, tech lead: eyes). The map is `MEMBER_IDLE_EMOJIS` in `jc-constants.ts` — 23 entries as of 2026-09-03. After 10s idle the member's signature emoji appears in a blink cycle (5s on / 3s off). Emotion emojis (celebration, frustration, focus fire) trigger on state transitions.
+Every member has an idle emoji reflecting their persona (e.g. secretary: pen, research lead: bar chart, tech lead: eyes). The map is `MEMBER_IDLE_EMOJIS` in `jc-constants.ts`, with entries maintained for the configured roster. After 10s idle the member's signature emoji appears in a blink cycle (5s on / 3s off). Emotion emojis (celebration, frustration, focus fire) trigger on state transitions.
 
 ### Department Zones & Neon Theming
 

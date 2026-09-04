@@ -373,6 +373,36 @@
         }
       ]
     },
+    "mkt-02": {
+      "base": { "part": "body_neutral", "color": { "h": 0, "s": 0, "b": 0, "c": 0 } },
+      "layers": [
+        { "slot": "bottom", "part": "pants_tailored", "color": { "h": -145, "s": 20, "b": -12, "c": 3 } },
+        { "slot": "top", "part": "hoodie_plain", "color": { "h": 105, "s": 38, "b": -5, "c": 2 } },
+        { "slot": "face", "part": "face_focused", "color": null },
+        { "slot": "hair", "part": "hair_bob_streak", "color": { "h": 12, "s": 12, "b": -18, "c": 4 } },
+        { "slot": "accessory", "part": "glasses_oversize", "color": null }
+      ]
+    },
+    "mkt-03": {
+      "base": { "part": "body_neutral", "color": { "h": -4, "s": -4, "b": -12, "c": 2 } },
+      "layers": [
+        { "slot": "bottom", "part": "pants_relaxed_sneakers", "color": { "h": 0, "s": 8, "b": -25, "c": 4 } },
+        { "slot": "top", "part": "shirt_rolled", "color": { "h": 12, "s": 30, "b": -5, "c": 3 } },
+        { "slot": "face", "part": "face_bright", "color": null },
+        { "slot": "hair", "part": "hair_wavy_gathered", "color": { "h": 8, "s": 38, "b": -2, "c": 3 } },
+        { "slot": "accessory", "part": "chest_pen", "color": null }
+      ]
+    },
+    "mkt-05": {
+      "base": { "part": "body_neutral", "color": { "h": 0, "s": 0, "b": 0, "c": 0 } },
+      "layers": [
+        { "slot": "bottom", "part": "pants_tailored", "color": { "h": 0, "s": 8, "b": -25, "c": 4 } },
+        { "slot": "top", "part": "jacket_field", "color": { "h": 36, "s": 40, "b": -5, "c": 3 } },
+        { "slot": "face", "part": "face_calm", "color": null },
+        { "slot": "hair", "part": "hair_business_sharp", "color": { "h": 12, "s": 12, "b": -18, "c": 4 } },
+        { "slot": "accessory", "part": "token_charm", "color": null }
+      ]
+    },
     "mkt-04": {
       "base": {
         "part": "body_neutral",

@@ -308,9 +308,13 @@ const avatarConfigs =
   avatarFile?.avatars && typeof avatarFile.avatars === 'object' ? avatarFile.avatars : {};
 const avatarIds = Object.keys(avatarConfigs);
 
+// QA側修正 2026-09-04: 名簿16名体制（空席10件は vacant:true で残す）に合わせ、稼働メンバー数で判定
+const activeRosterIds = Array.isArray(jcConfig?.members)
+  ? jcConfig.members.filter((member) => member?.vacant !== true).map((member) => member?.id)
+  : [];
 assert(
-  rosterIds.length === 23,
-  `jc-config.json contains exactly 23 members (got ${rosterIds.length})`,
+  activeRosterIds.length === 16,
+  `jc-config.json contains exactly 16 active members (got ${activeRosterIds.length})`,
 );
 assert(uniqueRosterIds.size === rosterIds.length, 'jc-config.json member IDs are unique');
 assert(avatarFile?.version === 1, 'default-avatars.json has version 1');
