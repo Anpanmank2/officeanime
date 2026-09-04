@@ -1,6 +1,8 @@
-# React + TypeScript + Vite
+# webview-ui (React + TypeScript + Vite)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The webview bundle for this extension. `npm run dev` starts the standalone browser mode (Vite dev server,
+default `http://localhost:5173`); `npm run build` produces the bundle the extension loads. Notes below are
+from the upstream Vite React-TS template and still apply.
 
 Currently, two official plugins are available:
 
