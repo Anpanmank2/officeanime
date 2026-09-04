@@ -46,6 +46,7 @@ import {
   startExternalSessionScanning,
   startStaleExternalAgentCheck,
 } from './fileWatcher.js';
+import { appendAnswer } from './jc/answers-writer.js';
 import type { BrowserServer } from './jc/browser-server.js';
 import { startBrowserServer } from './jc/browser-server.js';
 import type { CommandDispatcher } from './jc/command-dispatcher.js';
@@ -558,6 +559,58 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           const priorityNum = parseInt(priority.replace('P', ''), 10) || 3;
           submitTask(memberId, task, priorityNum);
           void memberName; // used in events above
+        }
+      } else if (message.type === 'jcApprovalAnswer') {
+        const {
+          request_id,
+          answer,
+          at: messageAt,
+          company_id,
+        } = message as {
+          request_id?: unknown;
+          answer?: unknown;
+          at?: unknown;
+          company_id?: unknown;
+        };
+        if (typeof request_id !== 'string' || !request_id || typeof answer !== 'string') {
+          return;
+        }
+
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!workspaceRoot) return;
+
+        const at =
+          typeof messageAt === 'string' && messageAt ? messageAt : new Date().toISOString();
+        const companyId = typeof company_id === 'string' ? company_id : '';
+        try {
+          appendAnswer(workspaceRoot, {
+            request_id,
+            answer,
+            at,
+            via: 'office',
+            company_id: companyId,
+          });
+
+          const eventsFile = path.join(workspaceRoot, 'jc-events.json');
+          let data: { version: number; events: unknown[] } = { version: 1, events: [] };
+          if (fs.existsSync(eventsFile)) {
+            data = JSON.parse(fs.readFileSync(eventsFile, 'utf-8')) as typeof data;
+          }
+          const approvalResolved = {
+            event: 'approval_resolved',
+            timestamp: at,
+            request_id,
+            answer,
+            at,
+            via: 'office' as const,
+          };
+          data.events.push(approvalResolved);
+          const tmp = eventsFile + '.tmp';
+          fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
+          fs.renameSync(tmp, eventsFile);
+          this.browserServer?.broadcast(approvalResolved);
+        } catch (e) {
+          console.error('[pixel-agents] jcApprovalAnswer write error:', e);
         }
       } else if (
         message.type === 'agent:instruct' ||

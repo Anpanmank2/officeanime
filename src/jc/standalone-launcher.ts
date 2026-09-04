@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
+import { appendAnswer } from './answers-writer.js';
 import { startBrowserServer } from './browser-server.js';
 import { createCommandDispatcher } from './command-dispatcher.js';
 import { EventWatcher } from './event-watcher.js';
@@ -1589,6 +1590,52 @@ async function main(): Promise<void> {
             },
           });
         }
+      }
+      return;
+    }
+
+    if (msg.type === 'jcApprovalAnswer') {
+      const d = data as {
+        request_id?: unknown;
+        answer?: unknown;
+        at?: unknown;
+        company_id?: unknown;
+      };
+      if (typeof d.request_id !== 'string' || !d.request_id || typeof d.answer !== 'string') {
+        return;
+      }
+
+      const workspaceRoot = path.dirname(ownerEventsFile);
+      const at = typeof d.at === 'string' && d.at ? d.at : new Date().toISOString();
+      const companyId = typeof d.company_id === 'string' ? d.company_id : '';
+      try {
+        appendAnswer(workspaceRoot, {
+          request_id: d.request_id,
+          answer: d.answer,
+          at,
+          via: 'office',
+          company_id: companyId,
+        });
+
+        let events: { version: number; events: unknown[] } = { version: 1, events: [] };
+        if (fs.existsSync(ownerEventsFile)) {
+          events = JSON.parse(fs.readFileSync(ownerEventsFile, 'utf-8')) as typeof events;
+        }
+        const approvalResolved = {
+          event: 'approval_resolved',
+          timestamp: at,
+          request_id: d.request_id,
+          answer: d.answer,
+          at,
+          via: 'office' as const,
+        };
+        events.events.push(approvalResolved);
+        const tmp = ownerEventsFile + '.tmp';
+        fs.writeFileSync(tmp, JSON.stringify(events, null, 2));
+        fs.renameSync(tmp, ownerEventsFile);
+        server.broadcast(approvalResolved);
+      } catch (e) {
+        console.error('[JC] jcApprovalAnswer write error:', e);
       }
       return;
     }
