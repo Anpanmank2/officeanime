@@ -314,6 +314,10 @@ export const OfficeEventType = {
   // 2026-07-04 R2: 秘書 1h ヒートビート痕跡 (from exec-sec)。「活動」には数えない
   // (店じまいタイマーをリセットしない) — 最終確認 HH:MM + 巡回リングの源。
   OFFICE_HEARTBEAT: 'office_heartbeat',
+  APPROVAL_REQUEST: 'approval_request',
+  APPROVAL_CANCEL: 'approval_cancel',
+  APPROVAL_EXPIRED: 'approval_expired',
+  APPROVAL_RESOLVED: 'approval_resolved',
 } as const;
 export type OfficeEventType = (typeof OfficeEventType)[keyof typeof OfficeEventType];
 
@@ -441,6 +445,43 @@ export interface OfficeHeartbeatEvent extends OfficeEventBase {
   message?: string; // 任意 (巡回メモ等)
 }
 
+export interface ApprovalOption {
+  key: string;
+  label: string;
+  recommended: boolean;
+}
+
+export interface ApprovalRequestEvent extends OfficeEventBase {
+  event: 'approval_request';
+  id: string;
+  company_id: string;
+  from: string;
+  title: string;
+  body_md: string;
+  options: ApprovalOption[];
+  irreversible: boolean;
+  expires: string;
+}
+
+export interface ApprovalCancelEvent extends OfficeEventBase {
+  event: 'approval_cancel';
+  request_id: string;
+}
+
+export interface ApprovalExpiredEvent extends OfficeEventBase {
+  event: 'approval_expired';
+  request_id: string;
+  at: string;
+}
+
+export interface ApprovalResolvedEvent extends OfficeEventBase {
+  event: 'approval_resolved';
+  request_id: string;
+  answer: string;
+  at: string;
+  via: 'office' | 'chat';
+}
+
 /** Union of all office events */
 export type OfficeEvent =
   | TaskReceivedEvent
@@ -455,7 +496,11 @@ export type OfficeEvent =
   | DelegateEvent
   | DelegationCompleteEvent
   | ProgressCheckEvent
-  | OfficeHeartbeatEvent;
+  | OfficeHeartbeatEvent
+  | ApprovalRequestEvent
+  | ApprovalCancelEvent
+  | ApprovalExpiredEvent
+  | ApprovalResolvedEvent;
 
 /** Office events file schema */
 export interface OfficeEventsFile {

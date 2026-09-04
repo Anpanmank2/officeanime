@@ -8,6 +8,7 @@ import type * as vscode from 'vscode';
 
 import { type AffinityResult, computeFit } from './affinity.js';
 import { scoreGain, TIER_GLYPH } from './affinity-constants.js';
+import { ApprovalState, parseApprovalEvent } from './approval-state.js';
 import { getDeskByMemberId } from './desk-registry.js';
 import { completionLine, reactionLine, thoughtLine } from './persona-lines.js';
 import type {
@@ -38,6 +39,8 @@ export class EventWatcher {
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private lastProcessedIndex = 0;
   private fsWatcher: fs.FSWatcher | null = null;
+  /** Approval requests are keyed by request id so queue replay remains idempotent. */
+  private approvals = new ApprovalState();
 
   // ── Slice1 game state (DEV-SPEC §5) ──
   /** Affinity per member, fixed at delegate time, held until task_completed. */
@@ -202,26 +205,43 @@ export class EventWatcher {
       return; // File might be mid-write
     }
 
-    if (!file.events || file.events.length <= this.lastProcessedIndex) return;
+    if (file.events && file.events.length > this.lastProcessedIndex) {
+      // Process new events
+      const newEvents = file.events.slice(this.lastProcessedIndex);
+      this.lastProcessedIndex = file.events.length;
 
-    // Process new events
-    const newEvents = file.events.slice(this.lastProcessedIndex);
-    this.lastProcessedIndex = file.events.length;
-
-    for (const event of newEvents) {
-      // ── R6 防御 (2026-07-03 差戻しv2): jc-events.json は複数 writer がいる。
-      // 1 つの malformed イベント (message 欠落等) がプロセスを殺さないよう
-      // per-event で隔離する。壊れたイベントは skip して次へ進む。
-      try {
-        this.handleEvent(event);
-      } catch (err) {
-        console.error('[JC-Events] handleEvent error — event skipped:', err);
+      for (const event of newEvents) {
+        // ── R6 防御 (2026-07-03 差戻しv2): jc-events.json は複数 writer がいる。
+        // 1 つの malformed イベント (message 欠落等) がプロセスを殺さないよう
+        // per-event で隔離する。壊れたイベントは skip して次へ進む。
+        try {
+          this.handleEvent(event);
+        } catch (err) {
+          console.error('[JC-Events] handleEvent error — event skipped:', err);
+        }
       }
+    }
+
+    // Poll-based expiry deliberately also runs when no queue row arrived.
+    for (const expired of this.approvals.expireDue()) {
+      this.emitEvent(expired);
+      this.handleEvent(expired);
     }
   }
 
   private handleEvent(event: OfficeEvent): void {
     if (!this.webview) return;
+
+    // Approval rows have a stricter runtime schema than the legacy event family.
+    // A malformed row is ignored without interrupting later events in the queue.
+    if (typeof event.event === 'string' && event.event.startsWith('approval_')) {
+      const approval = parseApprovalEvent(event);
+      if (!approval) {
+        console.warn('[JC-Events] malformed approval event skipped');
+        return;
+      }
+      this.approvals.apply(approval);
+    }
 
     // ── 部署カルテ (2026-07-03 藤井 §3): 生イベントを webview の karte store へ
     // 逐次 push する。演出メッセージと違い、集計用の履歴なので全種別を転送。

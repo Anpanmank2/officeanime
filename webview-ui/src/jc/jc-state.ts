@@ -29,6 +29,94 @@ let jcConfig: JCConfigData | null = null;
 const memberRuntimes = new Map<string, JCMemberRuntime>();
 const agentToMember = new Map<number, string>();
 
+export interface ApprovalOption {
+  key: string;
+  label: string;
+  recommended: boolean;
+}
+
+export interface ApprovalRequest {
+  id: string;
+  company_id: string;
+  from: string;
+  title: string;
+  body_md: string;
+  options: ApprovalOption[];
+  irreversible: boolean;
+  expires: string;
+}
+
+type ApprovalQueueEvent =
+  | ({ event: 'approval_request'; timestamp: string } & ApprovalRequest)
+  | { event: 'approval_cancel' | 'approval_expired'; request_id: string; at?: string }
+  | {
+      event: 'approval_resolved';
+      request_id: string;
+      answer: string;
+      at: string;
+      via: 'office' | 'chat';
+    };
+
+const approvals = new Map<string, ApprovalRequest>();
+const approvalListeners = new Set<() => void>();
+
+function isApprovalQueueEvent(value: unknown): value is ApprovalQueueEvent {
+  if (typeof value !== 'object' || value === null) return false;
+  const event = (value as { event?: unknown }).event;
+  return (
+    event === 'approval_request' ||
+    event === 'approval_cancel' ||
+    event === 'approval_expired' ||
+    event === 'approval_resolved'
+  );
+}
+
+function notifyApprovals(): void {
+  for (const listener of approvalListeners) listener();
+}
+
+/** Apply queue events idempotently; repeated requests overwrite their existing row. */
+export function jcApplyApprovalEvent(event: ApprovalQueueEvent): void {
+  if (event.event === 'approval_request') approvals.set(event.id, event);
+  else approvals.delete(event.request_id);
+  notifyApprovals();
+}
+
+/** Pending approval requests, excluding any whose expiry has passed. */
+export function jcGetApprovalRequests(now = Date.now()): ApprovalRequest[] {
+  let changed = false;
+  for (const [id, request] of approvals) {
+    if (Date.parse(request.expires) <= now) {
+      approvals.delete(id);
+      changed = true;
+    }
+  }
+  if (changed) notifyApprovals();
+  return [...approvals.values()];
+}
+
+export function subscribeApprovals(listener: () => void): () => void {
+  approvalListeners.add(listener);
+  return () => approvalListeners.delete(listener);
+}
+
+// Approval events are already forwarded by EventWatcher as jcOfficeEvent. The
+// history messages make pending requests recover after a webview reload.
+if (typeof window !== 'undefined') {
+  window.addEventListener(
+    'message',
+    (message: MessageEvent<{ type?: string; event?: unknown; events?: unknown }>) => {
+      if (message.data?.type === 'jcOfficeEvent' || message.data?.type === 'jcHistoryEvent') {
+        if (isApprovalQueueEvent(message.data.event)) jcApplyApprovalEvent(message.data.event);
+      } else if (message.data?.type === 'jcEventHistory' && Array.isArray(message.data.events)) {
+        for (const event of message.data.events) {
+          if (isApprovalQueueEvent(event)) jcApplyApprovalEvent(event);
+        }
+      }
+    },
+  );
+}
+
 /** Entrance tile (spawn/despawn point) */
 export const JC_ENTRANCE = { col: 12, row: 6 };
 

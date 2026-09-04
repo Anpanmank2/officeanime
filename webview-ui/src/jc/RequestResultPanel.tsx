@@ -13,7 +13,14 @@
 
 import { useEffect, useState } from 'react';
 
+import { vscode } from '../vscodeApi.js';
 import { DEPT_COLORS, DEPT_LABELS } from './jc-constants.js';
+import {
+  type ApprovalRequest,
+  jcApplyApprovalEvent,
+  jcGetApprovalRequests,
+  subscribeApprovals,
+} from './jc-state.js';
 import {
   clearRequestResult,
   getRequestResult,
@@ -28,6 +35,125 @@ const STATUS_TITLE: Record<string, string> = {
   blocked: '実行していません',
 };
 
+function ApprovalList() {
+  const [requests, setRequests] = useState<ApprovalRequest[]>(jcGetApprovalRequests);
+  const [selected, setSelected] = useState<{ request: ApprovalRequest; answer: string } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    const update = () => setRequests(jcGetApprovalRequests());
+    update();
+    return subscribeApprovals(update);
+  }, []);
+
+  const resolve = (request: ApprovalRequest, answer: string) => {
+    const at = new Date().toISOString();
+    // The extension owns filesystem access. It appends the answer and emits this
+    // normalized event back through jc-events; apply locally for responsive UI.
+    vscode.postMessage({
+      type: 'jcApprovalAnswer',
+      request_id: request.id,
+      answer,
+      at,
+      via: 'office',
+      company_id: request.company_id,
+    });
+    jcApplyApprovalEvent({
+      event: 'approval_resolved',
+      request_id: request.id,
+      answer,
+      at,
+      via: 'office',
+    });
+    setSelected(null);
+  };
+
+  if (requests.length === 0) return null;
+
+  return (
+    <div
+      data-approval-list
+      style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 60,
+        width: 'min(560px, 78%)',
+        maxHeight: '72%',
+        overflowY: 'auto',
+        background: 'var(--pixel-bg)',
+        color: 'var(--pixel-text)',
+        border: '2px solid #E4C36E',
+        boxShadow: '2px 2px 0 #0a0a14',
+        padding: 12,
+      }}
+    >
+      <div style={{ color: '#E4C36E', fontWeight: 'bold', marginBottom: 10 }}>
+        承認まち {requests.length}件
+      </div>
+      {requests.map((request) => {
+        const confirmation = selected?.request.id === request.id;
+        return (
+          <div
+            key={request.id}
+            data-approval-request={request.id}
+            style={{ borderTop: '1px solid var(--pixel-border)', padding: '10px 0' }}
+          >
+            <div style={{ color: '#fff', fontWeight: 'bold' }}>{request.title}</div>
+            <div
+              style={{
+                color: 'var(--pixel-text-dim)',
+                fontSize: 12,
+                whiteSpace: 'pre-wrap',
+                margin: '5px 0 8px',
+              }}
+            >
+              {request.body_md}
+            </div>
+            {confirmation ? (
+              <div
+                data-approval-confirmation
+                style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+              >
+                <span style={{ color: '#ffcf5c', fontSize: 12 }}>
+                  この操作は取り消せません。確定しますか？
+                </span>
+                <button onClick={() => resolve(request, selected?.answer ?? '')}>確定</button>
+                <button onClick={() => setSelected(null)}>戻る</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {request.options.map((option) => (
+                  <button
+                    key={option.key}
+                    data-approval-option={option.key}
+                    onClick={() =>
+                      request.irreversible
+                        ? setSelected({ request, answer: option.key })
+                        : resolve(request, option.key)
+                    }
+                    style={{
+                      border: `1px solid ${option.recommended ? '#39ff14' : 'var(--pixel-border)'}`,
+                      background: '#111',
+                      color: '#fff',
+                      padding: '4px 8px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function RequestResultPanel() {
   const [result, setResult] = useState<RequestResult | null>(getRequestResult);
 
@@ -37,7 +163,9 @@ export function RequestResultPanel() {
     return subscribeRequestResult(update);
   }, []);
 
-  if (!result) return null;
+  // This existing panel is reused for approval requests when the queue is non-empty.
+  // Keeping the former result panel intact preserves its existing behavior otherwise.
+  if (!result) return <ApprovalList />;
 
   const accent = DEPT_COLORS[result.department] ?? '#00e676';
   const deptLabel = DEPT_LABELS[result.department] ?? result.department.toUpperCase();

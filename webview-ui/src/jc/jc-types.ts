@@ -281,5 +281,9 @@ export const OfficeEventType = {
   REVIEW_COMPLETED: 'review_completed',
   TASK_COMPLETED: 'task_completed',
   AGENT_LEAVE: 'agent_leave',
+  APPROVAL_REQUEST: 'approval_request',
+  APPROVAL_CANCEL: 'approval_cancel',
+  APPROVAL_EXPIRED: 'approval_expired',
+  APPROVAL_RESOLVED: 'approval_resolved',
 } as const;
 export type OfficeEventType = (typeof OfficeEventType)[keyof typeof OfficeEventType];
