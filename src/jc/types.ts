@@ -141,8 +141,6 @@ export type JCMessageToWebview =
     }
   | { type: 'jcConfigLoaded'; config: JCConfig }
   | { type: 'jcMappingUpdate'; mappings: Record<number, string> }
-  | { type: 'jcAbsenceUpdate'; payload: AbsenceInfo }
-  | { type: 'jcAbsenceBulkSync'; payload: AbsenceInfo[] }
   | { type: 'jcTaskUpdate'; task: TaskDefinition }
   | { type: 'jcTasksBulkSync'; tasks: TaskDefinition[] }
   | { type: 'jcTaskHistory'; tasks: TaskDefinition[]; hasMore: boolean }
@@ -454,6 +452,7 @@ export interface ApprovalOption {
 }
 
 export interface ApprovalRequestEvent extends OfficeEventBase {
+  project?: string;
   event: 'approval_request';
   id: string;
   company_id: string;
@@ -524,18 +523,4 @@ export interface SpeechBubble {
   department: string;
   timestamp: number; // Date.now()
   duration: number; // ms (default 3000)
-}
-
-/** Absence tracking info for JC members without active agents */
-export interface AbsenceInfo {
-  memberId: string;
-  memberName: string;
-  role: string;
-  department: string;
-  status: 'active' | 'absent' | 'idle';
-  lastActivity: number; // Unix timestamp (ms)
-  lastTool?: string;
-  lastFile?: string;
-  sessionDuration?: number; // cumulative seconds today
-  absentSince?: number; // timestamp when absence started
 }

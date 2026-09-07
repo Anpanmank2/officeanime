@@ -5,7 +5,6 @@ import type * as vscode from 'vscode';
 
 import { readConfig } from '../configPersistence.js';
 import type { AgentState } from '../types.js';
-import { AbsenceTracker } from './absence-tracker.js';
 import { ActivitySummarizer } from './activity-summarizer.js';
 import {
   assignMapping,
@@ -54,9 +53,6 @@ const pendingArrivalData = new Map<
   { agentId: number; memberId: string; deskId: string; hueShift: number; palette: number }
 >();
 
-/** Absence tracker instance */
-let absenceTracker: AbsenceTracker | null = null;
-
 /** Task watcher instance */
 let taskWatcher: TaskWatcher | null = null;
 
@@ -77,7 +73,7 @@ let launchAgentFn:
 /** Initialize JC system. Call once from extension.ts activate(). */
 export function initJC(
   workspaceRoot: string,
-  agents?: Map<number, AgentState>,
+  _agents?: Map<number, AgentState>,
   extensionPath?: string,
 ): boolean {
   jcEnabled = isJCEnabled(workspaceRoot, extensionPath);
@@ -92,10 +88,6 @@ export function initJC(
   }
   workspaceRootPath = workspaceRoot;
   activitySummarizer = new ActivitySummarizer();
-  // Create absence tracker if agents map is provided
-  if (agents) {
-    absenceTracker = new AbsenceTracker(jcConfig, agents);
-  }
   console.log(
     `[JC] JC mode enabled: ${jcConfig.organization} (${jcConfig.members.length} members)`,
   );
@@ -118,7 +110,6 @@ export function restoreAgentMapping(agentId: number, memberId: string): boolean 
     return false;
   }
   assignMapping(agentId, memberId);
-  absenceTracker?.onAgentCreated(memberId);
   return true;
 }
 
@@ -143,7 +134,6 @@ export async function onAgentCreated(
 
   if (memberId) {
     assignMapping(agentId, memberId);
-    absenceTracker?.onAgentCreated(memberId);
 
     const desk = getDeskByMemberId(memberId);
     const member = jcConfig.members.find((m) => m.id === memberId);
@@ -177,7 +167,6 @@ export function onAgentRemoved(agentId: number, webview: vscode.Webview | undefi
   const memberId = removeMapping(agentId);
   if (memberId) {
     memberStates.set(memberId, 'leaving');
-    absenceTracker?.onAgentRemoved(memberId);
     clearMember(memberId);
     webview?.postMessage({ type: 'jcMemberLeaving', agentId, memberId });
     webview?.postMessage({ type: 'jcMappingUpdate', mappings: getAllMappings() });
@@ -218,7 +207,6 @@ export function onToolStart(
     pendingArrivalData.delete(memberId);
   }
 
-  absenceTracker?.onToolStart(agentId, toolName, toolName);
   memberLastActivity.set(memberId, Date.now());
 
   const newState = toolToJCState(toolName);
@@ -335,8 +323,6 @@ export function sendJCConfig(webview: vscode.Webview): void {
     }
   }
 
-  // Start absence tracker polling and send initial sync
-  absenceTracker?.start(webview);
   // Start task watcher
   if (!taskWatcher && jcConfig && launchAgentFn) {
     const config = readConfig();
@@ -465,8 +451,6 @@ function getAgentForMember(memberId: string): number | null {
 
 /** Clean up JC resources */
 export function disposeJC(): void {
-  absenceTracker?.dispose();
-  absenceTracker = null;
   taskWatcher?.dispose();
   taskWatcher = null;
   eventWatcher?.dispose();

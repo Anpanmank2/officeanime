@@ -49,9 +49,8 @@ for (const id of vacantIds) {
 }
 
 const root = new URL('../', import.meta.url);
-const [avatars, constants, desks, voices] = await Promise.all([
+const [avatars, desks, voices] = await Promise.all([
   readFile(new URL('webview-ui/public/assets/default-avatars.json', root), 'utf8').then(JSON.parse),
-  readFile(new URL('webview-ui/src/jc/jc-constants.ts', root), 'utf8'),
   readFile(new URL('src/jc/desk-registry.ts', root), 'utf8'),
   readFile(new URL('src/jc/persona-lines.ts', root), 'utf8'),
 ]);
@@ -63,12 +62,10 @@ for (const id of ['mkt-02', 'mkt-03', 'mkt-05']) {
   );
 }
 for (const id of expectedActiveIds) {
-  assert.match(constants, new RegExp(`'${id}'\\s*:`), `${id} must have an idle emoji`);
   assert.match(desks, new RegExp(`memberId: '${id}'`), `${id} must have an assigned desk`);
   assert.match(voices, new RegExp(`'${id}'\\s*:`), `${id} must have persona lines`);
 }
 for (const id of vacantIds) {
-  assert.doesNotMatch(constants, new RegExp(`'${id}'\\s*:`), `${id} must not have an idle emoji`);
   assert.match(
     desks,
     new RegExp(`memberId: 'vacant:${id}'`),
@@ -76,4 +73,4 @@ for (const id of vacantIds) {
   );
 }
 
-console.log('PASS: roster, avatars, emojis, desks, and persona lines match the 16-person roster');
+console.log('PASS: roster, avatars, desks, and persona lines match the 16-person roster');

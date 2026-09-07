@@ -10,11 +10,9 @@ import {
   gameStopGauge,
   type GameTier,
 } from '../jc/game-state.js';
-import type { AbsenceInfo, JCState, SpeechBubble, TaskDefinition } from '../jc/index.js';
+import type { JCState, SpeechBubble, TaskDefinition } from '../jc/index.js';
 import {
   JC_ENTRANCE,
-  jcAbsenceBulkSync,
-  jcAbsenceUpdate,
   jcActivitySummaryUpdate,
   jcAddSpeechBubble,
   jcGetBreakTarget,
@@ -37,7 +35,7 @@ import {
   jcUpdateMappings,
 } from '../jc/index.js';
 import { IDLE_TINT_STATES, MAIL_FLIGHT_MS, NON_WORKING_STATES } from '../jc/jc-constants.js';
-import { jcGetAllMembers } from '../jc/jc-state.js';
+import { jcGetAllMembers, jcGetApprovalDetails } from '../jc/jc-state.js';
 import {
   appendKarteEvent,
   bulkSetKarteEvents,
@@ -45,10 +43,6 @@ import {
   type KarteRawEvent,
 } from '../jc/karte-state.js';
 import { addLogEntry } from '../jc/office-log-state.js';
-import { addPlan, type PlanOrigin } from '../jc/plan-state.js';
-import { type ConfirmQuestion, setRequestQuestions } from '../jc/request-flow-state.js';
-import { type RequestResultStatus, setRequestResult } from '../jc/request-result-state.js';
-import { setResearchResult } from '../jc/research-result-state.js';
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import { setFloorSprites } from '../office/floorTiles.js';
@@ -69,6 +63,45 @@ import {
 } from '../office/types.js';
 import { setWallSprites } from '../office/wallTiles.js';
 import { vscode } from '../vscodeApi.js';
+
+const loggedApprovalEvents = new Set<string>();
+function logApprovalEvent(value: unknown): void {
+  if (!value || typeof value !== 'object') return;
+  const event = value as {
+    event?: string;
+    id?: string;
+    request_id?: string;
+    title?: string;
+    from?: string;
+    answer?: string;
+    timestamp?: string;
+    at?: string;
+  };
+  if (event.event !== 'approval_request' && event.event !== 'approval_resolved') return;
+  const id = event.event === 'approval_request' ? event.id : event.request_id;
+  if (!id) return;
+  const key = `${event.event}:${id}`;
+  if (loggedApprovalEvents.has(key)) return;
+  const details = jcGetApprovalDetails(id);
+  const from = event.from ?? details?.from ?? '';
+  const runtime = jcGetMemberRuntime(from);
+  const name = runtime?.config.name ?? from;
+  const title = event.title ?? details?.title ?? id;
+  const label =
+    details?.options.find((option) => option.key === event.answer)?.label ?? event.answer ?? '';
+  loggedApprovalEvents.add(key);
+  addLogEntry({
+    timestamp: Date.parse(event.timestamp ?? event.at ?? '') || Date.now(),
+    memberId: from,
+    memberName: name,
+    department: runtime?.config.department ?? 'exec',
+    type: 'approval',
+    summary:
+      event.event === 'approval_request'
+        ? `${name} から決裁の依頼: ${title}`
+        : `決裁: ${title} → ${label}`,
+  });
+}
 
 export interface SubagentCharacter {
   id: number;
@@ -310,20 +343,7 @@ export function useExtensionMessages(
         pendingAgents = [];
         // Process buffered JC member arrivals — place directly at desk
         for (const a of pendingJCArrivals) {
-          // 出社ログは不在→在席の遷移時のみ (P2-1 dedupe, live 経路と同一規約)
-          const bufWasPresent = jcGetMemberRuntime(a.memberId)?.isPresent === true;
           jcMemberArriving(a.memberId);
-          if (!bufWasPresent) {
-            const bufRt = jcGetMemberRuntime(a.memberId);
-            addLogEntry({
-              timestamp: Date.now(),
-              memberId: a.memberId,
-              memberName: bufRt?.config.name ?? a.memberId,
-              department: bufRt?.config.department ?? 'exec',
-              type: 'arrival',
-              summary: `${bufRt?.config.name ?? a.memberId} が出社しました`,
-            });
-          }
           // deskId → 実 seat uid (bench形式) を解決 — 自分の席に座らせる
           const bufSeatUid = resolveSeatUid(os, a.deskId) ?? a.deskId;
           const existing = os.characters.get(a.agentId);
@@ -737,25 +757,8 @@ export function useExtensionMessages(
         // deskId → 実 seat uid (bench形式) を解決 — member を自分の席に座らせる
         const seatUid = resolveSeatUid(os, deskId) ?? deskId;
 
-        // 出社spam根治 (2026-07-03 P2-1): jcMemberArriving は「presence を保証する」
-        // 冪等メッセージとして client-init / jc-events replay (再起動で lastProcessedIndex
-        // がリセット) / 再接続から同一メンバー宛に重複して届く。ログは不在→在席の
-        // 遷移時のみ記録する。jcMemberArriving() 自体は state 更新(+ e2e が assert する
-        // console.log)のため常に呼ぶ。
-        const arrWasPresent = jcGetMemberRuntime(memberId)?.isPresent === true;
+        // Preserve presence updates and arrival diagnostics.
         jcMemberArriving(memberId);
-        if (!arrWasPresent) {
-          // Log arrival (absent → present transition only)
-          const arrRt = jcGetMemberRuntime(memberId);
-          addLogEntry({
-            timestamp: Date.now(),
-            memberId,
-            memberName: arrRt?.config.name ?? memberId,
-            department: arrRt?.config.department ?? 'exec',
-            type: 'arrival',
-            summary: `${arrRt?.config.name ?? memberId} が出社しました`,
-          });
-        }
 
         // If character already exists (from agentCreated), reassign to correct seat
         const existing = os.characters.get(agentId);
@@ -817,21 +820,7 @@ export function useExtensionMessages(
       } else if (msg.type === 'jcMemberLeaving') {
         const agentId = msg.agentId as number;
         const memberId = msg.memberId as string;
-        // 退社も対称に dedupe: 在席中のみログ (replay された leave の重複を抑止)。
-        const depWasPresent = jcGetMemberRuntime(memberId)?.isPresent === true;
         jcMemberLeaving(memberId);
-        if (depWasPresent) {
-          // Log departure (present → leaving transition only)
-          const depRt = jcGetMemberRuntime(memberId);
-          addLogEntry({
-            timestamp: Date.now(),
-            memberId,
-            memberName: depRt?.config.name ?? memberId,
-            department: depRt?.config.department ?? 'exec',
-            type: 'departure',
-            summary: `${depRt?.config.name ?? memberId} が退社しました`,
-          });
-        }
 
         // Walk character to entrance, then despawn
         const ch = os.characters.get(agentId);
@@ -894,6 +883,7 @@ export function useExtensionMessages(
         const agentId = msg.agentId as number;
         const jcState = msg.jcState as JCState;
         const stateSince = msg.stateSince as number | undefined;
+        const previousState = jcGetMemberRuntime(msg.memberId)?.jcState;
         jcMemberStateChange(msg.memberId, jcState, stateSince);
         jcRecordActivity(msg.memberId as string);
 
@@ -907,13 +897,18 @@ export function useExtensionMessages(
         // Log state change (skip empty/undefined IDs → no "undefined: → coding" ghost row)
         const scMid = msg.memberId as string;
         const scRt = jcGetMemberRuntime(scMid);
-        if (scMid && scMid !== 'undefined') {
+        if (
+          scMid &&
+          scMid !== 'undefined' &&
+          previousState !== jcState &&
+          (jcState === 'error' || jcState === 'handoff')
+        ) {
           addLogEntry({
             timestamp: Date.now(),
             memberId: scMid,
             memberName: scRt?.config.name ?? scMid,
             department: scRt?.config.department ?? 'exec',
-            type: 'state_change',
+            type: 'warning',
             summary: `${scRt?.config.name ?? scMid}: → ${jcState}`,
           });
         }
@@ -999,10 +994,6 @@ export function useExtensionMessages(
         // Persist fresh mappings immediately once the complete layout roster is
         // present. Before first layout, its normal reconciliation save handles it.
         if (layoutReadyRef.current && appliedToCharacter) saveAgentSeats(os);
-      } else if (msg.type === 'jcAbsenceUpdate') {
-        jcAbsenceUpdate(msg.payload as AbsenceInfo);
-      } else if (msg.type === 'jcAbsenceBulkSync') {
-        jcAbsenceBulkSync(msg.payload as AbsenceInfo[]);
       } else if (msg.type === 'jcTaskUpdate') {
         jcTaskUpdate(msg.task as TaskDefinition);
         // Log task status changes
@@ -1014,101 +1005,10 @@ export function useExtensionMessages(
             memberId: task.assignee,
             memberName: rt?.config.name ?? task.assignee,
             department: rt?.config.department ?? 'exec',
-            type: 'task_event',
+            type: task.status === 'done' ? 'result' : 'warning',
             summary: `Task ${task.status}: ${task.prompt.slice(0, 60)}${task.result ? ' → ' + task.result.slice(0, 80) : ''}`,
           });
-          // Research completed → surface findings prominently in the office.
-          // Display-layer only: reuse the existing return path (task.result).
-          // Only research (not write-type cards) pops the 調査結果 panel.
-          if (task.label === 'research' && task.status === 'done' && task.result) {
-            const rrt = jcGetMemberRuntime(task.assignee);
-            setResearchResult({
-              id: task.id,
-              memberId: task.assignee,
-              memberName: rrt?.config.name ?? task.assignee,
-              department: rrt?.config.department ?? 'research',
-              subject: task.prompt,
-              findings: task.result,
-            });
-          }
         }
-      } else if (msg.type === 'jcPlanReady') {
-        // Step2 Fork B: a read-only plan spawn finished → add a card to the
-        // 承認まち tray. Display/intent only — the Owner's 〇/✕/✎ decision posts
-        // jcPlanDecision back to the extension, which is the ONLY place the
-        // scoped-write execute spawn fires.
-        const p = msg as {
-          planId: string;
-          memberId: string;
-          department: string;
-          origin: string;
-          task: string;
-          plan: string;
-          stagingDir: string;
-        };
-        const prt = jcGetMemberRuntime(p.memberId);
-        addPlan({
-          id: p.planId,
-          memberId: p.memberId,
-          memberName: prt?.config.name ?? p.memberId,
-          department: prt?.config.department ?? p.department ?? 'engineering',
-          origin: (p.origin === 'permitted' ? 'permitted' : 'requested') as PlanOrigin,
-          task: p.task,
-          plan: p.plan,
-          stagingDir: p.stagingDir,
-          status: 'awaiting',
-        });
-      } else if (msg.type === 'jcRequestQuestions') {
-        // 依頼(request) flow STEP 3: the read-only confirm-questions spawn
-        // finished → switch the request panel to the はい/いいえ loop. Display
-        // only; the Owner's はい answers post jcRequestConfirmed back to the
-        // extension, which runs the EXISTING research active path (no regression).
-        const rq = msg as {
-          requestId: string;
-          questions: Array<{
-            understanding: string;
-            question: string;
-            options?: string[];
-            field_ref: string;
-          }>;
-        };
-        const questions: ConfirmQuestion[] = (rq.questions ?? []).map((q) => ({
-          understanding: q.understanding,
-          question: q.question,
-          options: Array.isArray(q.options) ? q.options : [],
-          fieldRef: q.field_ref,
-        }));
-        setRequestQuestions(rq.requestId, questions);
-      } else if (msg.type === 'jcRequestResult') {
-        // 依頼(request) write型 (資料 doc / 実装 impl) の終端: scoped execute
-        // spawn の完了 (done/error) または明示ゲート通知 (disabled = --jc-live-spawn
-        // OFF / blocked = plan未確認)。下書きパス+ファイル+要約をパネルに出す。
-        // Display only — research の 調査結果 パスとは別 store (research-result-
-        // state は触るな契約で無改変のまま)。
-        const rr = msg as {
-          requestId: string;
-          memberId: string;
-          department: string;
-          kind: string;
-          stagingDir: string;
-          status: string;
-          files?: string[];
-          summary?: string;
-        };
-        const rrRt = jcGetMemberRuntime(rr.memberId);
-        setRequestResult({
-          id: rr.requestId,
-          memberId: rr.memberId,
-          memberName: rrRt?.config.name ?? rr.memberId,
-          department: rrRt?.config.department ?? rr.department ?? 'engineering',
-          kind: rr.kind,
-          stagingDir: rr.stagingDir ?? '',
-          status: (['done', 'error', 'disabled', 'blocked'].includes(rr.status)
-            ? rr.status
-            : 'error') as RequestResultStatus,
-          files: Array.isArray(rr.files) ? rr.files.filter((f) => typeof f === 'string') : [],
-          summary: typeof rr.summary === 'string' ? rr.summary : '',
-        });
       } else if (msg.type === 'jcTasksBulkSync') {
         jcTasksBulkSync(msg.tasks as TaskDefinition[]);
       } else if (msg.type === 'jcActivitySummary') {
@@ -1118,31 +1018,8 @@ export function useExtensionMessages(
           type: string;
         };
         jcActivitySummaryUpdate(memberId, summary);
-        if (summary) {
-          const rt = jcGetMemberRuntime(memberId);
-          addLogEntry({
-            timestamp: Date.now(),
-            memberId,
-            memberName: rt?.config.name ?? memberId,
-            department: rt?.config.department ?? 'exec',
-            type: 'speech',
-            summary: `${rt?.config.name ?? memberId}: ${summary}`,
-          });
-        }
       } else if (msg.type === 'jcSpeechBubble') {
         jcAddSpeechBubble(msg.bubble as SpeechBubble);
-        const bubble = msg.bubble as SpeechBubble;
-        const rt = jcGetMemberRuntime(bubble.memberId);
-        // OFFICE LOG が全文の正 (P2-3): 吹き出し用に切り詰められた text ではなく
-        // fullText (あれば) を記録。吹き出し=短く / 文脈はログで、の一貫動線。
-        addLogEntry({
-          timestamp: Date.now(),
-          memberId: bubble.memberId,
-          memberName: rt?.config.name ?? bubble.memberId,
-          department: bubble.department ?? rt?.config.department ?? 'exec',
-          type: 'speech',
-          summary: `${rt?.config.name ?? bubble.memberId}: ${bubble.fullText ?? bubble.text}`,
-        });
       } else if (msg.type === 'jcFitBadge') {
         const m = msg as { memberId: string; tier: GameTier; fit: number; label: string };
         gameSetFitBadge(m.memberId, m.tier, m.fit, m.label);
@@ -1167,11 +1044,15 @@ export function useExtensionMessages(
         gameSetCompanyScore(m.total, m.delta, m.todayCount, m.memberName, m.tier);
         // Clear the finished member's gauge/badge shortly after completion.
         gameClearMember(m.memberId);
+      } else if (msg.type === 'jcOfficeEvent') {
+        logApprovalEvent(msg.event);
       } else if (msg.type === 'jcEventHistory') {
+        for (const event of msg.events ?? []) logApprovalEvent(event);
         // client-init の jc-events 全量 sync (実データ) → R1 稼働復元
         bulkSetKarteEvents((msg.events ?? []) as KarteRawEvent[]);
         reconcileWorkloadPresence();
       } else if (msg.type === 'jcHistoryEvent') {
+        logApprovalEvent(msg.event);
         // EventWatcher からの逐次 push (冪等 append)
         appendKarteEvent(msg.event as KarteRawEvent);
       } else if (msg.type === 'jcMailFly') {

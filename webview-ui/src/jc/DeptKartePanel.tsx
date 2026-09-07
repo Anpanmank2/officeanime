@@ -1,6 +1,6 @@
 // ── 部署カルテパネル v2 (2026-07-03 差戻しv2 / Owner確定 R3) ──────────
 // 部署ホワイトボードのクリックで開く。表示値は全て jc-events 実データ +
-// 依頼フロー/承認まちの live store — ダミー値なし。
+// 決裁の live store — ダミー値なし。
 // ① 稼働 (大きい数字・R1 統一定義 = 未完了しごと保有)
 // ② 詰まり・要対応 (承認待ち‼️ + 長時間停滞) — 上位に配置
 // ③ 依頼ごとの進行状況 (受付→確認→実行中→完了 の段階表示)
@@ -14,15 +14,19 @@ import {
   WORK_STALL_MS,
   ZONE_LABEL_TEXT,
 } from './jc-constants.js';
-import { jcGetAllMembers, jcGetMemberNames, subscribeMembers } from './jc-state.js';
+import {
+  jcGetAllMembers,
+  jcGetApprovalRequests,
+  jcGetMemberNames,
+  subscribeApprovals,
+  subscribeMembers,
+} from './jc-state.js';
 import {
   computeDeptOccupancy,
   computeOpenWork,
   type OpenWork,
   subscribeKarte,
 } from './karte-state.js';
-import { getPlans, type PlanCard, subscribePlans } from './plan-state.js';
-import { getRequestFlow, type RequestFlow, subscribeRequestFlow } from './request-flow-state.js';
 
 const PANEL_W = 340;
 
@@ -107,8 +111,7 @@ export function DeptKartePanel({ department, position, onClose }: DeptKartePanel
   const [openWork, setOpenWork] = useState<OpenWork[]>(() => computeOpenWork());
   const [occupancy, setOccupancy] = useState(() => computeDeptOccupancy()[department]);
   const [names, setNames] = useState(() => jcGetMemberNames());
-  const [flow, setFlow] = useState<RequestFlow | null>(() => getRequestFlow());
-  const [plans, setPlans] = useState<PlanCard[]>(() => [...getPlans()]);
+  const [approvals, setApprovals] = useState(jcGetApprovalRequests);
 
   useEffect(() => {
     const update = () => {
@@ -117,16 +120,10 @@ export function DeptKartePanel({ department, position, onClose }: DeptKartePanel
       setOpenWork(computeOpenWork(t));
       setOccupancy(computeDeptOccupancy(t)[department]);
       setNames(jcGetMemberNames());
-      setFlow(getRequestFlow());
-      setPlans([...getPlans()]);
+      setApprovals(jcGetApprovalRequests());
     };
     update();
-    const unsubs = [
-      subscribeKarte(update),
-      subscribeMembers(update),
-      subscribeRequestFlow(update),
-      subscribePlans(update),
-    ];
+    const unsubs = [subscribeKarte(update), subscribeMembers(update), subscribeApprovals(update)];
     // 経過時間表示のため 30s ごとに再計算
     const timer = setInterval(update, 30000);
     return () => {
@@ -147,15 +144,11 @@ export function DeptKartePanel({ department, position, onClose }: DeptKartePanel
   const deptOpen = openWork.filter((w) => deptMemberIds.has(w.memberId));
 
   // ── ② 詰まり・要対応 ──
-  // 承認待ち (Owner回答待ち): 依頼フロー confirming + plan承認まち
+  // 承認待ち (Owner回答待ち): 未解決の決裁依頼
   const approvalItems: Array<{ key: string; label: string; memberId: string }> = [];
-  if (flow && flow.phase === 'confirming' && deptMemberIds.has(flow.memberId)) {
-    const t = flow.template.overview || flow.template.purpose || '依頼のすり合わせ';
-    approvalItems.push({ key: `flow-${flow.id}`, label: t, memberId: flow.memberId });
-  }
-  for (const p of plans) {
-    if (p.status === 'awaiting' && deptMemberIds.has(p.memberId)) {
-      approvalItems.push({ key: `plan-${p.id}`, label: p.task, memberId: p.memberId });
+  for (const request of approvals) {
+    if (deptMemberIds.has(request.from)) {
+      approvalItems.push({ key: request.id, label: request.title, memberId: request.from });
     }
   }
   const stalledItems = deptOpen.filter((w) => w.stalled);
@@ -163,17 +156,6 @@ export function DeptKartePanel({ department, position, onClose }: DeptKartePanel
 
   // ── ③ 依頼ごとの進行状況 (未完了のみ — 完了はアーカイブへ) ──
   const progress: ProgressItem[] = [];
-  if (flow && deptMemberIds.has(flow.memberId)) {
-    // 依頼フロー中 (テンプレ入力/確認質問生成/Owner確認) = 「確認」段階
-    progress.push({
-      key: `flow-${flow.id}`,
-      task: flow.template.overview || flow.template.purpose || '依頼のすり合わせ',
-      memberId: flow.memberId,
-      since: null,
-      stage: 1,
-      stalled: false,
-    });
-  }
   for (const w of deptOpen) {
     progress.push({
       key: `${w.memberId}|${w.task}`,

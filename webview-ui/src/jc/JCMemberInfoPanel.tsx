@@ -12,8 +12,7 @@
 // 設計正本: .company/engineering/docs/2026-07-04-pixel-office-member-card-v2-profile-tabs-spec-fujii.md (§11 v2-AC-1〜14)
 //
 // 触るな境界 (無改変・import もしない): affinity*.ts / affinity-preview.ts / routing-target.ts /
-//   persona-lines.ts / ResearchResultPanel.tsx / research-result-state.ts。相性は gameGetMember
-//   (READ-ONLY getter) のみ。待機ぼやきは IDLE_MURMUR_LINES (jc-constants) のみ。
+//   persona-lines.ts。相性は gameGetMember (READ-ONLY getter) のみ。
 //   ★プロフィールの性格/思想 (persona) は config.persona (jc-config.json 手書き) 由来であって
 //    persona-lines.ts (待機ぼやき) ではない — 別系統 (混同禁止)。
 // 新規 postMessage channel 0 (タブは内部 useState)・新規 fs read 0 (persona は jcConfigLoaded 相乗り)。
@@ -33,7 +32,6 @@ import {
   DEPT_LABELS,
   EXPERIENCE_FLOOR,
   FOCUS_WORK_COUNT,
-  IDLE_MURMUR_LINES,
   IDLE_ZZZ_AFTER_MS,
   LAYER_EXPERIENCE,
   MOMENTUM_BAR_CAP,
@@ -48,6 +46,7 @@ import {
 } from './jc-constants.js';
 import {
   jcGetActivitySummary,
+  jcGetApprovalRequests,
   jcGetMemberForAgent,
   jcGetMemberRuntime,
   jcGetMemberTaskStatus,
@@ -60,8 +59,6 @@ import {
   karteEarliestAt,
 } from './karte-state.js';
 import { MemberPortrait } from './MemberPortrait.js';
-import { getPlans } from './plan-state.js';
-import { getRequestFlow } from './request-flow-state.js';
 
 // ── 素材トークン (spec §1 = v1 流用) ─────────────────────────────────────────
 const CARD_W = 320;
@@ -81,13 +78,6 @@ const STAT_EMPTY = '#33334a'; // 空セグメント
 const STAT_UNSET = '#2a2a3c'; // 専門性 未設定のグレー空バー (捏造値を埋めない)
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(v, hi));
-
-/** memberId から安定した murmur 行を引く (flicker 防止に hash 固定・時間で回さない)。 */
-function stableHash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
 
 function todayStartMs(now: number): number {
   const d = new Date(now);
@@ -263,12 +253,8 @@ export function JCMemberInfoPanel({
   const stalledCount = workload?.stalled.length ?? 0;
   const openCount = openWorks.length;
 
-  // 承認待ち (Owner 回答待ち): request flow(hidden/confirming) or plan(awaiting)。
-  const flow = getRequestFlow();
-  const flowApproval =
-    !!flow && flow.memberId === memberId && (flow.hidden || flow.phase === 'confirming');
-  const planApproval = getPlans().some((p) => p.status === 'awaiting' && p.memberId === memberId);
-  const isApproval = flowApproval || planApproval;
+  // 未解決の決裁依頼を同じ供給元から表示する。
+  const isApproval = jcGetApprovalRequests().some((request) => request.from === memberId);
 
   const isFocus = activeCount >= FOCUS_WORK_COUNT;
   const isWaiting = openCount === 0 && isPresent;
@@ -284,11 +270,6 @@ export function JCMemberInfoPanel({
     chip = { emoji: '⚠', label: '停滞', color: '#f59e0b' };
   else if (isZzz) chip = { emoji: '💤', label: '待機', color: '#8888aa' };
   else if (isWaiting) chip = { emoji: '', label: '待機', color: '#8888aa' };
-
-  // 待機ぼやき (IDLE_MURMUR_LINES のみ・persona-lines.ts 不可侵)。手空き時だけ小さく。
-  const murmur = isWaiting
-    ? IDLE_MURMUR_LINES[stableHash(memberId) % IDLE_MURMUR_LINES.length]
-    : null;
 
   // ── §5 ①統一のバグ修正: 現タスク headline を open work の実データから導く ──
   //   着手済を優先 → なければ最新受付 (受付のみが着手中を追い越さない)。
@@ -782,11 +763,6 @@ export function JCMemberInfoPanel({
                     : isWaiting
                       ? '手が空いています'
                       : '現在のしごとはありません'}
-                  {!isApproval && isWaiting && murmur && (
-                    <div style={{ fontSize: FS_SUB, color: '#7a7a92', marginTop: 3 }}>
-                      “{murmur}”
-                    </div>
-                  )}
                 </div>
               )}
 

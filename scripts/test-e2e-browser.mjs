@@ -227,343 +227,120 @@ async function run() {
       .find((l) => l.includes('Member arriving: eng-01'));
     assert(!!reArrive, 'eng-01 re-arrives from history (not 0/x) after reload');
 
-    // Test 7: Request-flow textarea keystroke regression (charloss guard)
-    // Regression for 2026-07-02: controlled textarea driven by a store whose
-    // notify is deferred via requestAnimationFrame dropped fast / IME input.
-    // The prior e2e never exercised typing, so it let the bug through. This
-    // test types with REAL keystrokes (fast ascii + Japanese) and asserts exact
-    // readback — a static screenshot / fill() would bypass onChange and hide it.
-    console.log('  [Test 7] Request-flow textarea keystroke (charloss guard)');
-    try {
-      const openBtn = page.locator('[data-request-open]').first();
-      if ((await openBtn.count()) === 0) {
-        assert(false, 'Request-flow open button present');
-      } else {
-        await openBtn.click();
-        await page.waitForTimeout(400);
-        const ta = page.locator('[data-request-flow] textarea').first();
-        await ta.waitFor({ timeout: 3000 });
-
-        // Fast ascii (no delay) — the exact case the bug dropped to 1 char.
-        const ASCII = 'fukuoka-hotel-123';
-        await ta.click();
-        await page.keyboard.type(ASCII);
-        await page.waitForTimeout(200);
-        const gotAscii = await ta.inputValue();
-        assert(gotAscii === ASCII, `Fast ascii keystroke exact (got "${gotAscii}")`);
-
-        // Clear (macOS Ctrl+A = move-to-line-start, so use platform select-all).
-        await ta.click();
-        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
-        await page.keyboard.press('Delete');
-        await page.waitForTimeout(150);
-
-        // Japanese bulk insert (IME-commit equivalent).
-        const JP = '福岡の提携ホテルを決める';
-        await ta.click();
-        await page.keyboard.insertText(JP);
-        await page.waitForTimeout(200);
-        const gotJp = await ta.inputValue();
-        assert(gotJp === JP, `Japanese IME-commit exact (got "${gotJp}")`);
-
-        // ── Test 8: adaptive multi-choice confirm + その他 inline charloss guard ──
-        // Drive the flow to the confirm phase by simulating the backend's
-        // jcRequestQuestions message (webview listens on window 'message'). The
-        // requestId is exposed via data-request-id so we can target this flow.
-        console.log('  [Test 8] Confirm multi-choice + その他 inline keystroke (charloss guard)');
-        const reqId = await page
-          .locator('[data-request-flow]')
-          .first()
-          .getAttribute('data-request-id');
-        assert(!!reqId, 'Request flow exposes data-request-id');
-        await page.evaluate((requestId) => {
-          window.postMessage(
-            {
-              type: 'jcRequestQuestions',
-              requestId,
-              memberId: 'res-01',
-              department: 'research',
-              questions: [
-                {
-                  understanding: '福岡の提携ホテルを決める判断材料を集めると理解しました。',
-                  question: 'この目的で合っていますか?',
-                  options: ['はい、この目的で合っています', 'いえ、別の目的です'],
-                  field_ref: 'purpose',
-                },
-                {
-                  understanding: '各ホテルの評価・立地・価格帯を知りたいと理解しました。',
-                  question: '重視する軸はどれですか?',
-                  options: ['評価と口コミ中心', '立地中心', '価格帯中心'],
-                  field_ref: 'wants',
-                },
-              ],
-            },
-            '*',
-          );
-        }, reqId);
-        await page.waitForTimeout(400);
-
-        // Options + その他 render.
-        const optCount = await page.locator('[data-request-option]').count();
-        assert(optCount >= 2, `Confirm shows 2〜4 option buttons (got ${optCount})`);
-        const otherBtn = page.locator('[data-request-other]').first();
-        assert((await otherBtn.count()) === 1, 'その他 button present');
-
-        // Open その他 → the inline textarea appears.
-        await otherBtn.click();
-        await page.waitForTimeout(200);
-        const otherTa = page.locator('[data-request-other-input]').first();
-        await otherTa.waitFor({ timeout: 3000 });
-
-        // Fast ascii keystroke into その他 inline input (the exact charloss case).
-        const OTHER_ASCII = 'location-over-price-42';
-        await otherTa.click();
-        await page.keyboard.type(OTHER_ASCII);
-        await page.waitForTimeout(200);
-        const gotOtherAscii = await otherTa.inputValue();
-        assert(
-          gotOtherAscii === OTHER_ASCII,
-          `その他 fast ascii keystroke exact (got "${gotOtherAscii}")`,
-        );
-
-        // Clear then Japanese IME-commit into その他 input.
-        await otherTa.click();
-        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
-        await page.keyboard.press('Delete');
-        await page.waitForTimeout(150);
-        const OTHER_JP = '目的は立地重視です';
-        await otherTa.click();
-        await page.keyboard.insertText(OTHER_JP);
-        await page.waitForTimeout(200);
-        const gotOtherJp = await otherTa.inputValue();
-        assert(gotOtherJp === OTHER_JP, `その他 Japanese IME-commit exact (got "${gotOtherJp}")`);
-      }
-    } catch (e) {
-      assert(false, `Request-flow keystroke test threw: ${e.message}`);
-    }
-
-    // ── Test 9: 依頼 4カード (2026-07-02 横展開) — cards render + dept templates ──
-    // The dock shows 4 request cards (research/market/doc/impl). Each opens the
-    // 3-field template with its OWN dept labels (問いかけ型).
-    console.log('  [Test 9] Request cards ×4 + dept-specific templates');
-    try {
-      // Close any flow left open by Test 7/8 (ESC-less: click ✕ if present).
-      const closeBtn = page.locator('[data-request-flow] button[title*="閉じる"]');
-      if ((await closeBtn.count()) > 0) {
-        await closeBtn.click();
-        await page.waitForTimeout(200);
-      }
-      const kinds = await page
-        .locator('[data-request-open]')
-        .evaluateAll((els) => els.map((el) => el.getAttribute('data-request-kind')));
-      assert(
-        kinds.length === 4 && ['research', 'market', 'doc', 'impl'].every((k) => kinds.includes(k)),
-        `4 request cards present (got ${JSON.stringify(kinds)})`,
-      );
-
-      // 資料(doc) card opens the Marketing write-template with its own labels.
-      await page.locator('[data-request-kind="doc"]').click();
-      await page.waitForTimeout(300);
-      const docPanel = page.locator('[data-request-flow][data-request-kind="doc"]');
-      assert((await docPanel.count()) === 1, '資料(doc) flow panel opens with kind attr');
-      const docText = await docPanel.innerText();
-      const docLabelsOk =
-        docText.includes('誰に見せる資料？') &&
-        docText.includes('何を伝えたい？') &&
-        docText.includes('どんな形にする？');
-      assert(docLabelsOk, '資料 template shows doc 3項目 labels');
-      await page.locator('[data-request-flow] button[title*="閉じる"]').click();
-      await page.waitForTimeout(200);
-
-      // 市場調査(market) card opens with the research-style (marketing例題) labels.
-      await page.locator('[data-request-kind="market"]').click();
-      await page.waitForTimeout(300);
-      const mkPanel = page.locator('[data-request-flow][data-request-kind="market"]');
-      const mkText = (await mkPanel.count()) > 0 ? await mkPanel.innerText() : '';
-      assert(
-        mkText.includes('何のために調べる？') && mkText.includes('どの範囲を調べる？'),
-        '市場調査 template shows market 3項目 labels',
-      );
-      await page.locator('[data-request-flow] button[title*="閉じる"]').click();
-      await page.waitForTimeout(200);
-    } catch (e) {
-      assert(false, `Request 4-cards test threw: ${e.message}`);
-    }
-
-    // ── Test 10: write型(実装) — 3欄 real-keystroke + plan確認(①②③+書き先) ──
-    // AC-F: every template field takes fast ascii (17) + Japanese without
-    // charloss. AC-C: the write confirm ends with the plan question (understanding
-    // carries ①②③ + 書き先 staging path) and 確定 posts jcRequestConfirmed.
-    console.log('  [Test 10] Write-kind (impl): 3-field keystroke + plan confirm');
-    try {
-      await page.locator('[data-request-kind="impl"]').click();
-      await page.waitForTimeout(300);
-      const implPanel = page.locator('[data-request-flow][data-request-kind="impl"]');
-      assert((await implPanel.count()) === 1, '実装(impl) flow panel opens');
-      const implText = await implPanel.innerText();
-      assert(
-        implText.includes('何を作る・直す？') &&
-          implText.includes('できたと言える条件は？') &&
-          implText.includes('対象はどこ？'),
-        '実装 template shows impl 3項目 labels',
-      );
-
-      // Real keystrokes into ALL 3 textareas (fast ascii 17 chars + JP commit).
-      const FAST = 'quick-impl-check1'; // 17 chars, no delay
-      const JPS = ['一覧画面を作って', '日付で絞り込める', '対象は画面まわり'];
-      const tas = page.locator('[data-request-flow] textarea');
-      const taCount = await tas.count();
-      assert(taCount === 3, `impl template has 3 textareas (got ${taCount})`);
-      for (let i = 0; i < 3; i++) {
-        const ta = tas.nth(i);
-        await ta.click();
-        await page.keyboard.type(FAST);
-        await page.waitForTimeout(150);
-        const gotFast = await ta.inputValue();
-        assert(gotFast === FAST, `field${i + 1} fast ascii exact (got "${gotFast}")`);
-        await ta.click();
-        await page.keyboard.press(process.platform === 'darwin' ? 'Meta+A' : 'Control+A');
-        await page.keyboard.press('Delete');
-        await page.waitForTimeout(100);
-        await ta.click();
-        await page.keyboard.insertText(JPS[i]);
-        await page.waitForTimeout(150);
-        const gotJp = await ta.inputValue();
-        assert(gotJp === JPS[i], `field${i + 1} Japanese IME-commit exact (got "${gotJp}")`);
-      }
-
-      // Drive to confirm phase with a WRITE-shape question set (output + plan).
-      const STAGING = '/tmp/e2e-staging/office-tasks/req-e2e';
-      const implReqId = await implPanel.getAttribute('data-request-id');
-      assert(!!implReqId, 'impl flow exposes data-request-id');
+    // Test 7: desk remains visible, initially collapsed even at zero.
+    console.log('  [Test 7] Empty desk');
+    const count = page.locator('[data-desk-docs-count]');
+    assert((await page.locator('[data-desk-docs]').count()) === 1, 'Desk exists');
+    assert((await count.textContent()) === '0', 'Empty desk count is zero');
+    assert((await page.locator('[data-approval-list]').count()) === 0, 'Desk starts collapsed');
+    const sendApproval = async (id, irreversible = false, project) => {
       await page.evaluate(
-        ({ requestId, staging }) => {
+        ({ id, irreversible, project }) =>
           window.postMessage(
             {
-              type: 'jcRequestQuestions',
-              requestId,
-              memberId: 'eng-01',
-              department: 'engineering',
-              questions: [
-                {
-                  understanding: 'アウトプットはコード一式+適用手順のドラフトと理解しました。',
-                  question: '形・完成条件はこれでよいですか?',
-                  options: ['はい、この形でお願いします', 'いえ、違う形にしたい'],
-                  field_ref: 'output',
-                },
-                {
-                  understanding: `こう作ります:\n① 依頼内容を整理\n② コード一式のドラフトを作成\n③ 適用手順をまとめる\n書き先: ${staging}`,
-                  question: 'この計画で進めてよいですか?',
-                  options: ['はい、この計画で進めてください'],
-                  field_ref: 'plan',
-                },
-              ],
+              type: 'jcOfficeEvent',
+              event: {
+                event: 'approval_request',
+                id,
+                company_id: 'acme',
+                from: 'eng-01',
+                timestamp: new Date().toISOString(),
+                title: 'Deploy?',
+                body_md: 'Review the draft.',
+                expires: new Date(Date.now() + 3600000).toISOString(),
+                irreversible,
+                ...(project ? { project } : {}),
+                options: [
+                  { key: 'yes', label: 'Yes', recommended: true },
+                  { key: 'no', label: 'No', recommended: false },
+                  { key: 'later', label: 'Later', recommended: false },
+                ],
+              },
             },
             '*',
-          );
+          ),
+        { id, irreversible, project },
+      );
+      await page.waitForTimeout(200);
+    };
+    console.log('  [Test 8] New document and recommendation');
+    await sendApproval('desk-e2e-1');
+    assert((await count.textContent()) === '1', 'New request increments badge');
+    assert(
+      (await page.locator('[data-approval-list]').count()) === 0,
+      'New request does not auto-open',
+    );
+    await page.locator('[data-desk-docs-label]').click();
+    assert((await page.locator('[data-approval-option]').count()) === 3, 'Three options');
+    assert((await page.locator('[data-approval-recommended]').count()) === 1, 'One recommendation');
+    assert(
+      (await page.locator('[data-desk-doc-project]').count()) === 0,
+      'No project tag when absent',
+    );
+    console.log('  [Test 9] Reversible one-click answer');
+    await page.locator('[data-approval-recommended]').click();
+    assert(
+      (await page.locator('[data-approval-confirmation]').count()) === 0,
+      'No confirmation for reversible answer',
+    );
+    assert((await count.textContent()) === '0', 'Answer removes document');
+    console.log('  [Test 10] Irreversible confirmation and back');
+    await sendApproval('desk-e2e-2', true);
+    await page.locator('[data-approval-recommended]').click();
+    const confirmation = page.locator('[data-approval-confirmation]');
+    assert((await confirmation.count()) === 1, 'Irreversible answer requires confirmation');
+    assert((await confirmation.innerText()).includes('Deploy?'), 'Confirmation repeats title');
+    assert((await count.textContent()) === '1', 'Unconfirmed document remains');
+    await confirmation.getByRole('button', { name: '戻る', exact: true }).click();
+    assert(
+      (await confirmation.count()) === 0 && (await count.textContent()) === '1',
+      'Back cancels confirmation only',
+    );
+    await page.locator('[data-approval-recommended]').click();
+    await confirmation.getByRole('button', { name: '確定', exact: true }).click();
+    assert((await count.textContent()) === '0', 'Confirmed document removed');
+    console.log('  [Test 11] Optional project and chat sync');
+    await sendApproval('desk-e2e-3', false, 'pixel-office');
+    assert(
+      (await page.locator('[data-desk-doc-project]').textContent()) === 'pixel-office',
+      'Project tag rendered',
+    );
+    await page.evaluate(() =>
+      window.postMessage(
+        {
+          type: 'jcOfficeEvent',
+          event: {
+            event: 'approval_resolved',
+            request_id: 'desk-e2e-3',
+            answer: 'yes',
+            at: new Date().toISOString(),
+            via: 'chat',
+          },
         },
-        { requestId: implReqId, staging: STAGING },
-      );
-      await page.waitForTimeout(400);
-
-      // Q1 = output spec question renders.
-      let confirmText = await implPanel.innerText();
-      assert(
-        confirmText.includes('形・完成条件はこれでよいですか?'),
-        'write confirm shows アウトプット仕様 question',
-      );
-      await page.locator('[data-request-option]').first().click();
-      await page.waitForTimeout(300);
-
-      // Q2 = plan confirm renders LAST with ①②③ + 書き先 staging path.
-      confirmText = await implPanel.innerText();
-      const planOk =
-        confirmText.includes('この計画で進めてよいですか?') &&
-        confirmText.includes('①') &&
-        confirmText.includes('書き先') &&
-        confirmText.includes(STAGING);
-      assert(planOk, 'plan confirm shows ①②③ + 書き先 staging path');
-
-      // その他 inline correction on the plan question (charloss-guarded input).
-      await page.locator('[data-request-other]').click();
-      await page.waitForTimeout(200);
-      const planOtherTa = page.locator('[data-request-other-input]').first();
-      await planOtherTa.waitFor({ timeout: 3000 });
-      const PLAN_FIX = 'readme-first-plan1'; // 17 chars fast
-      await planOtherTa.click();
-      await page.keyboard.type(PLAN_FIX);
-      await page.waitForTimeout(150);
-      const gotPlanFix = await planOtherTa.inputValue();
-      assert(gotPlanFix === PLAN_FIX, `plan その他 fast ascii exact (got "${gotPlanFix}")`);
-      await page.locator('[data-request-other-submit]').click();
-      await page.waitForTimeout(300);
-
-      // All questions answered → flow closes (jcRequestConfirmed posted).
-      const stillOpen = await page.locator('[data-request-flow]').count();
-      assert(stillOpen === 0, 'flow closes after plan 確定 (jcRequestConfirmed posted)');
-    } catch (e) {
-      assert(false, `Write-kind confirm test threw: ${e.message}`);
-    }
-
-    // ── Test 11: write型 result panel — 下書きパス + files + 要約 / gate notice ──
-    console.log('  [Test 11] Request result panel (write型: path + summary)');
-    try {
-      await page.evaluate(() => {
-        window.postMessage(
-          {
-            type: 'jcRequestResult',
-            requestId: 'req-e2e-result',
-            memberId: 'eng-01',
-            department: 'engineering',
-            kind: 'impl',
-            stagingDir: '/tmp/e2e-staging/office-tasks/req-e2e',
-            status: 'done',
-            files: ['patch/list-view.tsx', 'APPLY-STEPS.md'],
-            summary: '一覧画面のドラフト一式を作成しました。適用手順は APPLY-STEPS.md を参照。',
-          },
-          '*',
-        );
-      });
-      await page.waitForTimeout(400);
-      const rp = page.locator('[data-request-result]');
-      assert((await rp.count()) === 1, 'request result panel appears');
-      const rpText = await rp.innerText();
-      assert(
-        rpText.includes('/tmp/e2e-staging/office-tasks/req-e2e') &&
-          rpText.includes('APPLY-STEPS.md') &&
-          rpText.includes('ドラフト一式を作成しました'),
-        'result panel shows 書き先パス + files + 要約',
-      );
-      await rp.locator('button[title="閉じる"]').click();
-      await page.waitForTimeout(200);
-
-      // Gate notice (disabled = --jc-live-spawn OFF) renders the explicit message.
-      await page.evaluate(() => {
-        window.postMessage(
-          {
-            type: 'jcRequestResult',
-            requestId: 'req-e2e-disabled',
-            memberId: 'mkt-01',
-            department: 'marketing',
-            kind: 'doc',
-            stagingDir: '/tmp/e2e-staging/office-tasks/req-e2e-2',
-            status: 'disabled',
-            files: [],
-            summary:
-              '実行ゲート: サーバーが --jc-live-spawn フラグなしで起動しているため、実行していません。',
-          },
-          '*',
-        );
-      });
-      await page.waitForTimeout(400);
-      const rp2 = page.locator('[data-request-result][data-request-result-status="disabled"]');
-      assert((await rp2.count()) === 1, 'disabled gate notice panel appears');
-      const rp2Text = await rp2.innerText();
-      assert(rp2Text.includes('--jc-live-spawn'), 'gate notice mentions the flag explicitly');
-      await rp2.locator('button[title="閉じる"]').click();
-    } catch (e) {
-      assert(false, `Request result panel test threw: ${e.message}`);
-    }
+        '*',
+      ),
+    );
+    await page.waitForTimeout(200);
+    assert((await count.textContent()) === '0', 'Chat answer updates badge without reload');
+    const orphanWarnings = [];
+    const onOrphanConsole = (msg) => {
+      if (['warning', 'error'].includes(msg.type())) orphanWarnings.push(msg.text());
+    };
+    page.on('console', onOrphanConsole);
+    await page.evaluate(() => {
+      for (const type of [
+        'jcPlanReady',
+        'jcRequestQuestions',
+        'jcRequestResult',
+        'jcResearchResult',
+        'jcAbsenceUpdate',
+        'jcAbsenceBulkSync',
+      ])
+        window.postMessage({ type }, '*');
+    });
+    await page.waitForTimeout(200);
+    page.off('console', onOrphanConsole);
+    assert(orphanWarnings.length === 0, 'Orphan messages cause no console warning/error');
 
     // ── Test 12: 営業状態マシン (店じまい/営業中) — R1状態 + R2見た目 ──────────
     // AC-1: 全員idle + 2h無活動 → CLOSED (dim>0)。AC-2: 新イベントで OPEN に戻る

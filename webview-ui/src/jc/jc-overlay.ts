@@ -23,9 +23,6 @@ import {
   DEPT_LABELS,
   DEPT_NEON,
   FOCUS_WORK_COUNT,
-  IDLE_MURMUR_CYCLE_MS,
-  IDLE_MURMUR_LINES,
-  IDLE_MURMUR_ON_MS,
   IDLE_ZZZ_AFTER_MS,
   MAIL_FLIGHT_ARC_TILES,
   OCCUPANCY_CHIP_COLORS,
@@ -50,6 +47,7 @@ import {
   jcGetActiveLiaisons,
   jcGetActiveMailFlights,
   jcGetActivitySummary,
+  jcGetApprovalRequests,
   jcGetDashboardMembers,
   jcGetDeptColor,
   jcGetDeskPosition,
@@ -67,8 +65,6 @@ import type { JCBubbleType, JCState } from './jc-types.js';
 import { computeDeptOccupancy, computeMemberWorkloads } from './karte-state.js';
 import { officeHoursRenderState } from './office-hours-state.js';
 import { jcGetPet } from './pet-state.js';
-import { getPlans } from './plan-state.js';
-import { getRequestFlow } from './request-flow-state.js';
 
 // ── Rendering Constants (overlay-specific) ───────────────────────
 const NAMEPLATE_FONT = '7px "Press Start 2P", monospace';
@@ -1534,13 +1530,7 @@ function memberIdOfChar(ch: Character): string | undefined {
  * 表示 (‼️) とクリック導線 (App.handleClick) が同じ判定を共有する。
  */
 export function jcGetApprovalWaitMemberIds(): Set<string> {
-  const out = new Set<string>();
-  const flow = getRequestFlow();
-  if (flow && flow.phase === 'confirming') out.add(flow.memberId);
-  for (const p of getPlans()) {
-    if (p.status === 'awaiting') out.add(p.memberId);
-  }
-  return out;
+  return new Set(jcGetApprovalRequests().map((request) => request.from));
 }
 
 function renderMemberStatusIcons(
@@ -1553,7 +1543,6 @@ function renderMemberStatusIcons(
   const now = Date.now();
   const workloads = computeMemberWorkloads(now);
   const approvalWait = jcGetApprovalWaitMemberIds();
-  const liveBubbles = jcGetSpeechBubbles();
   // QC/実機検証フック: 各 member の状態アイコンとキャラ画面座標を毎フレーム公開
   // (描画には無関与 — playwright QC がクリック座標と表示状態を検証するために読む)
   const qcDebug: Array<{ memberId: string; icon: string; x: number; y: number }> = [];
@@ -1620,16 +1609,6 @@ function renderMemberStatusIcons(
       continue;
     }
     qcDebug.push({ memberId, icon: 'idle', x: anchorX, y: anchorY });
-    // ぼやきは周期表示。実セリフ (speech bubble) 表示中は譲る。
-    if (liveBubbles.some((b) => b.memberId === memberId)) continue;
-    const cycle = Math.floor(elapsed / IDLE_MURMUR_CYCLE_MS);
-    const phase = elapsed % IDLE_MURMUR_CYCLE_MS;
-    if (phase < IDLE_MURMUR_ON_MS) {
-      let hash = 0;
-      for (let i = 0; i < memberId.length; i++) hash = (hash * 31 + memberId.charCodeAt(i)) | 0;
-      const line = IDLE_MURMUR_LINES[Math.abs(hash + cycle) % IDLE_MURMUR_LINES.length];
-      renderMurmurBubble(ctx, line, anchorX, headY, zoom);
-    }
   }
 
   // QC hook 公開 (表示検証専用 — UI 挙動には無関与)。view = 現在のカメラ変換
@@ -1689,55 +1668,6 @@ function renderZzz(
   ctx.fillText('zzz', x + 1, y + bob + 1);
   ctx.fillStyle = '#9fb0c0';
   ctx.fillText('zzz', x, y + bob);
-  ctx.restore();
-}
-
-/** ③ 待機のぼやき吹き出し (「仕事がないなー…」等 — jc-constants の汎用文言) */
-function renderMurmurBubble(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  charX: number,
-  charYScreen: number,
-  zoom: number,
-): void {
-  ctx.save();
-  const FONT = zoom >= 3 ? '6px "Press Start 2P", monospace' : '7px monospace';
-  ctx.font = FONT;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-
-  const PADDING_X = 4 * zoom;
-  const PADDING_Y = 3 * zoom;
-  const OFFSET_Y = -36 * zoom; // 実セリフ (speech bubble) と同じ頭上帯 — 顔に被らない
-  const TAIL_SIZE = 3 * zoom;
-
-  const textW = ctx.measureText(text).width;
-  const textH = zoom >= 3 ? 6 : 7;
-  const bgX = charX - textW / 2 - PADDING_X;
-  const bgY = charYScreen + OFFSET_Y - textH - PADDING_Y;
-  const bgW = textW + PADDING_X * 2;
-  const bgH = textH + PADDING_Y * 2;
-
-  ctx.globalAlpha = 0.92;
-  // Shadow + dark bg + slate border (独白トーン: 部署色を使わない)
-  ctx.fillStyle = 'rgba(0,0,0,0.5)';
-  ctx.fillRect(bgX + 1, bgY + 1, bgW, bgH);
-  ctx.fillStyle = 'rgba(24, 27, 34, 0.92)';
-  ctx.fillRect(bgX, bgY, bgW, bgH);
-  ctx.strokeStyle = 'rgba(148, 163, 178, 0.55)';
-  ctx.lineWidth = Math.max(1, zoom * 0.4);
-  ctx.strokeRect(bgX, bgY, bgW, bgH);
-
-  // Tail
-  ctx.fillStyle = 'rgba(24, 27, 34, 0.92)';
-  ctx.beginPath();
-  ctx.moveTo(charX - TAIL_SIZE, bgY + bgH);
-  ctx.lineTo(charX, bgY + bgH + TAIL_SIZE);
-  ctx.lineTo(charX + TAIL_SIZE, bgY + bgH);
-  ctx.fill();
-
-  ctx.fillStyle = '#b8c2cc';
-  ctx.fillText(text, charX, charYScreen + OFFSET_Y);
   ctx.restore();
 }
 

@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { ConfidenceBadge } from './ConfidenceBadge.js';
-import { DEPT_COLORS, LOG_DEPT_FILTER_MAP, LOG_DEPT_FILTERS } from './jc-constants.js';
+import { LOG_DEPT_FILTER_MAP, LOG_DEPT_FILTERS } from './jc-constants.js';
 import type { OfficeLogEntry } from './jc-types.js';
 import { getLogEntries, subscribeLog } from './office-log-state.js';
 
@@ -14,7 +14,7 @@ function formatTime(ts: number): string {
 }
 
 function LogEntryRow({ entry }: { entry: OfficeLogEntry }) {
-  const dotColor = DEPT_COLORS[entry.department] ?? '#666';
+  const dotColor = { approval: '#E4C36E', result: '#39ff14', warning: '#ff3d3d' }[entry.type];
   return (
     <div style={{ padding: '4px 8px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
@@ -31,7 +31,7 @@ function LogEntryRow({ entry }: { entry: OfficeLogEntry }) {
           }}
         />
         <span style={{ fontSize: '14px', color: dotColor, fontWeight: 'bold' }}>
-          {entry.memberName}
+          {{ approval: '決裁', result: '成果', warning: '⚠' }[entry.type]} · {entry.memberName}
         </span>
         {entry.confidence && <ConfidenceBadge level={entry.confidence} />}
       </div>

@@ -55,12 +55,10 @@ Panels and UI (2026-09-03 snapshot — see the directory listing for the full se
 | `JCMemberInfoPanel.tsx` | Click-to-inspect member detail panel |
 | `DeptKartePanel.tsx` | Member card: profile-first tabs + status bars |
 | `CompanyActivationBoard.tsx` | Company-wide activation / workload board |
-| `DelegationDock.tsx` | Dock-based delegation: pick a target, dispatch a request |
-| `RequestFlowPanel.tsx` / `RequestResultPanel.tsx` / `ResearchResultPanel.tsx` | Request templates → confirmation gate → result / findings |
-| `ApprovalTray.tsx` | Approval gate for write-type plans |
+| `DeskDocsTray.tsx` | Always-visible pending approval badge and document decisions |
 | `PetStatusPanel.tsx` | Owner pet companion (egg → chick) status |
-| `OfficeLog.tsx` / `DelegationChain.tsx` / `AbsentStatusPopup.tsx` | Event log, delegation flow, absent tracking |
-| `ModeSwitcher.tsx` / `OwnerAvatar.tsx` | Mode switch + Owner avatar |
+| `OfficeLog.tsx` / `DelegationChain.tsx` | Approval / result / warning log and delegation flow |
+| `OwnerAvatar.tsx` | Owner avatar |
 
 ### Persona-Based Avatars (Paperdoll Composition)
 
@@ -76,9 +74,9 @@ Run `scripts/render-avatar-gallery.mts` to render a gallery through the loader a
 Run `scripts/capture-persona-office.mts` against a running standalone office to capture `artifacts/persona-characters/persona-office.png`.
 Coverage for composition, configuration, browser fallback, and development assets is in `webview-ui/test/avatarComposite.test.ts`, `webview-ui/test/avatarConfig.test.ts`, `webview-ui/test/browserMock-avatar-failsoft.test.ts`, and `webview-ui/test/dev-assets.test.ts`.
 
-### Per-Member Idle Emojis & Emotion System
+### Emotion System
 
-Every member has an idle emoji reflecting their persona (e.g. secretary: pen, research lead: bar chart, tech lead: eyes). The map is `MEMBER_IDLE_EMOJIS` in `jc-constants.ts`, with entries maintained for the configured roster. After 10s idle the member's signature emoji appears in a blink cycle (5s on / 3s off). Emotion emojis (celebration, frustration, focus fire) trigger on state transitions.
+Emotion emojis (celebration, frustration, focus fire) and active-work speech remain visible. Idle murmurs and signature idle emojis are removed.
 
 ### Department Zones & Neon Theming
 
@@ -88,9 +86,11 @@ The office layout is divided into zones — `entrance`, `exec`, `poker`, `break`
 
 Members have assigned desks with rendered nameplates. The roles in `PERMANENT_ROLES` (`jc-constants.ts` — 2026-09-03: Secretary and PM / Director) are permanent residents that never auto-depart on idle timeout.
 
-### Delegation Dock, Request Flow & Approval Gate
+### Desk Documents & Approvals
 
-Delegation is dock-driven: pick a member, choose a request template (research / documentation / implementation), confirm the derived plan, then run it. Read-only research runs surface findings in `ResearchResultPanel`; write-type plans stop at an approval gate (`ApprovalTray`) before any scoped write happens.
+Issue requests through chat. The upper-left `UNO の机` tray always shows the pending count, including zero, and starts collapsed. Open it to read each question, body, sender, remaining time and optional project tag. Recommended choices are marked in green. Reversible choices resolve in one click; irreversible choices repeat the question in a confirmation row with confirm/back buttons. Office answers use the existing `jcApprovalAnswer` route; chat answers remove documents without a reload.
+
+Office Log contains only approvals, completed results and warnings. The office retains its single default view, desk layout, vacant nameplates and Owner avatar.
 
 ### Member Card, Activation Board & Owner Pet
 
@@ -128,8 +128,10 @@ node scripts/test-state-machine.mjs          # FSM state transitions
 node scripts/test-jc-events.mjs              # Event type parsing + robustness
 npx tsx scripts/test-malformed-delegate.mts  # Malformed events must not kill the watcher
 npx tsx scripts/test-workload.mts            # Workload derivation (source of truth for chips/lighting/cards)
-node scripts/test-e2e-browser.mjs            # Playwright: browser launch, permanent residents appear
+node scripts/test-e2e-browser.mjs            # Playwright: residents, desk approvals, confirmation, optional project, chat sync
 ```
+
+Additional approval checks: `npx tsx scripts/test-desk-docs.mts`, `npx tsx scripts/test-approval-events.mts` and `npx tsx scripts/test-approval-answer-handler.mts`. Browser tests skipped because Playwright or the local server cannot start require verification on a browser-capable machine.
 
 ## Repository
 

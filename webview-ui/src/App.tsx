@@ -9,14 +9,12 @@ import { PULSE_ANIMATION_DURATION_SEC } from './constants.js';
 import { useEditorActions } from './hooks/useEditorActions.js';
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js';
 import { useExtensionMessages } from './hooks/useExtensionMessages.js';
-import { AbsentStatusPopup } from './jc/AbsentStatusPopup.js';
-import { ApprovalTray } from './jc/ApprovalTray.js';
 import { CompanyActivationBoard } from './jc/CompanyActivationBoard.js';
 import { CompletedArchivePanel } from './jc/CompletedArchivePanel.js';
 import { CompletionToast } from './jc/CompletionToast.js';
-import { DelegationDock } from './jc/DelegationDock.js';
 import { DeptKartePanel } from './jc/DeptKartePanel.js';
 import { DeskCard } from './jc/DeskCard.js';
+import { DeskDocsTray } from './jc/DeskDocsTray.js';
 import { gameGetCompanyScore, gameGetTodayCount, subscribeGame } from './jc/game-state.js';
 import {
   DEPT_COLORS,
@@ -35,10 +33,9 @@ import {
   jcSetOwnerAvatarState,
   subscribeOwnerAvatar,
 } from './jc/jc-state.js';
-import type { AbsenceInfo, OwnerAvatarState } from './jc/jc-types.js';
+import type { OwnerAvatarState } from './jc/jc-types.js';
 import { JCMemberInfoPanel } from './jc/JCMemberInfoPanel.js';
 import { subscribeKarte } from './jc/karte-state.js';
-import { ModeProvider } from './jc/ModeContext.js';
 import {
   officeHoursEvaluate,
   officeHoursGetLastHeartbeatAt,
@@ -51,11 +48,6 @@ import { OWNER_AGENT_ID } from './jc/owner-avatar-constants.js';
 import { OwnerAvatar } from './jc/OwnerAvatar.js';
 import { jcGetPet } from './jc/pet-state.js';
 import { PetStatusPanel } from './jc/PetStatusPanel.js';
-import { flashPlansForMember, getPlans } from './jc/plan-state.js';
-import { getRequestFlow, setRequestFlowHidden } from './jc/request-flow-state.js';
-import { RequestFlowPanel } from './jc/RequestFlowPanel.js';
-import { RequestResultPanel } from './jc/RequestResultPanel.js';
-import { ResearchResultPanel } from './jc/ResearchResultPanel.js';
 import { TaskHistoryPanel } from './jc/TaskHistoryPanel.js';
 import { OfficeCanvas } from './office/components/OfficeCanvas.js';
 import { ToolOverlay } from './office/components/ToolOverlay.js';
@@ -183,7 +175,6 @@ function EditActionBar({
 function selectTickerEntries() {
   return getLogEntries()
     .filter((e) => e.memberName && e.memberName !== 'undefined' && e.summary)
-    .filter((e) => e.type !== 'speech')
     .slice(-TICKER_MAX_ENTRIES)
     .reverse();
 }
@@ -487,19 +478,6 @@ function AppContent() {
     setIsTaskHistoryOpen((prev) => !prev);
   }, []);
 
-  // Absent desk popup state
-  const [absentPopup, setAbsentPopup] = useState<{
-    info: AbsenceInfo;
-    position: { x: number; y: number };
-  } | null>(null);
-
-  const handleAbsentDeskClick = useCallback(
-    (info: AbsenceInfo, screenPos: { x: number; y: number }) => {
-      setAbsentPopup({ info, position: screenPos });
-    },
-    [],
-  );
-
   // DeskCard state
   const [deskCard, setDeskCard] = useState<{
     memberId: string;
@@ -552,13 +530,6 @@ function AppContent() {
     [],
   );
 
-  const handleAbsentPopupClose = useCallback(() => setAbsentPopup(null), []);
-
-  const handleAbsentPopupLaunch = useCallback((memberId: string) => {
-    vscode.postMessage({ type: 'jcLaunchAgent', memberId });
-    setAbsentPopup(null);
-  }, []);
-
   useEffect(() => {
     setAlwaysShowOverlay(alwaysShowLabels);
   }, [alwaysShowLabels]);
@@ -595,23 +566,9 @@ function AppContent() {
     // Skip clicks on the owner avatar itself
     if (focusId === OWNER_AGENT_ID) return;
 
-    // R2 ‼️承認待ち導線: クリックしたキャラの member が Owner 回答待ちなら
-    // 該当の確認パネルへ誘導する。確認フロー自体の挙動は無改変 (導線のみ)。
     const ch = os.characters.get(focusId);
     const memberId = ch?.jcMemberId ?? jcGetMemberForAgent(focusId);
     if (memberId) console.log(`[JC-WV] char click: agent=${focusId} member=${memberId}`);
-    if (memberId) {
-      const flow = getRequestFlow();
-      if (flow && flow.memberId === memberId && flow.hidden) {
-        // 「あとで」でしまった依頼確認 (RequestFlowPanel の当該リクエスト) を再表示
-        setRequestFlowHidden(false);
-        return;
-      }
-      if (getPlans().some((p) => p.status === 'awaiting' && p.memberId === memberId)) {
-        // plan確認 (承認まちtray) — 該当カードを赤アウトラインで誘目
-        flashPlansForMember(memberId);
-      }
-    }
 
     vscode.postMessage({ type: 'focusAgent', id: focusId });
   }, []);
@@ -676,7 +633,6 @@ function AppContent() {
       <OfficeCanvas
         officeState={officeState}
         onClick={handleClick}
-        onAbsentDeskClick={handleAbsentDeskClick}
         onDeskCardOpen={handleDeskCardOpen}
         onDeptBoardClick={handleDeptBoardClick}
         onBookshelfClick={handleBookshelfClick}
@@ -707,25 +663,8 @@ function AppContent() {
       />
 
       {/* Slice1: completion toast "本日N件目! 🎉" (screen-space DOM) */}
+      <DeskDocsTray />
       <CompletionToast />
-
-      {/* Research findings panel: 調査完了 → prominent dismissible 調査結果 popup */}
-      <ResearchResultPanel />
-
-      {/* 依頼(write型) result panel: 資料/実装の下書き完成 → 書き先パス+要約 popup
-          (--jc-live-spawn OFF / plan未確認 の明示ゲート通知もここに出る) */}
-      <RequestResultPanel />
-
-      {/* PARKED (2026-07-02 Owner FB pivot): 〇✕✎ tray kept for FUTURE 許可制
-          (AI-initiated) source only; NOT used by the 依頼(request) flow. Renders
-          nothing unless a permitted-source plan appears. */}
-      <ApprovalTray />
-
-      {/* 依頼(request) flow: 「調査を依頼」→ 3項目テンプレ → はい/いいえ確認 → 実行 */}
-      <RequestFlowPanel />
-
-      {/* Slice1 T10: delegation dock (bottom) — pick a card, click a member */}
-      <DelegationDock />
 
       {/* ── Bottom Toolbar (Tasks + Settings + Owner summon) ── */}
       <BottomToolbar
@@ -874,15 +813,6 @@ function AppContent() {
         />
       )}
 
-      {absentPopup && (
-        <AbsentStatusPopup
-          info={absentPopup.info}
-          position={absentPopup.position}
-          onClose={handleAbsentPopupClose}
-          onLaunch={handleAbsentPopupLaunch}
-        />
-      )}
-
       {/* ── DeskCard (shown on desk tile click) ── */}
       {deskCard && (
         <DeskCard
@@ -932,11 +862,7 @@ function AppContent() {
 }
 
 function App() {
-  return (
-    <ModeProvider>
-      <AppContent />
-    </ModeProvider>
-  );
+  return <AppContent />;
 }
 
 export default App;

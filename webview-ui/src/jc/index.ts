@@ -40,10 +40,6 @@ export {
 } from './jc-state.js';
 export {
   JC_ENTRANCE,
-  jcAbsenceBulkSync,
-  jcAbsenceUpdate,
-  jcGetAbsenceInfo,
-  jcGetAbsentMemberAtDesk,
   jcGetBreakTarget,
   jcGetDeptStats,
   jcGetDeskPosition,
@@ -75,7 +71,6 @@ export {
 export { subscribeMembers, subscribeTasks } from './jc-state.js';
 export { jcGetOwnerAvatarState, jcSetOwnerAvatarState, subscribeOwnerAvatar } from './jc-state.js';
 export type {
-  AbsenceInfo,
   ConfidenceLevel,
   JCBubbleType,
   JCConfigData,
@@ -87,10 +82,6 @@ export type {
   TaskDefinition,
   TaskStatus,
 } from './jc-types.js';
-export type { ViewMode } from './mode-store.js';
-export { getViewMode, setViewMode, subscribeMode, useViewMode } from './mode-store.js';
-export { ModeProvider } from './ModeContext.js';
-export { ModeSwitcher } from './ModeSwitcher.js';
 export { subscribeLog } from './office-log-state.js';
 export { dismissOwner, OWNER_AGENT_ID, summonOwner } from './owner-avatar-constants.js';
 export { OwnerAvatar } from './OwnerAvatar.js';

@@ -8,20 +8,10 @@ import {
   ZOOM_MIN,
   ZOOM_SCROLL_THRESHOLD,
 } from '../../constants.js';
-import { dockConsumeCard, dockGetPickedCard } from '../../jc/dock-state.js';
-import { gameSetPreview, gameSetRoutePreview } from '../../jc/game-state.js';
 import { renderJCOverlay } from '../../jc/jc-overlay.js';
-import {
-  jcGetAbsentMemberAtDesk,
-  jcGetDeptBoardAtTile,
-  jcGetMemberAtDesk,
-  jcGetMemberRuntime,
-  jcIsBookshelfAtTile,
-} from '../../jc/jc-state.js';
-import type { AbsenceInfo } from '../../jc/jc-types.js';
+import { jcGetDeptBoardAtTile, jcGetMemberAtDesk, jcIsBookshelfAtTile } from '../../jc/jc-state.js';
 import { jcIsPetTile } from '../../jc/pet-state.js';
 import { isPinned } from '../../jc/pin-store.js';
-import { pickBestMember, resolveRoutingTarget } from '../../jc/routing-target.js';
 import { unlockAudio } from '../../notificationSound.js';
 import { vscode } from '../../vscodeApi.js';
 import { canPlaceFurniture, getWallPlacementRow } from '../editor/editorActions.js';
@@ -38,18 +28,9 @@ import { renderFrame } from '../engine/renderer.js';
 import { getCatalogEntry, isRotatable } from '../layout/furnitureCatalog.js';
 import { EditTool, TILE_SIZE } from '../types.js';
 
-/** Derive department from member ID prefix (fallback when runtime config absent). */
-function deptFromMemberId(id: string): string {
-  if (id.startsWith('eng-')) return 'engineering';
-  if (id.startsWith('mkt-')) return 'marketing';
-  if (id.startsWith('res-')) return 'research';
-  return 'exec';
-}
-
 interface OfficeCanvasProps {
   officeState: OfficeState;
   onClick: (agentId: number) => void;
-  onAbsentDeskClick?: (info: AbsenceInfo, screenPos: { x: number; y: number }) => void;
   onDeskCardOpen?: (memberId: string, screenPos: { x: number; y: number }) => void;
   /** 部署ホワイトボードクリック → 部署カルテ (2026-07-03 藤井 §3) */
   onDeptBoardClick?: (department: string, screenPos: { x: number; y: number }) => void;
@@ -79,7 +60,6 @@ interface OfficeCanvasProps {
 export function OfficeCanvas({
   officeState,
   onClick,
-  onAbsentDeskClick,
   onDeskCardOpen,
   onDeptBoardClick,
   onBookshelfClick,
@@ -517,29 +497,6 @@ export function OfficeCanvas({
       officeState.hoveredTile = tile;
       hoverTileRef.current = tile;
 
-      // ── Living-loop routing preview while a dock card is picked ──
-      // Hover a zone → show which target (秘書 / dept) will take it AND preview
-      // the ◎/△/✗ badge on the member the secretary/dept would auto-select.
-      const pickedCard = dockGetPickedCard();
-      if (pickedCard && tile) {
-        const target = resolveRoutingTarget(tile.col, tile.row);
-        if (target) {
-          const best = pickBestMember(pickedCard.task, target.scope);
-          gameSetRoutePreview({ label: target.label });
-          if (best) gameSetPreview(best.memberId, best.tier);
-          else gameSetPreview(null, null);
-          const canvas = canvasRef.current;
-          if (canvas) canvas.style.cursor = 'copy';
-          officeState.hoveredAgentId = hitId;
-          return;
-        }
-        gameSetPreview(null, null);
-        gameSetRoutePreview(null);
-      } else if (!pickedCard) {
-        gameSetPreview(null, null);
-        gameSetRoutePreview(null);
-      }
-
       const canvas = canvasRef.current;
       if (canvas) {
         let cursor = 'default';
@@ -751,42 +708,6 @@ export function OfficeCanvas({
     (e: React.MouseEvent) => {
       if (isEditMode) return; // handled by mouseDown/mouseUp
 
-      // ── Living-loop routing: delegate to SECRETARY or a DEPARTMENT ──
-      // Owner drops the picked card on the secretary desk (whole-company) or a
-      // department zone; the secretary/dept auto-selects the best-◎ member. The
-      // Owner never picks an individual — no need to remember who is who (§1).
-      const picked = dockGetPickedCard();
-      if (picked) {
-        const tile = screenToTile(e.clientX, e.clientY);
-        if (tile) {
-          const target = resolveRoutingTarget(tile.col, tile.row);
-          if (target) {
-            const best = pickBestMember(picked.task, target.scope);
-            if (best) {
-              const rt = jcGetMemberRuntime(best.memberId);
-              const department = rt?.config.department ?? deptFromMemberId(best.memberId);
-              vscode.postMessage({
-                type: 'jcOwnerDelegate',
-                memberId: best.memberId,
-                memberName: rt?.config.name ?? best.memberId,
-                department,
-                task: picked.task,
-                message: picked.task,
-                priority: `P${picked.priority}`,
-                deadline: null,
-                timestamp: new Date().toISOString(),
-                // via: how the Owner routed it (drives the secretary→member beam).
-                via: target.scope,
-              });
-              dockConsumeCard(picked.id);
-              gameSetRoutePreview(null);
-              return;
-            }
-          }
-        }
-        // Clicked outside any drop target with a card picked — keep the card.
-      }
-
       const pos = screenToWorld(e.clientX, e.clientY);
       if (!pos) return;
 
@@ -940,32 +861,6 @@ export function OfficeCanvas({
         }
       }
 
-      // Check if clicked on an absent member's desk area (JC mode)
-      if (onAbsentDeskClick) {
-        const tile = screenToTile(e.clientX, e.clientY);
-        if (tile) {
-          const absenceInfo = jcGetAbsentMemberAtDesk(tile.col, tile.row);
-          if (absenceInfo) {
-            // Convert tile position to screen position for popup placement
-            const el = containerRef.current;
-            if (el) {
-              const rect = el.getBoundingClientRect();
-              const dpr = window.devicePixelRatio || 1;
-              const canvasW = Math.round(rect.width * dpr);
-              const canvasH = Math.round(rect.height * dpr);
-              const layout = officeState.getLayout();
-              const mapW = layout.cols * TILE_SIZE * zoom;
-              const mapH = layout.rows * TILE_SIZE * zoom;
-              const deviceOffsetX = Math.floor((canvasW - mapW) / 2) + Math.round(panRef.current.x);
-              const deviceOffsetY = Math.floor((canvasH - mapH) / 2) + Math.round(panRef.current.y);
-              const screenX = (deviceOffsetX + (tile.col + 0.5) * TILE_SIZE * zoom) / dpr;
-              const screenY = (deviceOffsetY + tile.row * TILE_SIZE * zoom) / dpr;
-              onAbsentDeskClick(absenceInfo, { x: screenX, y: screenY });
-            }
-          }
-        }
-      }
-
       // DeskCard: any desk tile click opens the card (unless owner avatar mode active)
       if (onDeskCardOpen) {
         const tile = screenToTile(e.clientX, e.clientY);
@@ -994,7 +889,6 @@ export function OfficeCanvas({
     [
       officeState,
       onClick,
-      onAbsentDeskClick,
       onDeskCardOpen,
       onDeptBoardClick,
       onBookshelfClick,
@@ -1018,8 +912,6 @@ export function OfficeCanvas({
     officeState.hoveredAgentId = null;
     officeState.hoveredTile = null;
     hoverTileRef.current = null;
-    gameSetPreview(null, null); // clear affinity preview
-    gameSetRoutePreview(null); // clear routing-zone preview
   }, [officeState, editorState]);
 
   const handleContextMenu = useCallback(

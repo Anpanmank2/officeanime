@@ -144,41 +144,6 @@ export const BUBBLE_EMOJIS: Record<string, string> = {
   sleeping: '💤',
 };
 
-// ── Per-Member Idle Emojis ──────────────────────────────────────
-// Unique idle-habit emoji for each member, derived from persona idle癖.
-// Displayed when a member has been idle for IDLE_EMOJI_TRIGGER_MS.
-export const MEMBER_IDLE_EMOJIS: Record<string, string> = {
-  // ── Exec ──
-  'exec-sec': '🖊️', // TODOリスト整理 + ペン回し
-
-  // ── Engineering ──
-  'eng-01': '👀', // コードレビューを黙々と進める
-  'eng-04': '📝', // チームメンバーの様子を見回しながらメモ
-  'codex-01': '🤖', // 実装ジョブの状態を映すボット席
-
-  // ── Marketing ──
-  'mkt-01': '💹', // P/Lダッシュボードを眺めながら考え込む
-  'mkt-02': '🔬', // 仮説の抜けを系統立てて点検
-  'mkt-03': '🫶', // 相手の立場から言葉の受け取り方を考える
-  'mkt-04': '✍️', // 過去のA/Bテスト結果ファイルを見返す
-  'mkt-05': '🧭', // 施策の目的と受け手を静かに照合
-  'mkt-12': '📄', // テンプレートライブラリを整理
-
-  // ── Research ──
-  'res-01': '📊', // ダッシュボード数値を眺めながら仮説メモ
-  'res-02': '📱', // TweetDeckの複数カラムを高速スクロール — NOTE: same emoji as mkt-09 but different member
-  'res-03': '🎨', // ムードボードを整理しながら色彩パレット吟味 — NOTE: same emoji as eng-03
-  'res-04': '📲', // スマホでTikTokをスワイプしながらフック構造メモ
-  'res-05': '📖', // 学術論文を読みながらノートに要点
-  'res-07': '🃏', // Bloomberg端末風画面 + ポーカーチップを回す
-  'res-09': '🗂️', // 複数レポートを並べて構造マップ
-};
-
-// ── Idle Emoji Timing ───────────────────────────────────────────
-export const IDLE_EMOJI_TRIGGER_MS = 10_000; // 10s idle before showing member emoji
-export const IDLE_EMOJI_ON_MS = 5_000; // 5s display
-export const IDLE_EMOJI_OFF_MS = 3_000; // 3s hidden (blink cycle)
-
 // ── Task Status Colors (canvas overlay) ─────────────────────────
 export const TASK_STATUS_COLORS: Record<string, string> = {
   pending: '#ffbf00',
@@ -267,7 +232,7 @@ export const UI_TEXT = {
   companyBoardZeroLine1: '今日のしごとは これから！',
   // 制御改行 (\n + whiteSpace:pre-line 表示): 自然折返しだと「う」1字が孤立する。
   // トーンガイド「1文言 全角20字目安」に沿い 2行に分割 (10字 / 17字)。
-  companyBoardZeroLine2: '下の依頼ドックから、\n最初のおしごとを頼んでみましょう 📋',
+  companyBoardZeroLine2: '机の書類を決裁すると、\nここに今日の成果が積み上がります 📋', // 便1で依頼ドック削除（QA側修正）
   // 左下ボタン群
   ownerArrive: '出社する',
   ownerLeave: '退社する',
@@ -392,20 +357,6 @@ export const FOCUS_WORK_COUNT = 2;
 export const STATUS_APPROVAL_EMOJI = '‼️';
 /** 待機 (未完了0件・出社中) が5分続いたら zzz 表記 */
 export const IDLE_ZZZ_AFTER_MS = 5 * 60 * 1000;
-/** 待機中のぼやき (persona-lines とは別系統の汎用文言 — R2 Owner 指定)。
- *  ⚠ persona-lines.ts は触るな契約 — ぼやきは必ずここから引く。 */
-export const IDLE_MURMUR_LINES: readonly string[] = [
-  '仕事がないなー…',
-  '次のしごと、まだかな…',
-  'ひまだなあ…',
-  '何か手伝えることないかな',
-  'コーヒーでも いれようかな…',
-  'そろそろ出番のはず…',
-];
-/** ぼやきの表示サイクル: MURMUR_CYCLE_MS ごとに MURMUR_ON_MS だけ表示 */
-export const IDLE_MURMUR_CYCLE_MS = 18_000;
-export const IDLE_MURMUR_ON_MS = 6_000;
-
 // ── R5 ✉️メール演出 (依頼発行=委任の実イベント駆動) ─────────────────
 export const MAIL_FLIGHT_MS = 1_400; // 封筒の飛翔時間
 export const MAIL_FLIGHT_ARC_TILES = 2.2; // 弧の高さ (タイル数)

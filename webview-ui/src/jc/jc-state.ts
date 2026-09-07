@@ -11,7 +11,6 @@ import {
   STATE_COLORS,
 } from './jc-constants.js';
 import type {
-  AbsenceInfo,
   JCBubbleType,
   JCConfigData,
   JCMemberRuntime,
@@ -36,6 +35,7 @@ export interface ApprovalOption {
 }
 
 export interface ApprovalRequest {
+  project?: string;
   id: string;
   company_id: string;
   from: string;
@@ -58,6 +58,15 @@ type ApprovalQueueEvent =
     };
 
 const approvals = new Map<string, ApprovalRequest>();
+const resolvedApprovalCache = new Map<
+  string,
+  Pick<ApprovalRequest, 'title' | 'options' | 'from'>
+>();
+
+export function jcGetApprovalDetails(id: string) {
+  return approvals.get(id) ?? resolvedApprovalCache.get(id);
+}
+
 const approvalListeners = new Set<() => void>();
 
 function isApprovalQueueEvent(value: unknown): value is ApprovalQueueEvent {
@@ -78,7 +87,20 @@ function notifyApprovals(): void {
 /** Apply queue events idempotently; repeated requests overwrite their existing row. */
 export function jcApplyApprovalEvent(event: ApprovalQueueEvent): void {
   if (event.event === 'approval_request') approvals.set(event.id, event);
-  else approvals.delete(event.request_id);
+  else {
+    const request = approvals.get(event.request_id);
+    if (request && event.event === 'approval_resolved') {
+      resolvedApprovalCache.set(request.id, {
+        title: request.title,
+        options: request.options,
+        from: request.from,
+      });
+      if (resolvedApprovalCache.size > 50) {
+        resolvedApprovalCache.delete(resolvedApprovalCache.keys().next().value!);
+      }
+    }
+    approvals.delete(event.request_id);
+  }
   notifyApprovals();
 }
 
@@ -465,60 +487,6 @@ export function jcGetDeptBoardAtTile(col: number, row: number): string | null {
 /** Get member runtime by ID */
 export function jcGetMemberRuntime(memberId: string): JCMemberRuntime | undefined {
   return memberRuntimes.get(memberId);
-}
-
-/** Per-member absence info (from extension's AbsenceTracker) */
-const memberAbsenceInfo = new Map<string, AbsenceInfo>();
-
-/** Handle individual absence update */
-export function jcAbsenceUpdate(info: AbsenceInfo): void {
-  memberAbsenceInfo.set(info.memberId, info);
-  scheduleMemberNotify();
-}
-
-/** Handle bulk absence sync */
-export function jcAbsenceBulkSync(infos: AbsenceInfo[]): void {
-  memberAbsenceInfo.clear();
-  for (const info of infos) {
-    memberAbsenceInfo.set(info.memberId, info);
-  }
-  scheduleMemberNotify();
-}
-
-/** Get absence info for a member */
-export function jcGetAbsenceInfo(memberId: string): AbsenceInfo | undefined {
-  return memberAbsenceInfo.get(memberId);
-}
-
-/**
- * Check if a tile position corresponds to an absent member's desk.
- * Returns the member's absence info if found, or null.
- */
-export function jcGetAbsentMemberAtDesk(col: number, row: number): AbsenceInfo | null {
-  if (!jcConfig) return null;
-
-  // Check if this tile is within 1 tile of any desk position for an absent member
-  for (const [deskId, pos] of Object.entries(DESK_POSITIONS)) {
-    // Check if clicked tile is near this desk (seat position ± 1 tile)
-    if (Math.abs(pos.col - col) <= 1 && Math.abs(pos.row - row) <= 1) {
-      const member = jcConfig.members.find((m) => m.deskId === deskId);
-      if (!member) continue;
-      const runtime = memberRuntimes.get(member.id);
-      if (runtime && !runtime.isPresent) {
-        return (
-          memberAbsenceInfo.get(member.id) ?? {
-            memberId: member.id,
-            memberName: member.name,
-            role: member.role,
-            department: member.department,
-            status: 'absent',
-            lastActivity: 0,
-          }
-        );
-      }
-    }
-  }
-  return null;
 }
 
 /** Active department liaison effects */

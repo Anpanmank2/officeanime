@@ -149,20 +149,6 @@ export interface NameplateInfo {
   zone: ZoneType;
 }
 
-/** Absence tracking info for JC members without active agents */
-export interface AbsenceInfo {
-  memberId: string;
-  memberName: string;
-  role: string;
-  department: string;
-  status: 'active' | 'absent' | 'idle';
-  lastActivity: number;
-  lastTool?: string;
-  lastFile?: string;
-  sessionDuration?: number;
-  absentSince?: number;
-}
-
 /** Task status values */
 export const TaskStatus = {
   PENDING: 'pending',
@@ -220,7 +206,7 @@ export interface OfficeLogEntry {
   memberId: string;
   memberName: string;
   department: string;
-  type: 'speech' | 'state_change' | 'task_event' | 'delegation' | 'arrival' | 'departure';
+  type: 'approval' | 'result' | 'warning';
   summary: string;
   stateColor?: string;
   confidence?: ConfidenceLevel;
