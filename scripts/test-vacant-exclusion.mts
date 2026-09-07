@@ -22,7 +22,7 @@ assert.match(
 );
 assert.match(
   source,
-  /cfg\.members\.filter\(\(m\)\s*=>\s*!m\.vacant\)\.map/,
+  /cfg\.members\s*\.filter\(\s*\(m\)\s*=>\s*!m\.vacant,?\s*\)\s*\.map/,
   'jcMembers initialization must exclude vacant members',
 );
 assert.match(

@@ -126,9 +126,23 @@ async function run() {
     // Persona avatars must travel through the real browser message path, not
     // merely exist on disk while the canvas silently uses legacy characters.
     const avatarPartsLog = logs.find((l) => l.includes('Received 41 avatar parts'));
-    const avatarConfigsLog = logs.find((l) => l.includes('Received 23 avatar configs'));
+    // QA側修正 2026-09-07: 名簿は default-avatars.json から導出（16名体制+空席10=26。固定値23は旧名簿）
+    const expectedAvatarCount = Object.keys(
+      JSON.parse(
+        readFileSync(
+          new URL('../webview-ui/public/assets/default-avatars.json', import.meta.url),
+          'utf-8',
+        ),
+      ).avatars,
+    ).length;
+    const avatarConfigsLog = logs.find((l) =>
+      l.includes(`Received ${expectedAvatarCount} avatar configs`),
+    );
     assert(!!avatarPartsLog, '41 avatar parts loaded into the webview');
-    assert(!!avatarConfigsLog, 'All 23 persona avatar configs loaded into the webview');
+    assert(
+      !!avatarConfigsLog,
+      `All ${expectedAvatarCount} persona avatar configs loaded into the webview`,
+    );
 
     // Test 4: Permanent residents dispatched
     console.log('  [Test 4] Permanent residents');
