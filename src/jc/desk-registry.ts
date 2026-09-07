@@ -302,6 +302,16 @@ export const DESK_REGISTRY: DeskEntry[] = [
     nameplate: '空席',
     nameplateEn: 'Vacant',
   },
+  {
+    deskId: 'dev-desk-07',
+    memberId: 'codex-01',
+    zone: 'dev',
+    seatCol: 7,
+    seatRow: 20,
+    facingDir: UP,
+    nameplate: 'Codex',
+    nameplateEn: 'Codex',
+  },
 ];
 
 /** Entrance tile position (spawn/despawn point) — center of atrium floor */

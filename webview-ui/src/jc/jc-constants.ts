@@ -154,6 +154,7 @@ export const MEMBER_IDLE_EMOJIS: Record<string, string> = {
   // ── Engineering ──
   'eng-01': '👀', // コードレビューを黙々と進める
   'eng-04': '📝', // チームメンバーの様子を見回しながらメモ
+  'codex-01': '🤖', // 実装ジョブの状態を映すボット席
 
   // ── Marketing ──
   'mkt-01': '💹', // P/Lダッシュボードを眺めながら考え込む

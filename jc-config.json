@@ -437,6 +437,20 @@
         "mainWork": "受付 · 手配 · メモ整理",
         "specialty": 70
       }
+    },
+    {
+      "id": "codex-01",
+      "name": "Codex",
+      "nameEn": "Codex",
+      "role": "Implementation Bot",
+      "department": "engineering",
+      "layer": "L3",
+      "zone": "dev",
+      "hueShift": 320,
+      "palette": 6,
+      "deskId": "dev-desk-07",
+      "accentColor": "#6E4BAA",
+      "breakBehavior": "coffee"
     }
   ],
   "exec": [

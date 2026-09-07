@@ -177,6 +177,7 @@ const DESK_POSITIONS: Record<string, { col: number; row: number; facingDir: numb
   'dev-desk-03': { col: 7, row: 17, facingDir: 3 }, // Hina
   'dev-desk-05': { col: 3, row: 20, facingDir: 3 }, // Ren Fujii
   'dev-desk-06': { col: 5, row: 20, facingDir: 3 }, // Shota
+  'dev-desk-07': { col: 7, row: 20, facingDir: 3 }, // Codex (implementation bot seat)
 };
 
 /** Exec positions — icon-only (no character), shown in Exec Area */

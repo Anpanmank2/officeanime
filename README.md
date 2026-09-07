@@ -100,6 +100,8 @@ Delegation is dock-driven: pick a member, choose a request template (research / 
 
 Member roster, desk assignments and public-safe persona bios are defined in `jc-config.json` at the repository root (schema `version: 2`). The extension reads this on startup and passes it to the webview as `JCConfigData`. Bios are hand-written fiction for the pixel-office world — no real internal routing, project names or decision criteria are stored here.
 
+`codex-01` is a bot seat, not a person: it reflects the state of external implementation jobs. Its events are emitted by the runner.
+
 ## Requirements
 
 - VS Code 1.105.0+ (extension mode) or any modern browser (standalone mode)
