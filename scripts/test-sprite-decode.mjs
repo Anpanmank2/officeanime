@@ -312,9 +312,10 @@ const avatarIds = Object.keys(avatarConfigs);
 const activeRosterIds = Array.isArray(jcConfig?.members)
   ? jcConfig.members.filter((member) => member?.vacant !== true).map((member) => member?.id)
   : [];
+// 2026-09-07: ボット席 codex-01（人ではない・外部実装ジョブの状態を映す）を追加し 16→17
 assert(
-  activeRosterIds.length === 16,
-  `jc-config.json contains exactly 16 active members (got ${activeRosterIds.length})`,
+  activeRosterIds.length === 17,
+  `jc-config.json contains exactly 17 active members (got ${activeRosterIds.length})`,
 );
 assert(uniqueRosterIds.size === rosterIds.length, 'jc-config.json member IDs are unique');
 assert(avatarFile?.version === 1, 'default-avatars.json has version 1');
