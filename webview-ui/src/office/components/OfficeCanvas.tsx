@@ -11,7 +11,8 @@ import {
 import { PET_TILE } from '../../jc/jc-constants.js';
 import { renderJCOverlay } from '../../jc/jc-overlay.js';
 import { jcGetDeptBoardAtTile, jcGetMemberAtDesk, jcIsBookshelfAtTile } from '../../jc/jc-state.js';
-import { jcIsPetTile } from '../../jc/pet-state.js';
+import { petCompanionBounds, petContainsPoint } from '../../jc/pet-geometry.js';
+import { jcGetPet } from '../../jc/pet-state.js';
 import { PetSpeechBubble } from '../../jc/PetSpeechBubble.js';
 import { isPinned } from '../../jc/pin-store.js';
 import { unlockAudio } from '../../notificationSound.js';
@@ -38,7 +39,7 @@ interface OfficeCanvasProps {
   onDeptBoardClick?: (department: string, screenPos: { x: number; y: number }) => void;
   /** 本棚クリック → 完了アーカイブ (R4 保存ボックス) */
   onBookshelfClick?: (screenPos: { x: number; y: number }) => void;
-  /** 相棒 (agent-pet) の卵クリック → 相棒カルテ。相棒不在時は発火しない。 */
+  /** 相棒 (agent-pet) の姿をクリック → 相棒カルテ。 */
   onPetClick?: (screenPos: { x: number; y: number }) => void;
   onDeskContextMenu?: (
     memberId: string,
@@ -297,11 +298,19 @@ export function OfficeCanvas({
         offsetRef.current = { x: offsetX, y: offsetY };
         const dpr = window.devicePixelRatio || 1;
         const petX = (offsetX + (PET_TILE.col + 0.5) * TILE_SIZE * zoom) / dpr;
-        const petY = (offsetY + PET_TILE.row * TILE_SIZE * zoom) / dpr;
+        const currentPet = jcGetPet();
+        const petTop = currentPet ? petCompanionBounds(currentPet).y : PET_TILE.row * TILE_SIZE;
+        const petY = (offsetY + petTop * zoom) / dpr;
         petAnchorRef.current = {
           x: petX,
           y: petY,
-          visible: !isEditMode && petX >= 0 && petX <= w / dpr && petY >= 0 && petY <= h / dpr,
+          visible:
+            !!currentPet &&
+            !isEditMode &&
+            petX >= 0 &&
+            petX <= w / dpr &&
+            petY >= 0 &&
+            petY <= h / dpr,
         };
 
         // JC Virtual Office overlay (nameplates, zone labels, exec icons, stats)
@@ -511,7 +520,8 @@ export function OfficeCanvas({
       const canvas = canvasRef.current;
       if (canvas) {
         let cursor = 'default';
-        if (hitId !== null) {
+        const pet = jcGetPet();
+        if (hitId !== null || (pet && petContainsPoint(pet, pos.worldX, pos.worldY))) {
           cursor = 'pointer';
         } else if (officeState.selectedAgentId !== null && tile) {
           // Check if hovering over a clickable seat (available or own)
@@ -722,6 +732,20 @@ export function OfficeCanvas({
       const pos = screenToWorld(e.clientX, e.clientY);
       if (!pos) return;
 
+      // The body grows beyond its floor tile: every visible part opens its card.
+      if (onPetClick) {
+        const pet = jcGetPet();
+        if (pet && pos && petContainsPoint(pet, pos.worldX, pos.worldY)) {
+          const bounds = petCompanionBounds(pet);
+          const dpr = window.devicePixelRatio || 1;
+          onPetClick({
+            x: (offsetRef.current.x + (bounds.x + bounds.width) * zoom) / dpr,
+            y: (offsetRef.current.y + (bounds.y + bounds.height) * zoom) / dpr,
+          });
+          return;
+        }
+      }
+
       const hitId = officeState.getCharacterAt(pos.worldX, pos.worldY);
       if (hitId !== null) {
         // Dismiss any active bubble on click
@@ -820,30 +844,6 @@ export function OfficeCanvas({
               onDeptBoardClick(boardDept, { x: screenX, y: screenY });
               return;
             }
-          }
-        }
-      }
-
-      // 相棒 (agent-pet) の卵 = 相棒カルテ: 1タイル exact 判定。相棒が居ない
-      // 環境では jcIsPetTile が常に false を返すため、既存挙動は一切変わらない。
-      if (onPetClick) {
-        const tile = screenToTile(e.clientX, e.clientY);
-        if (tile && jcIsPetTile(tile.col, tile.row)) {
-          const el = containerRef.current;
-          if (el) {
-            const rect = el.getBoundingClientRect();
-            const dpr = window.devicePixelRatio || 1;
-            const canvasW = Math.round(rect.width * dpr);
-            const canvasH = Math.round(rect.height * dpr);
-            const layout = officeState.getLayout();
-            const mapW = layout.cols * TILE_SIZE * zoom;
-            const mapH = layout.rows * TILE_SIZE * zoom;
-            const deviceOffsetX = Math.floor((canvasW - mapW) / 2) + Math.round(panRef.current.x);
-            const deviceOffsetY = Math.floor((canvasH - mapH) / 2) + Math.round(panRef.current.y);
-            const screenX = (deviceOffsetX + (tile.col + 0.5) * TILE_SIZE * zoom) / dpr;
-            const screenY = (deviceOffsetY + (tile.row + 1) * TILE_SIZE * zoom) / dpr;
-            onPetClick({ x: screenX, y: screenY });
-            return;
           }
         }
       }

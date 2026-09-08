@@ -5,11 +5,12 @@
 // Nothing here is hardcoded to a particular companion: the name, the
 // birthday and every number come from the served record at runtime.
 
-import type { PetFirstVoice } from '../../../shared/agent-pet.js';
+import type { PetAppearance, PetFirstVoice } from '../../../shared/agent-pet.js';
 import petContract from '../../../shared/agent-pet.js';
 import { PET_TILE, PET_TRAIT_ORDER } from './jc-constants.js';
 
-const { petAgeDays, petDate, petFirstVoice, petLocalDate, petStageDays } = petContract;
+const { petAgeDays, petAppearance, petDate, petFirstVoice, petLocalDate, petStageDays } =
+  petContract;
 
 /** One sticky note ("付箋") the companion wrote to itself. Local-only. */
 export interface JCPetNote {
@@ -25,6 +26,7 @@ export interface JCPet {
   /** 0 = egg … 5 = fully grown. */
   stage: number;
   stageDays: readonly number[];
+  appearance: PetAppearance;
   firstVoice: PetFirstVoice | null;
   /** Birthday (YYYY-MM-DD), or null when the authoritative date is invalid or missing. */
   bornAt: string | null;
@@ -92,6 +94,7 @@ export function jcSetPet(value: unknown, now: Date = new Date()): void {
       name: data.name,
       stage: Math.min(5, num(data.stage)),
       stageDays: petStageDays({ schema: 'stage-days/1', days: data.stageDays }),
+      appearance: petAppearance(data.appearance),
       firstVoice: petFirstVoice(data.firstVoice, petLocalDate(now)),
       bornAt: petDate(data.bornAt),
       traits,

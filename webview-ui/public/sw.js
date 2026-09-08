@@ -1,6 +1,6 @@
 // ── Service Worker — Office Anime PWA ──────────────────────────
 // v5: Network-first for all assets. Cache only as offline fallback.
-const CACHE_NAME = 'office-anime-v6';
+const CACHE_NAME = 'office-anime-v7';
 
 self.addEventListener('install', (event) => {
   // Immediately take over from any previous SW

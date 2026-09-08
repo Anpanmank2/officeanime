@@ -1,18 +1,14 @@
 // ── 相棒カルテ (agent-pet ステータス画面) ─────────────────────────
-// 卵 (将来は成長後の姿) クリックで開く。設計正本:
+// 相棒の姿をクリックして開く。設計正本:
 //   .company/secretary/owner-ventures/agent-tamagotchi/status-panel-ux-v1.md
 //
 // 成長条件・なつき・ストレスは数値やメーターにしない。
 
-import {
-  PET_STAGE_GLYPHS,
-  PET_STAGE_LABELS,
-  PET_TRAIT_LABELS,
-  PET_TRAIT_ORDER,
-} from './jc-constants.js';
+import { PET_STAGE_LABELS, PET_TRAIT_LABELS, PET_TRAIT_ORDER } from './jc-constants.js';
 import type { JCPet } from './pet-state.js';
 import { jcGetPetDayCount, jcGetPetNextStage } from './pet-state.js';
 import { currentPetVoice } from './pet-voice-state.js';
+import { PetPortrait } from './PetPortrait.js';
 
 const PANEL_W = 340;
 /** 卵の横に置く隙間 (相棒を隠さずに読めるようにする)。 */
@@ -32,11 +28,6 @@ const CARD_LINE = 'rgba(245, 231, 200, 0.18)';
 
 function stageLabel(stage: number): string {
   return PET_STAGE_LABELS[stage] ?? PET_STAGE_LABELS[0];
-}
-
-/** 段階の見出し絵文字。姿 (卵→ひな→…) と同じ順で切り替わる。 */
-function stageGlyph(stage: number): string {
-  return PET_STAGE_GLYPHS[stage] ?? PET_STAGE_GLYPHS[0];
 }
 
 function birthdayLabel(bornAt: string | null): string {
@@ -118,8 +109,8 @@ export function PetStatusPanel({ pet, position, onClose }: PetStatusPanelProps) 
           flexShrink: 0,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
-          <span style={{ fontSize: '16px' }}>{stageGlyph(pet.stage)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <PetPortrait pet={pet} />
           <span
             style={{
               fontSize: '15px',

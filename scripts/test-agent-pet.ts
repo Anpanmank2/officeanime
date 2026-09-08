@@ -20,7 +20,12 @@ const write = (name: string, value: unknown) =>
 try {
   assert.equal(readAgentPet(home, now), null);
   fs.mkdirSync(petDir, { recursive: true });
-  write('growth.json', { stage: 4, born_at: '2026-09-08', bond: 99 });
+  write('growth.json', {
+    stage: 2,
+    born_at: '2026-09-08',
+    lineage: { kind: null, score: 99 },
+    look: { direction: 'cute', style_counter: 99 },
+  });
   fs.writeFileSync(path.join(petDir, 'timeline.jsonl'), '{"event":"hatch","date":"2020-01-01"}\n');
   write('first-voice.json', { ...voice, additionalContext: 'SECRET', candidate_token: 'TOKEN' });
   const before = fs
@@ -28,13 +33,17 @@ try {
     .map((file) => [file, fs.readFileSync(path.join(petDir, file), 'utf8')]);
   const pet = readAgentPet(home, now)!;
   assert.equal(pet.bornAt, '2026-09-08');
-  assert.equal(pet.stage, 4);
+  assert.equal(pet.stage, 2);
+  assert.deepEqual(pet.appearance, { lineage: null, direction: 'cute' });
+  assert.deepEqual(Object.keys(pet.appearance).sort(), ['direction', 'lineage']);
   assert.deepEqual(pet.firstVoice, voice);
   assert.deepEqual(agentPetMessage(home, now), { type: 'jcPetUpdated', pet });
   assert.deepEqual(
     fs.readdirSync(petDir).map((file) => [file, fs.readFileSync(path.join(petDir, file), 'utf8')]),
     before,
   );
+  write('growth.json', { stage: 2, lineage: { kind: 'unknown' }, look: { direction: 'unknown' } });
+  assert.deepEqual(readAgentPet(home, now)!.appearance, { lineage: null, direction: null });
   write('stage-days.json', { schema: 'stage-days/1', days: [0, 1, 2, 3, 4, 5] });
   assert.deepEqual(readAgentPet(home, now)!.stageDays, [0, 1, 2, 3, 4, 5]);
   write('stage-days.json', { schema: 'broken' });

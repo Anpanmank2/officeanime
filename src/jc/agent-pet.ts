@@ -14,6 +14,8 @@ import * as os from 'os';
 import * as path from 'path';
 
 import {
+  type PetAppearance,
+  petAppearance,
   petDate,
   type PetFirstVoice,
   petFirstVoice,
@@ -64,6 +66,8 @@ export interface AgentPetInfo {
   /** 0 = egg … 5 = fully grown. */
   stage: number;
   stageDays: readonly number[];
+  /** Strictly allowlisted rendering hints from the authoritative growth record. */
+  appearance: PetAppearance;
   firstVoice: PetFirstVoice | null;
   /** Growth record schema version, for forward compatibility. */
   schema: string;
@@ -228,6 +232,10 @@ export function readAgentPet(
         name,
         stage: Math.max(0, Math.min(PET_MAX_STAGE, Math.floor(asNumber(raw.stage, 0)))),
         stageDays: petStageDays(readDisplayJson(path.join(petDir, 'stage-days.json'))),
+        appearance: petAppearance({
+          lineage: (raw.lineage as Record<string, unknown> | null)?.kind,
+          direction: (raw.look as Record<string, unknown> | null)?.direction,
+        }),
         firstVoice: petFirstVoice(readDisplayJson(path.join(petDir, 'first-voice.json')), today),
         schema: typeof raw.schema === 'string' ? raw.schema : '',
         bornAt: raw.born_at === undefined ? readBornAt(petDir) : asDateString(raw.born_at),

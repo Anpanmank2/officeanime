@@ -5,7 +5,7 @@ import petContract from '../../shared/agent-pet.js';
 import { jcGetPet, jcGetPetDayCount, jcGetPetNextStage, jcSetPet } from '../src/jc/pet-state.js';
 import { claimPetVoice } from '../src/jc/pet-voice-state.js';
 
-const { petAgeDays, petFirstVoice, petLocalDate, petStageDays } = petContract;
+const { petAgeDays, petAppearance, petFirstVoice, petLocalDate, petStageDays } = petContract;
 
 const now = new Date(2026, 8, 8, 12);
 const voice = {
@@ -93,6 +93,26 @@ test('voice is an allowlisted display record, stale/broken/oversized data disapp
   assert.equal(jcGetPet(), null);
   jcSetPet({ name: 'fixture', firstVoice: voice }, new Date(2026, 8, 9, 4));
   assert.equal(jcGetPet()?.firstVoice, null);
+});
+
+test('appearance is a closed display record and preserves a recorded stage', () => {
+  assert.deepEqual(
+    petAppearance({ lineage: 'cat', direction: 'cool', score: 99, raw: { private: true } }),
+    { lineage: 'cat', direction: 'cool' },
+  );
+  for (const invalid of [null, {}, { lineage: 'fox', direction: 'warm' }]) {
+    assert.deepEqual(petAppearance(invalid), { lineage: null, direction: null });
+  }
+  assert.deepEqual(petAppearance({ lineage: ['cat'], direction: 'cute' }), {
+    lineage: null,
+    direction: 'cute',
+  });
+  jcSetPet(
+    { name: 'fixture', stage: 2, appearance: { lineage: null, direction: 'cute', score: 7 } },
+    now,
+  );
+  assert.equal(jcGetPet()!.stage, 2);
+  assert.deepEqual(jcGetPet()!.appearance, { lineage: null, direction: 'cute' });
 });
 
 test('replay uses only opaque IDs; inaccessible storage suppresses automatic display', () => {

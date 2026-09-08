@@ -64,6 +64,8 @@ import {
 import type { JCBubbleType, JCState } from './jc-types.js';
 import { computeDeptOccupancy, computeMemberWorkloads } from './karte-state.js';
 import { officeHoursRenderState } from './office-hours-state.js';
+import { petCompanionBounds } from './pet-geometry.js';
+import { drawPetSprite } from './pet-sprite.js';
 import { jcGetPet } from './pet-state.js';
 
 // ── Rendering Constants (overlay-specific) ───────────────────────
@@ -1000,96 +1002,15 @@ function renderExecIcons(
 }
 
 // ── Owner's companion (agent-pet) ────────────────────────────────
-// Stage 0 = egg, stage 1+ = hatched chick. Both are drawn as pixel spans in
-// code so the companion scales with the office zoom without shipping a new
-// PNG. The stage itself is never decided here: `agent-pet` promotes the pet
-// on the morning run (source of truth = agent-pet/scripts/lib/stages.mjs)
-// and this file only draws whatever stage the record already carries.
-
-/** Egg silhouette: [startX, endX] per sprite-pixel row, 10w × 12h. */
-const PET_EGG_ROWS: Array<[number, number]> = [
-  [4, 5],
-  [3, 6],
-  [2, 7],
-  [2, 7],
-  [1, 8],
-  [1, 8],
-  [0, 9],
-  [0, 9],
-  [0, 9],
-  [1, 8],
-  [2, 7],
-  [3, 6],
-];
-const PET_EGG_W = 10;
-const PET_EGG_H = 12;
-const PET_EGG_SHELL = '#F5E7C8';
-const PET_EGG_SHADE = '#D9C39B';
-const PET_EGG_SPOT = '#8FD3C7';
-const PET_EGG_SHINE = '#FFFFFF';
-const PET_EGG_OUTLINE = '#3A2E22';
+// The saved stage and lineage select the sprite. The display never promotes
+// the pet or assigns a lineage; unknown lineage keeps the common sprouted form.
 const PET_SHADOW = 'rgba(0, 0, 0, 0.28)';
-/** Spot pixels (x, y) in sprite coords. */
-const PET_EGG_SPOTS: Array<[number, number]> = [
-  [3, 6],
-  [6, 8],
-  [4, 10],
-];
-// ── Stage 1+ : hatched chick ─────────────────────────────────────
-// Same technique as the egg (pixel spans, no PNG). 11w chick + 1px gap +
-// 4w mug = exactly one 16px tile, so the pair stays centred on the tile.
-
-/** Chick silhouette: [startX, endX] per sprite-pixel row, 11w × 11h (+1 feet row). */
-const PET_CHICK_ROWS: Array<[number, number]> = [
-  [3, 6],
-  [2, 7],
-  [1, 8],
-  [1, 8],
-  [2, 7],
-  [2, 7],
-  [1, 8],
-  [0, 9],
-  [0, 9],
-  [1, 8],
-  [2, 7],
-];
-const PET_CHICK_W = 11;
-/** Body rows plus the feet row underneath. */
-const PET_CHICK_H = PET_CHICK_ROWS.length + 1;
-const PET_CHICK_BODY = '#F7D65A';
-const PET_CHICK_SHADE = '#E0B63C';
-const PET_CHICK_BEAK = '#F2913C';
-/** Eye pixels (x, y). */
-const PET_CHICK_EYES: Array<[number, number]> = [
-  [3, 2],
-  [6, 2],
-];
-/** Beak pixels (x, y) — pokes out to the right of the head. */
-const PET_CHICK_BEAK_PIXELS: Array<[number, number]> = [
-  [9, 3],
-  [10, 3],
-];
-/** Wing pixels (x, y) on the near side of the body. */
-const PET_CHICK_WING: Array<[number, number]> = [
-  [2, 7],
-  [3, 7],
-  [2, 8],
-  [3, 8],
-];
-/** Feet pixels (x, y) on the row under the body. */
-const PET_CHICK_FEET: Array<[number, number]> = [
-  [2, 11],
-  [3, 11],
-  [6, 11],
-  [7, 11],
-];
-/** Leftover shell worn as a cap — only right after hatching (stage 1). */
-const PET_CHICK_SHELL_CAP: [number, number] = [3, 6];
+const PET_OUTLINE = '#59483F';
 
 /** The mug the companion is given at stage 1 (骨子§5「もらえる持ち物」). */
 const PET_MUG_W = 4;
 const PET_MUG_H = 4;
-const PET_MUG_GAP = 1;
+const PET_MUG_GAP = 2;
 const PET_MUG_BODY = '#E8EDF2';
 const PET_MUG_SHADE = '#B9C3CC';
 const PET_MUG_DRINK = '#6B4A2F';
@@ -1141,25 +1062,17 @@ function renderPetCompanion(
 
   ctx.save();
 
-  if (pet.stage === 0) {
-    const x0 = tileX + Math.round(((TILE_SIZE - PET_EGG_W) / 2) * px);
-    const y0 = tileY + Math.round((TILE_SIZE - PET_EGG_H) * px) + bob;
-    // Ground shadow (stays put while the egg bobs)
-    ctx.fillStyle = PET_SHADOW;
-    ctx.fillRect(x0 + px, groundY, (PET_EGG_W - 2) * px, px);
-    drawPetEgg(ctx, x0, y0, px);
-  } else {
-    // Chick + mug read as one 16px-wide group so the pair stays tile-centred.
-    const groupW = PET_CHICK_W + PET_MUG_GAP + PET_MUG_W;
-    const x0 = tileX + Math.round(((TILE_SIZE - groupW) / 2) * px);
-    const y0 = tileY + Math.round((TILE_SIZE - PET_CHICK_H) * px) + bob;
-    ctx.fillStyle = PET_SHADOW;
-    ctx.fillRect(x0 + px, groundY, (PET_CHICK_W - 2) * px, px);
-    drawPetChick(ctx, x0, y0, px, pet.stage);
-    // The mug sits on the floor, so it does not bob with the chick.
+  const bounds = petCompanionBounds(pet);
+  const x0 = offsetX + bounds.x * px;
+  const y0 = offsetY + bounds.y * px + bob;
+  ctx.fillStyle = PET_SHADOW;
+  ctx.fillRect(x0 + px, groundY, (bounds.width - 2) * px, px);
+  drawPetSprite(ctx, x0, y0, px, bounds.sprite);
+  if (pet.stage > 0) {
+    // A separate keepsake, never baked into the growing body.
     drawPetMug(
       ctx,
-      x0 + (PET_CHICK_W + PET_MUG_GAP) * px,
+      x0 + (bounds.width + PET_MUG_GAP) * px,
       tileY + Math.round((TILE_SIZE - PET_MUG_H) * px),
       px,
     );
@@ -1179,86 +1092,9 @@ function renderPetCompanion(
   ctx.restore();
 }
 
-/** Stage 0 — the unhatched egg. */
-function drawPetEgg(ctx: CanvasRenderingContext2D, x0: number, y0: number, px: number): void {
-  // 1px outline silhouette (sides, plus a capping row above and below)
-  ctx.fillStyle = PET_EGG_OUTLINE;
-  for (let row = -1; row <= PET_EGG_ROWS.length; row++) {
-    const clamped = Math.max(0, Math.min(PET_EGG_ROWS.length - 1, row));
-    const [sx, ex] = PET_EGG_ROWS[clamped];
-    ctx.fillRect(x0 + (sx - 1) * px, y0 + row * px, (ex - sx + 3) * px, px);
-  }
-  for (let row = 0; row < PET_EGG_ROWS.length; row++) {
-    const [sx, ex] = PET_EGG_ROWS[row];
-    const y = y0 + row * px;
-    ctx.fillStyle = PET_EGG_SHELL;
-    ctx.fillRect(x0 + sx * px, y, (ex - sx + 1) * px, px);
-    // Right-side shading
-    ctx.fillStyle = PET_EGG_SHADE;
-    ctx.fillRect(x0 + (ex - 1) * px, y, 2 * px, px);
-  }
-
-  ctx.fillStyle = PET_EGG_SPOT;
-  for (const [sx, sy] of PET_EGG_SPOTS) {
-    ctx.fillRect(x0 + sx * px, y0 + sy * px, px, px);
-  }
-  ctx.fillStyle = PET_EGG_SHINE;
-  ctx.fillRect(x0 + 2 * px, y0 + 4 * px, px, 2 * px);
-}
-
-/** Stage 1+ — the hatched chick. Stage 1 still wears a piece of its shell. */
-function drawPetChick(
-  ctx: CanvasRenderingContext2D,
-  x0: number,
-  y0: number,
-  px: number,
-  stage: number,
-): void {
-  // 1px outline silhouette, same construction as the egg.
-  ctx.fillStyle = PET_EGG_OUTLINE;
-  for (let row = -1; row <= PET_CHICK_ROWS.length; row++) {
-    const clamped = Math.max(0, Math.min(PET_CHICK_ROWS.length - 1, row));
-    const [sx, ex] = PET_CHICK_ROWS[clamped];
-    ctx.fillRect(x0 + (sx - 1) * px, y0 + row * px, (ex - sx + 3) * px, px);
-  }
-  for (let row = 0; row < PET_CHICK_ROWS.length; row++) {
-    const [sx, ex] = PET_CHICK_ROWS[row];
-    const y = y0 + row * px;
-    ctx.fillStyle = PET_CHICK_BODY;
-    ctx.fillRect(x0 + sx * px, y, (ex - sx + 1) * px, px);
-    // Right-side shading
-    ctx.fillStyle = PET_CHICK_SHADE;
-    ctx.fillRect(x0 + ex * px, y, px, px);
-  }
-
-  ctx.fillStyle = PET_CHICK_SHADE;
-  for (const [sx, sy] of PET_CHICK_WING) {
-    ctx.fillRect(x0 + sx * px, y0 + sy * px, px, px);
-  }
-  ctx.fillStyle = PET_CHICK_BEAK;
-  for (const [sx, sy] of [...PET_CHICK_BEAK_PIXELS, ...PET_CHICK_FEET]) {
-    ctx.fillRect(x0 + sx * px, y0 + sy * px, px, px);
-  }
-  ctx.fillStyle = PET_EGG_OUTLINE;
-  for (const [sx, sy] of PET_CHICK_EYES) {
-    ctx.fillRect(x0 + sx * px, y0 + sy * px, px, px);
-  }
-
-  // Freshly hatched: a bit of shell still sits on its head.
-  if (stage === 1) {
-    const [sx, ex] = PET_CHICK_SHELL_CAP;
-    ctx.fillStyle = PET_EGG_OUTLINE;
-    ctx.fillRect(x0 + (sx - 1) * px, y0 - 2 * px, (ex - sx + 3) * px, px);
-    ctx.fillStyle = PET_EGG_SHELL;
-    ctx.fillRect(x0 + sx * px, y0 - px, (ex - sx + 1) * px, px);
-    ctx.fillStyle = PET_EGG_SHADE;
-    ctx.fillRect(x0 + ex * px, y0 - px, px, px);
-  }
-}
-
 /** The mug the companion is handed at stage 1. Sits on the floor beside it. */
 function drawPetMug(ctx: CanvasRenderingContext2D, x0: number, y0: number, px: number): void {
-  ctx.fillStyle = PET_EGG_OUTLINE;
+  ctx.fillStyle = PET_OUTLINE;
   ctx.fillRect(x0 - px, y0 - px, (PET_MUG_W + 1) * px, (PET_MUG_H + 2) * px);
   for (const [sx, sy, color] of PET_MUG_PIXELS) {
     ctx.fillStyle = color;

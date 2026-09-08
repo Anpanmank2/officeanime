@@ -145,3 +145,12 @@ export const PET_VOICE_COLORS = {
   border: '#b9a986',
   muted: '#72654d',
 } as const;
+
+// Bare companion body palette. Clothing and occupation layers remain separate.
+export const PET_SPRITE_PALETTE = {
+  dark: '#59483F',
+  cream: '#F4E8CE',
+  honey: '#D8AF73',
+  sage: '#94AA91',
+  coral: '#C98270',
+} as const;

@@ -43,6 +43,35 @@ export interface PetFirstVoice {
   text: string;
 }
 
+/** Display-only appearance fields. These are deliberately closed vocabularies. */
+export type PetLineage = 'cat' | 'dog' | 'rabbit' | 'maru';
+export type PetDirection = 'cool' | 'cute' | 'mixed';
+export interface PetAppearance {
+  lineage: PetLineage | null;
+  direction: PetDirection | null;
+}
+
+const PET_LINEAGES: readonly PetLineage[] = ['cat', 'dog', 'rabbit', 'maru'];
+const PET_DIRECTIONS: readonly PetDirection[] = ['cool', 'cute', 'mixed'];
+
+/**
+ * Fail-closed appearance record for rendering. Extra producer fields are
+ * intentionally discarded so styling counters and arbitrary objects cannot
+ * cross the local display boundary.
+ */
+export function petAppearance(value: unknown): PetAppearance {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { lineage: null, direction: null };
+  }
+  const v = value as Record<string, unknown>;
+  return {
+    lineage: PET_LINEAGES.includes(v.lineage as PetLineage) ? (v.lineage as PetLineage) : null,
+    direction: PET_DIRECTIONS.includes(v.direction as PetDirection)
+      ? (v.direction as PetDirection)
+      : null,
+  };
+}
+
 /** Fail closed; allowlist only display data, never hook instructions or candidate metadata. */
 export function petFirstVoice(value: unknown, today: string): PetFirstVoice | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -67,4 +96,4 @@ export function petFirstVoice(value: unknown, today: string): PetFirstVoice | nu
 }
 
 // Default namespace also supports Node ESM webview tests consuming the CJS host package.
-export default { petAgeDays, petDate, petFirstVoice, petLocalDate, petStageDays };
+export default { petAgeDays, petAppearance, petDate, petFirstVoice, petLocalDate, petStageDays };

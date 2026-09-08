@@ -454,9 +454,6 @@ export const PET_STAGE_LABELS: readonly string[] = [
   '相棒',
 ];
 
-/** 段階 0〜5 の見出し絵文字（カルテのヘッダー）。姿の変化を字でも伝える。 */
-export const PET_STAGE_GLYPHS: readonly string[] = ['🥚', '🐣', '🐥', '🐤', '🐔', '🕊️'];
-
 /** 得意分野の表示名。growth.json の traits キーと 1:1。 */
 export const PET_TRAIT_LABELS: Readonly<Record<string, string>> = {
   code: 'コード・実装',
