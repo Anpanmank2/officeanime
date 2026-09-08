@@ -82,7 +82,7 @@
     "@types/ws": "^8.5.0",
     "@anthropic-ai/sdk": "^0.80.0",
     "@playwright/test": "^1.58.2",
-    "@types/node": "25.x",
+    "@types/node": "26.x",
     "@types/pngjs": "^6.0.5",
     "@types/vscode": "^1.105.0",
     "@vscode/test-electron": "^2.5.2",
