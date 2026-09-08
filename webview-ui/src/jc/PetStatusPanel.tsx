@@ -2,16 +2,9 @@
 // 卵 (将来は成長後の姿) クリックで開く。設計正本:
 //   .company/secretary/owner-ventures/agent-tamagotchi/status-panel-ux-v1.md
 //
-// 3系統の計器盤:
-//   ①愛着系 = 名前 / 段階 / いっしょの日数 / 誕生日
-//   ②実用系 = 得意分野の内訳 / おぼえた作法 / きのうの付箋 (原文)
-//   ③期待系 = つぎの成長まであと◯ (距離は見せる・中身は「？」で伏せる)
-//
-// この画面は「飼い主だけが見るローカル画面」。付箋の原文・仕事の具体名を
-// 出してよいのはここだけで、見せ合い用のキャラカードには出さない (骨子§6)。
+// 成長条件・なつき・ストレスは数値やメーターにしない。
 
 import {
-  PET_NEXT_REWARD_GLYPH,
   PET_STAGE_GLYPHS,
   PET_STAGE_LABELS,
   PET_TRAIT_LABELS,
@@ -19,6 +12,7 @@ import {
 } from './jc-constants.js';
 import type { JCPet } from './pet-state.js';
 import { jcGetPetDayCount, jcGetPetNextStage } from './pet-state.js';
+import { currentPetVoice } from './pet-voice-state.js';
 
 const PANEL_W = 340;
 /** 卵の横に置く隙間 (相棒を隠さずに読めるようにする)。 */
@@ -34,9 +28,6 @@ const PANEL_BORDER = 'rgba(245, 231, 200, 0.5)';
 const ACCENT_TEXT = '#F5E7C8';
 const BODY_TEXT = '#D8D2C4';
 const MUTED_TEXT = '#8A97A0';
-const BAR_BG = 'rgba(255, 255, 255, 0.08)';
-const BAR_FILL = '#8FD3C7';
-const NEXT_FILL = '#E4C36E';
 const CARD_LINE = 'rgba(245, 231, 200, 0.18)';
 
 function stageLabel(stage: number): string {
@@ -72,20 +63,6 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-function Bar({ ratio, color }: { ratio: number; color: string }) {
-  return (
-    <div style={{ height: 6, background: BAR_BG, flex: 1, minWidth: 0 }}>
-      <div
-        style={{
-          height: '100%',
-          width: `${Math.round(Math.max(0, Math.min(1, ratio)) * 100)}%`,
-          background: color,
-        }}
-      />
-    </div>
-  );
-}
-
 export interface PetStatusPanelProps {
   pet: JCPet;
   position: { x: number; y: number };
@@ -95,8 +72,8 @@ export interface PetStatusPanelProps {
 export function PetStatusPanel({ pet, position, onClose }: PetStatusPanelProps) {
   const next = jcGetPetNextStage(pet);
   const dayCount = jcGetPetDayCount(pet);
-  const traitMax = Math.max(1, ...PET_TRAIT_ORDER.map((k) => pet.traits[k] ?? 0));
-  const traitTotal = PET_TRAIT_ORDER.reduce((sum, k) => sum + (pet.traits[k] ?? 0), 0);
+  const firstVoice = currentPetVoice(pet.firstVoice);
+  const interests = PET_TRAIT_ORDER.filter((key) => (pet.traits[key] ?? 0) > 0);
 
   // 相棒の「横」に開く。中央に被せると読んでいる間ずっと相棒が隠れてしまい、
   // 「この子のカルテ」でなく単なるダイアログになる。右に入らなければ左へ。
@@ -179,100 +156,39 @@ export function PetStatusPanel({ pet, position, onClose }: PetStatusPanelProps) 
       <div style={{ overflowY: 'auto', minHeight: 0 }}>
         {/* ── ①いま (愛着系) ── */}
         <Card title="いま">
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-            <span style={{ color: MUTED_TEXT, fontSize: '11px' }}>いっしょに</span>
-            <span style={{ fontSize: '24px', fontWeight: 900, color: ACCENT_TEXT, lineHeight: 1 }}>
-              {pet.bond}
-            </span>
-            <span style={{ color: MUTED_TEXT, fontSize: '11px' }}>日</span>
-          </div>
-          <div style={{ color: MUTED_TEXT, fontSize: '11px', marginTop: 4 }}>
-            {birthdayLabel(pet.bornAt)}
-            {dayCount !== null && ` ／ きょうで ${dayCount}日目`}
-          </div>
-        </Card>
-
-        {/* ── ②つぎの成長 (期待系・この画面の主役) ── */}
-        <Card title="つぎの成長">
-          {next === null ? (
-            <div style={{ color: BODY_TEXT }}>いちばん上まで育ちました</div>
-          ) : (
-            <>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                  marginBottom: 6,
-                }}
-              >
-                <span style={{ color: ACCENT_TEXT, fontWeight: 'bold' }}>
-                  {stageLabel(next.stage)} まで
-                </span>
-                <span style={{ color: NEXT_FILL, fontWeight: 900, fontSize: '15px' }}>
-                  {next.met ? '条件クリア ✓' : `あと ${next.target - next.current}${next.unit}`}
-                </span>
-              </div>
-              <Bar ratio={next.ratio} color={NEXT_FILL} />
-              {next.met && (
-                <div style={{ color: NEXT_FILL, fontSize: '11px', marginTop: 5 }}>
-                  つぎの朝、あいさつと一緒に あがります
-                </div>
-              )}
-              <div style={{ color: MUTED_TEXT, fontSize: '11px', marginTop: 5 }}>
-                条件: {next.label} {next.target}
-                {next.unit}（いま {next.current}
-                {next.unit}）
-              </div>
-              <div style={{ color: MUTED_TEXT, fontSize: '11px', marginTop: 3 }}>
-                そのとき もらえるもの: {PET_NEXT_REWARD_GLYPH}
-              </div>
-            </>
-          )}
-        </Card>
-
-        {/* ── ③とくいなこと (実用系) ── */}
-        <Card title="とくいなこと">
-          {traitTotal === 0 ? (
-            <div style={{ color: MUTED_TEXT, fontSize: '12px' }}>
-              まだ どれも 0。仕事を頼むと ここが伸びます
+          <div style={{ color: ACCENT_TEXT }}>{birthdayLabel(pet.bornAt)}</div>
+          {pet.bornAt && (
+            <div style={{ color: MUTED_TEXT, fontSize: '12px', marginTop: 4 }}>
+              生まれて {dayCount}日
             </div>
-          ) : (
-            PET_TRAIT_ORDER.map((key) => {
-              const v = pet.traits[key] ?? 0;
-              return (
-                <div
-                  key={key}
-                  style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}
-                >
-                  <span
-                    style={{
-                      width: 76,
-                      flexShrink: 0,
-                      fontSize: '11px',
-                      color: v > 0 ? BODY_TEXT : MUTED_TEXT,
-                    }}
-                  >
-                    {PET_TRAIT_LABELS[key] ?? key}
-                  </span>
-                  <Bar ratio={v / traitMax} color={BAR_FILL} />
-                  <span
-                    style={{
-                      width: 22,
-                      flexShrink: 0,
-                      textAlign: 'right',
-                      fontSize: '11px',
-                      color: v > 0 ? ACCENT_TEXT : MUTED_TEXT,
-                    }}
-                  >
-                    {v}
-                  </span>
-                </div>
-              );
-            })
           )}
         </Card>
+
+        <Card title="成長のようす">
+          <div style={{ lineHeight: 1.6 }}>
+            {next === null
+              ? 'これからも、いっしょに。'
+              : next.met
+                ? 'つぎの朝のあいさつを、楽しみに。'
+                : '日々を重ねて、少しずつ育っています。'}
+          </div>
+        </Card>
+
+        <Card title="とくいなこと">
+          <div style={{ color: BODY_TEXT, fontSize: '12px', lineHeight: 1.6 }}>
+            {interests.length
+              ? interests.map((key) => PET_TRAIT_LABELS[key]).join('・')
+              : 'いっしょに、好きなことを見つけていこう。'}
+          </div>
+        </Card>
+
+        {firstVoice && (
+          <Card title="きょうの第一声">
+            <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.6 }}>
+              {firstVoice.text}
+            </div>
+          </Card>
+        )}
 
         {/* ── ④おぼえた作法 (実用系) ── */}
         <Card title="おぼえた作法">

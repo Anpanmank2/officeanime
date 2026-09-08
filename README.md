@@ -94,13 +94,32 @@ Office Log contains only approvals, completed results and warnings. The office r
 
 ### Member Card, Activation Board & Owner Pet
 
-`DeptKartePanel` renders a per-member card (profile-first tabs, status bars, derived current task) and `CompanyActivationBoard` aggregates the same derivation company-wide — the workload derivation is the single source of truth for chips, desk lighting, cards and state display, pinned by `scripts/test-workload.mts`. An owner-side pet companion hatches from egg to chick alongside office activity (`PetStatusPanel.tsx`, `pet-state.ts`).
+`DeptKartePanel` renders a per-member card (profile-first tabs, status bars, derived current task) and `CompanyActivationBoard` aggregates the same derivation company-wide — the workload derivation is the single source of truth for chips, desk lighting, cards and state display, pinned by `scripts/test-workload.mts`. An owner-side pet companion follows the recorded agent-pet stage (`PetStatusPanel.tsx`, `pet-state.ts`).
 
 ## Configuration
 
 Member roster, desk assignments and public-safe persona bios are defined in `jc-config.json` at the repository root (schema `version: 2`). The extension reads this on startup and passes it to the webview as `JCConfigData`. Bios are hand-written fiction for the pixel-office world — no real internal routing, project names or decision criteria are stored here.
 
 `codex-01` is a bot seat, not a person: it reflects the state of external implementation jobs. Its events are emitted by the runner.
+
+### Companion calendar and first voice
+
+The office reads the optional `~/.agent-pet/<pet>/` records without running a hook or changing the pet. Growth uses zero-based calendar age from `growth.born_at`, with the producer's local 04:00 day boundary. The recorded stage is preserved. A valid individual `stage-days.json` overrides the current defaults `[0, 3, 10, 25, 45, 70]`; absent or broken overrides use those defaults. `shared/agent-pet.ts` mirrors agent-pet's current repository config, so future default changes need a coordinated update. Growth conditions, bond and stress are not shown as numbers or meters.
+
+An updated agent-pet `pet-day-start` saves its actual first display text in `first-voice.json`: `{schema:"first-voice/1", id, date, kind, text}`. Normal records contain two lines and milestone records three, each at most 120 Unicode code points. The office accepts only that display data, rejects stale, broken, oversized or symlinked records, and never substitutes a sticky note. The producer patch is delivered separately; installing only the office change leaves first voice hidden until the producer emits a valid record.
+
+Standalone uses uncached `/jc-pet.json` on the loopback server. VS Code uses `jcRequestPet` → `jcPetUpdated`, bypassing shared replay/log buffers. Both refresh every 30 seconds. The automatic bubble renders plain text beside the pet; the current voice is also readable in the companion panel. Only opaque seen IDs are saved in the tab's session storage to suppress polling/reconnect/reload repeats. If storage is unavailable, automatic speech is suppressed and the panel remains available. Closing the browser session resets this tab-local display history.
+
+Regression commands:
+
+```bash
+node --import tsx scripts/test-agent-pet.ts
+node scripts/test-agent-pet-transfer.mjs
+npm --prefix webview-ui test
+node scripts/test-agent-pet-integration.mjs --pet-source=/path/to/isolated/agent-pet
+```
+
+The transfer test executes the real VS Code request/receive branches with fixture I/O; it does not claim an IDE-host rendering test. Webview tests use the full `tsx` loader to cover the shared host/webview module across the package boundary.
 
 ## Requirements
 

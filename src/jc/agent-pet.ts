@@ -13,6 +13,14 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
+import {
+  petDate,
+  type PetFirstVoice,
+  petFirstVoice,
+  petLocalDate,
+  petStageDays,
+} from '../../shared/agent-pet.js';
+
 /** Directory (under the user's home) that holds one folder per pet. */
 const PET_ROOT_DIR = '.agent-pet';
 /** Growth record file inside each pet folder. */
@@ -55,11 +63,11 @@ export interface AgentPetInfo {
   name: string;
   /** 0 = egg … 5 = fully grown. */
   stage: number;
-  /** Days spent together (0+). */
-  bond: number;
+  stageDays: readonly number[];
+  firstVoice: PetFirstVoice | null;
   /** Growth record schema version, for forward compatibility. */
   schema: string;
-  /** Birthday (YYYY-MM-DD) from the timeline hatch entry, else the record. */
+  /** Birthday from growth.born_at; the timeline is a fallback for legacy missing fields. */
   bornAt: string | null;
   /** Experience per work category. */
   traits: Record<string, number>;
@@ -81,23 +89,12 @@ export interface AgentPetInfo {
   lastEndDate: string | null;
 }
 
-/** Absolute path of the pet root, derived from the current user's home. */
-function petRoot(): string {
-  return path.join(os.homedir(), PET_ROOT_DIR);
-}
-
-/** Local calendar day (YYYY-MM-DD) — matches how the pet scripts stamp files. */
-function localDate(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
-}
-
 function asNumber(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
 function asDateString(value: unknown): string | null {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+  return petDate(value);
 }
 
 /** Sorted list of days (YYYY-MM-DD) that have a sticky-note file. */
@@ -184,9 +181,12 @@ function readBornAt(petDir: string): string | null {
  * Returns null when no pet exists or anything is unreadable — callers
  * must treat null as "no companion, render nothing".
  */
-export function readAgentPet(): AgentPetInfo | null {
+export function readAgentPet(
+  home: string = os.homedir(),
+  now: Date = new Date(),
+): AgentPetInfo | null {
   try {
-    const root = petRoot();
+    const root = path.join(home, PET_ROOT_DIR);
     if (!fs.existsSync(root)) return null;
 
     const entries = fs
@@ -199,7 +199,14 @@ export function readAgentPet(): AgentPetInfo | null {
       const petDir = path.join(root, name);
       const growthPath = path.join(petDir, PET_GROWTH_FILE);
       if (!fs.existsSync(growthPath)) continue;
-      const raw = JSON.parse(fs.readFileSync(growthPath, 'utf-8')) as Record<string, unknown>;
+      let raw: Record<string, unknown>;
+      try {
+        const value: unknown = JSON.parse(fs.readFileSync(growthPath, 'utf-8'));
+        if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+        raw = value as Record<string, unknown>;
+      } catch {
+        continue;
+      }
 
       const rawTraits = (raw.traits ?? {}) as Record<string, unknown>;
       const traits: Record<string, number> = {};
@@ -208,7 +215,7 @@ export function readAgentPet(): AgentPetInfo | null {
       }
 
       const memoryDates = listMemoryDates(petDir);
-      const today = localDate(new Date());
+      const today = petLocalDate(now);
       const learned = readLearned(petDir);
 
       // Newest note: walk back from the newest day until one carries a note.
@@ -220,9 +227,10 @@ export function readAgentPet(): AgentPetInfo | null {
       return {
         name,
         stage: Math.max(0, Math.min(PET_MAX_STAGE, Math.floor(asNumber(raw.stage, 0)))),
-        bond: Math.max(0, Math.floor(asNumber(raw.bond, 0))),
+        stageDays: petStageDays(readDisplayJson(path.join(petDir, 'stage-days.json'))),
+        firstVoice: petFirstVoice(readDisplayJson(path.join(petDir, 'first-voice.json')), today),
         schema: typeof raw.schema === 'string' ? raw.schema : '',
-        bornAt: readBornAt(petDir) ?? asDateString(raw.born_at),
+        bornAt: raw.born_at === undefined ? readBornAt(petDir) : asDateString(raw.born_at),
         traits,
         remembered: Math.max(0, Math.floor(asNumber(raw.remembered, 0))),
         learnedCount: learned.count,
@@ -238,4 +246,20 @@ export function readAgentPet(): AgentPetInfo | null {
   } catch {
     return null;
   }
+}
+
+/** Bounded, ordinary files only; never follow display-record symlinks. */
+function readDisplayJson(file: string): unknown {
+  try {
+    const stat = fs.lstatSync(file);
+    if (!stat.isFile() || stat.size > 4096) return null;
+    return JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/** Both transports use the same read-only payload. */
+export function agentPetMessage(home?: string, now?: Date) {
+  return { type: 'jcPetUpdated', pet: readAgentPet(home, now) };
 }

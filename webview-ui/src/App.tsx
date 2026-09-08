@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { BottomToolbar } from './components/BottomToolbar.js';
 import { DebugView } from './components/DebugView.js';
@@ -46,7 +46,7 @@ import { getLogEntries, subscribeLog } from './jc/office-log-state.js';
 import { OfficeLog } from './jc/OfficeLog.js';
 import { OWNER_AGENT_ID } from './jc/owner-avatar-constants.js';
 import { OwnerAvatar } from './jc/OwnerAvatar.js';
-import { jcGetPet } from './jc/pet-state.js';
+import { jcGetPet, jcSubscribePet } from './jc/pet-state.js';
 import { PetStatusPanel } from './jc/PetStatusPanel.js';
 import { TaskHistoryPanel } from './jc/TaskHistoryPanel.js';
 import { OfficeCanvas } from './office/components/OfficeCanvas.js';
@@ -498,6 +498,8 @@ function AppContent() {
   // 全社稼働可視化ボード (2026-07-25 藤井spec): 会社ボード ミニパネルのクリックのみで開閉
   const [isBoardOpen, setIsBoardOpen] = useState(false);
 
+  const currentPet = useSyncExternalStore(jcSubscribePet, jcGetPet);
+
   // 相棒カルテ (agent-pet ステータス画面): 卵クリックで開閉
   const [petPanel, setPetPanel] = useState<{ position: { x: number; y: number } } | null>(null);
 
@@ -843,17 +845,13 @@ function AppContent() {
       {isBoardOpen && <CompanyActivationBoard onClose={() => setIsBoardOpen(false)} />}
 
       {/* ── 相棒カルテ (卵クリック / agent-pet 不在時は開かない) ── */}
-      {petPanel &&
-        (() => {
-          const pet = jcGetPet();
-          return pet ? (
-            <PetStatusPanel
-              pet={pet}
-              position={petPanel.position}
-              onClose={() => setPetPanel(null)}
-            />
-          ) : null;
-        })()}
+      {petPanel && currentPet && (
+        <PetStatusPanel
+          pet={currentPet}
+          position={petPanel.position}
+          onClose={() => setPetPanel(null)}
+        />
+      )}
 
       {/* ── Owner Avatar (always mounted when active, renders via canvas) ── */}
       {ownerAvatarState.active && <OwnerAvatar officeState={officeState} onExited={() => {}} />}

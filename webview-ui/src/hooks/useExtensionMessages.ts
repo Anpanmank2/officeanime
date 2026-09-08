@@ -43,6 +43,7 @@ import {
   type KarteRawEvent,
 } from '../jc/karte-state.js';
 import { addLogEntry } from '../jc/office-log-state.js';
+import { jcLoadPet, jcSetPet } from '../jc/pet-state.js';
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import { setFloorSprites } from '../office/floorTiles.js';
@@ -62,6 +63,7 @@ import {
   type ToolActivity,
 } from '../office/types.js';
 import { setWallSprites } from '../office/wallTiles.js';
+import { isBrowserRuntime } from '../runtime.js';
 import { vscode } from '../vscodeApi.js';
 
 const loggedApprovalEvents = new Set<string>();
@@ -736,7 +738,9 @@ export function useExtensionMessages(
         }
       }
       // ── JC Messages ──────────────────────────────────────────
-      else if (msg.type === 'jcConfigLoaded') {
+      else if (msg.type === 'jcPetUpdated') {
+        jcSetPet(msg.pet);
+      } else if (msg.type === 'jcConfigLoaded') {
         jcLoadConfig(msg.config);
         // R1: 拡張経路等で config が履歴より後に届くケースの取りこぼし防止
         // (roster が無いと復元できない)。冪等 — 安定 agentId + 遷移 dedupe。
@@ -1062,7 +1066,16 @@ export function useExtensionMessages(
     };
     window.addEventListener('message', handler);
     vscode.postMessage({ type: 'webviewReady' });
-    return () => window.removeEventListener('message', handler);
+    const refreshPet = () => {
+      if (isBrowserRuntime) void jcLoadPet(import.meta.env.BASE_URL);
+      else vscode.postMessage({ type: 'jcRequestPet' });
+    };
+    refreshPet();
+    const petTimer = window.setInterval(refreshPet, 30_000);
+    return () => {
+      window.removeEventListener('message', handler);
+      window.clearInterval(petTimer);
+    };
   }, [getOfficeState]);
 
   return {

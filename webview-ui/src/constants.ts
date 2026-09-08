@@ -137,3 +137,11 @@ export const CHARACTER_HIT_HALF_WIDTH = 8;
 export const CHARACTER_HIT_HEIGHT = 24;
 export const TOOL_OVERLAY_VERTICAL_OFFSET = 32;
 export const PULSE_ANIMATION_DURATION_SEC = 1.5;
+
+// Companion speech palette shared by the DOM overlay.
+export const PET_VOICE_COLORS = {
+  background: '#faf3df',
+  text: '#3a332a',
+  border: '#b9a986',
+  muted: '#72654d',
+} as const;

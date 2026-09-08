@@ -50,7 +50,7 @@ export function startBrowserServer(
       // Optional companion (agent-pet). Always answers JSON; `null` when the
       // user has no pet, so the client can degrade to "render nothing".
       if (urlPath === `/${PET_ENDPOINT}`) {
-        res.writeHead(200, { 'Content-Type': MIME_TYPES['.json'] });
+        res.writeHead(200, { 'Content-Type': MIME_TYPES['.json'], 'Cache-Control': 'no-store' });
         res.end(JSON.stringify(readAgentPet()));
         return;
       }
@@ -131,7 +131,7 @@ export function startBrowserServer(
       reject(err);
     });
 
-    server.listen(port, () => {
+    server.listen(port, '127.0.0.1', () => {
       console.log(`[JC] Browser server listening on http://localhost:${port}`);
       resolve({
         port,

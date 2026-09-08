@@ -8,9 +8,11 @@ import {
   ZOOM_MIN,
   ZOOM_SCROLL_THRESHOLD,
 } from '../../constants.js';
+import { PET_TILE } from '../../jc/jc-constants.js';
 import { renderJCOverlay } from '../../jc/jc-overlay.js';
 import { jcGetDeptBoardAtTile, jcGetMemberAtDesk, jcIsBookshelfAtTile } from '../../jc/jc-state.js';
 import { jcIsPetTile } from '../../jc/pet-state.js';
+import { PetSpeechBubble } from '../../jc/PetSpeechBubble.js';
 import { isPinned } from '../../jc/pin-store.js';
 import { unlockAudio } from '../../notificationSound.js';
 import { vscode } from '../../vscodeApi.js';
@@ -81,6 +83,7 @@ export function OfficeCanvas({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef({ x: 0, y: 0 });
+  const petAnchorRef = useRef({ x: 0, y: 0, visible: false });
   // Middle-mouse pan state (imperative, no re-renders)
   const isPanningRef = useRef(false);
   const panStartRef = useRef({ mouseX: 0, mouseY: 0, panX: 0, panY: 0 });
@@ -292,6 +295,14 @@ export function OfficeCanvas({
           officeState.getLayout().rows,
         );
         offsetRef.current = { x: offsetX, y: offsetY };
+        const dpr = window.devicePixelRatio || 1;
+        const petX = (offsetX + (PET_TILE.col + 0.5) * TILE_SIZE * zoom) / dpr;
+        const petY = (offsetY + PET_TILE.row * TILE_SIZE * zoom) / dpr;
+        petAnchorRef.current = {
+          x: petX,
+          y: petY,
+          visible: !isEditMode && petX >= 0 && petX <= w / dpr && petY >= 0 && petY <= h / dpr,
+        };
 
         // JC Virtual Office overlay (nameplates, zone labels, exec icons, stats)
         const ht = hoverTileRef.current;
@@ -1001,6 +1012,7 @@ export function OfficeCanvas({
         background: '#1E1E2E',
       }}
     >
+      <PetSpeechBubble anchor={petAnchorRef} />
       <canvas
         ref={canvasRef}
         onMouseMove={handleMouseMove}

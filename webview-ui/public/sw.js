@@ -1,6 +1,6 @@
 // ── Service Worker — Office Anime PWA ──────────────────────────
 // v5: Network-first for all assets. Cache only as offline fallback.
-const CACHE_NAME = 'office-anime-v5';
+const CACHE_NAME = 'office-anime-v6';
 
 self.addEventListener('install', (event) => {
   // Immediately take over from any previous SW
@@ -20,6 +20,9 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+
+  // Companion records stay local to the live page, never in offline caches.
+  if (url.pathname === '/jc-pet.json') return;
 
   // Skip WebSocket and non-GET
   if (url.protocol === 'ws:' || url.protocol === 'wss:' || event.request.method !== 'GET') {

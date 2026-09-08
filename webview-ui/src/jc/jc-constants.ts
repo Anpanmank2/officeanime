@@ -437,7 +437,7 @@ export const COMP_BADGE_TOOLTIP_DISCLAIMER = '※匿名workflow経由の作業�
 
 // ── 相棒カルテ (agent-pet ステータス画面) ────────────────────────
 // 設計正本: .company/secretary/owner-ventures/agent-tamagotchi/status-panel-ux-v1.md
-// 3系統 (愛着 / 実用 / 期待) の計器盤。期待系は「距離は見せる・中身は伏せる」。
+// 暦日成長。成長条件となつき・ストレスの数値は表示しない。
 // 数値はすべて表示専用。育成データ本体 (agent-pet/) は一切変更しない。
 
 /** 相棒が居る執務室のタイル (卵の描画位置 = クリック判定位置)。 */
@@ -466,7 +466,7 @@ export const PET_TRAIT_LABELS: Readonly<Record<string, string>> = {
   numbers: '数字・集計',
 };
 
-/** 得意分野バーの表示順 (traits キー)。 */
+/** 得意分野の表示順 (traits キー)。 */
 export const PET_TRAIT_ORDER: readonly string[] = [
   'code',
   'research',
@@ -474,44 +474,6 @@ export const PET_TRAIT_ORDER: readonly string[] = [
   'chat',
   'numbers',
 ];
-
-/** 昇段しきい値が参照する数字の種類。 */
-export type PetStageMetric = 'bond' | 'topTrait' | 'learned';
-
-export interface PetStageRule {
-  /** この規則を満たすと到達する段階 (1〜5)。 */
-  stage: number;
-  /** どの数字を見るか。 */
-  metric: PetStageMetric;
-  /** 到達に必要な値。 */
-  target: number;
-  /** 条件の平易な言い方 (画面にそのまま出す)。 */
-  label: string;
-  /** 数え方の単位。 */
-  unit: string;
-}
-
-/**
- * 段階のしきい値。
- *
- * ★ 正本は agent-pet 側 — `agent-pet/scripts/lib/stages.mjs` の `STAGE_RULES`。
- *   実際に stage を書き換えるのは agent-pet の朝の処理 (pet-day-start.mjs) だけで、
- *   ここは「あと◯」を出すための **同値の写し** に過ぎない。
- *   **片方だけ変えないこと**。数値を変えるときは必ず両方を同じ値にする。
- *
- * 由来: 骨子§5「見た目の成長段階」
- *   (.company/secretary/owner-ventures/agent-tamagotchi/v1-skeleton-draft.md)
- */
-export const PET_STAGE_RULES: readonly PetStageRule[] = [
-  { stage: 1, metric: 'bond', target: 2, label: 'いっしょに過ごした日数', unit: '日' },
-  { stage: 2, metric: 'bond', target: 5, label: 'いっしょに過ごした日数', unit: '日' },
-  { stage: 3, metric: 'topTrait', target: 10, label: 'いちばん得意な分野の経験', unit: '' },
-  { stage: 4, metric: 'learned', target: 5, label: 'おぼえた作法', unit: '件' },
-  { stage: 5, metric: 'bond', target: 30, label: 'いっしょに過ごした日数', unit: '日' },
-];
-
-/** 次にもらえるものは伏せる (設計原則A: 距離は見せる・中身は伏せる)。 */
-export const PET_NEXT_REWARD_GLYPH = '？';
 
 // ── Confidence Badge Colors (eng-05 spec) ───────────────────────
 export const CONFIDENCE_COLORS: Record<string, string> = {

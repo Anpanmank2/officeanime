@@ -46,6 +46,7 @@ import {
   startExternalSessionScanning,
   startStaleExternalAgentCheck,
 } from './fileWatcher.js';
+import { agentPetMessage } from './jc/agent-pet.js';
 import { appendAnswer } from './jc/answers-writer.js';
 import type { BrowserServer } from './jc/browser-server.js';
 import { startBrowserServer } from './jc/browser-server.js';
@@ -136,7 +137,10 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
     };
 
     webviewView.webview.onDidReceiveMessage(async (message) => {
-      if (message.type === 'openClaude') {
+      if (message.type === 'jcRequestPet') {
+        // Reply directly: companion text must not enter the shared replay/log buffer.
+        origPostMessage(agentPetMessage());
+      } else if (message.type === 'openClaude') {
         await launchNewTerminal(
           this.nextAgentId,
           this.nextTerminalIndex,
