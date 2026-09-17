@@ -1,5 +1,6 @@
 // ── Just Curious Virtual Office — Webview State Manager ─────────
 
+import { COMPACT_DESK_SEAT_UIDS, resolveCompactDeskSeatPositions } from './desk-seat-registry.js';
 import {
   DEPT_COLORS,
   IDLE_TIMEOUT_MS,
@@ -12,7 +13,6 @@ import {
   SPEECH_BUBBLE_PER_10_CHARS_MS,
   STATE_COLORS,
 } from './jc-constants.js';
-import { COMPACT_DESK_SEAT_UIDS, resolveCompactDeskSeatPositions } from './desk-seat-registry.js';
 import type {
   JCBubbleType,
   JCConfigData,
@@ -60,6 +60,7 @@ type ApprovalQueueEvent =
       via: 'office' | 'chat';
     };
 
+const closedApprovals = new Set<string>();
 const approvals = new Map<string, ApprovalRequest>();
 const resolvedApprovalCache = new Map<
   string,
@@ -89,8 +90,11 @@ function notifyApprovals(): void {
 
 /** Apply queue events idempotently; repeated requests overwrite their existing row. */
 export function jcApplyApprovalEvent(event: ApprovalQueueEvent): void {
-  if (event.event === 'approval_request') approvals.set(event.id, event);
-  else {
+  if (event.event === 'approval_request') {
+    if (closedApprovals.has(event.id)) return;
+    approvals.set(event.id, event);
+  } else {
+    closedApprovals.add(event.request_id);
     const request = approvals.get(event.request_id);
     if (request && event.event === 'approval_resolved') {
       resolvedApprovalCache.set(request.id, {
@@ -112,6 +116,7 @@ export function jcGetApprovalRequests(now = Date.now()): ApprovalRequest[] {
   let changed = false;
   for (const [id, request] of approvals) {
     if (Date.parse(request.expires) <= now) {
+      closedApprovals.add(id);
       approvals.delete(id);
       changed = true;
     }

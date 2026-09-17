@@ -20,6 +20,14 @@ export function appendAnswer(workspaceRoot: string, answer: ApprovalAnswer): voi
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
   }
 
+  const previous = answers.find(
+    (row) => (row as ApprovalAnswer)?.request_id === answer.request_id,
+  ) as ApprovalAnswer | undefined;
+  if (previous) {
+    if (previous.answer !== answer.answer || previous.company_id !== answer.company_id)
+      throw new Error('この判断には既に別の回答があります。');
+    return;
+  }
   const tmpPath = `${answersPath}.tmp`;
   answers.push(answer);
   fs.writeFileSync(tmpPath, JSON.stringify(answers, null, 2), 'utf8');

@@ -9,6 +9,7 @@
  * Ref: .company/engineering/knowledge/2026-04-03-pixel-agents-quality-gate.md
  */
 
+import { WebSocketServer } from 'ws';
 import { execSync, spawn } from 'child_process';
 import { existsSync, writeFileSync, readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
@@ -17,7 +18,7 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
 const WEBVIEW = resolve(ROOT, 'webview-ui');
-const PORT = 18432; // Ephemeral port to avoid conflict with running dev server
+let PORT = 0; // OS-assigned isolated port
 const EVENTS_FILE = resolve(ROOT, 'jc-events.json');
 
 let serverProcess = null;
@@ -38,20 +39,26 @@ async function startServer() {
   // Reset events file
   writeFileSync(EVENTS_FILE, '{"version":1,"events":[]}');
 
-  return new Promise((resolve, reject) => {
-    serverProcess = spawn('npx', ['vite', '--port', String(PORT)], {
-      cwd: WEBVIEW,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+  return new Promise((ready, reject) => {
+    serverProcess = spawn(
+      process.execPath,
+      [resolve(WEBVIEW, 'node_modules/vite/bin/vite.js'), '--port', String(PORT)],
+      {
+        cwd: WEBVIEW,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
 
     let output = '';
     const timeout = setTimeout(() => reject(new Error('Server start timeout')), 15000);
 
     serverProcess.stdout.on('data', (data) => {
       output += data.toString();
-      if (output.includes('ready in')) {
+      const address = output.match(/localhost:(\d+)/);
+      if (output.includes('ready in') && address) {
+        PORT = Number(address[1]);
         clearTimeout(timeout);
-        resolve();
+        ready();
       }
     });
 
@@ -96,10 +103,44 @@ async function run() {
     process.exit(0);
   }
 
+  // This legacy suite injects producer events. Its isolated acknowledgement
+  // transport replaces the old optimistic UI removal; full persistence is
+  // exercised separately by test-phase2-browser against the real host.
+  const ackServer = new WebSocketServer({ port: 0, host: '127.0.0.1' });
+  await new Promise((resolve) => ackServer.once('listening', resolve));
+  ackServer.on('connection', (socket) =>
+    socket.on('message', (raw) => {
+      const message = JSON.parse(raw.toString());
+      if (message.type === 'webviewReady')
+        socket.send(
+          JSON.stringify({
+            type: 'jcEventHistory',
+            events: JSON.parse(readFileSync(EVENTS_FILE, 'utf8')).events,
+          }),
+        );
+      if (message.type === 'jcApprovalAnswer')
+        socket.send(
+          JSON.stringify({
+            type: 'jcOfficeEvent',
+            event: {
+              event: 'approval_resolved',
+              request_id: message.request_id,
+              answer: message.answer,
+              at: new Date().toISOString(),
+              timestamp: new Date().toISOString(),
+              via: 'office',
+            },
+          }),
+        );
+    }),
+  );
   const browser = await chromium.launch({ headless: true });
 
   try {
     const page = await browser.newPage();
+    await page.addInitScript((port) => {
+      window.__PIXEL_AGENTS_WS_PORT__ = port;
+    }, ackServer.address().port);
     const logs = [];
     const errors = [];
     page.on('console', (msg) => logs.push(msg.text()));
@@ -283,7 +324,10 @@ async function run() {
       (await page.locator('[data-approval-confirmation]').count()) === 0,
       'No confirmation for reversible answer',
     );
-    assert((await count.textContent()) === '0', 'Answer removes document');
+    await page.waitForFunction(
+      () => document.querySelector('[data-desk-docs-count]')?.textContent === '0',
+    );
+    assert((await count.textContent()) === '0', 'Host acknowledgement removes document');
     console.log('  [Test 10] Irreversible confirmation and back');
     await sendApproval('desk-e2e-2', true);
     await page.locator('[data-approval-recommended]').click();
@@ -298,7 +342,10 @@ async function run() {
     );
     await page.locator('[data-approval-recommended]').click();
     await confirmation.getByRole('button', { name: '確定', exact: true }).click();
-    assert((await count.textContent()) === '0', 'Confirmed document removed');
+    await page.waitForFunction(
+      () => document.querySelector('[data-desk-docs-count]')?.textContent === '0',
+    );
+    assert((await count.textContent()) === '0', 'Confirmed document removed after acknowledgement');
     console.log('  [Test 11] Optional project and chat sync');
     await sendApproval('desk-e2e-3', false, 'pixel-office');
     assert(
@@ -458,6 +505,8 @@ async function run() {
     }
   } finally {
     await browser.close();
+    for (const client of ackServer.clients) client.terminate();
+    ackServer.close();
     stopServer();
     // Clean up events file
     writeFileSync(EVENTS_FILE, '{"version":1,"events":[]}');

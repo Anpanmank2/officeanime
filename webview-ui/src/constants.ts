@@ -154,3 +154,5 @@ export const PET_SPRITE_PALETTE = {
   sage: '#94AA91',
   coral: '#C98270',
 } as const;
+
+export const WORK_TOAST_MS = 2400;

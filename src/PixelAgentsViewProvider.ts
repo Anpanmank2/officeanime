@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -48,11 +49,13 @@ import {
 } from './fileWatcher.js';
 import { agentPetMessage } from './jc/agent-pet.js';
 import { appendAnswer } from './jc/answers-writer.js';
+import { validateApprovalAnswer } from './jc/approval-answer-validation.js';
 import type { BrowserServer } from './jc/browser-server.js';
 import { startBrowserServer } from './jc/browser-server.js';
 import type { CommandDispatcher } from './jc/command-dispatcher.js';
 import { createCommandDispatcher } from './jc/command-dispatcher.js';
 import {
+  getJCConfig,
   isJCActive,
   onAgentCreated as jcOnAgentCreated,
   onAgentRemoved as jcOnAgentRemoved,
@@ -63,6 +66,8 @@ import {
 } from './jc/index.js';
 import type { MessageBridge } from './jc/message-bridge.js';
 import { createMessageBridge } from './jc/message-bridge.js';
+import { createRequestWorkflow } from './jc/request-runtime.js';
+import type { RequestWorkflow } from './jc/request-workflow.js';
 import { TaskHistoryWriter } from './jc/task-history-writer.js';
 import type { LayoutWatcher } from './layoutPersistence.js';
 import { readLayoutFromFile, watchLayoutFile, writeLayoutToFile } from './layoutPersistence.js';
@@ -112,6 +117,57 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
   /** Track messages sent to webview for replay to late-connecting browser clients */
   private sentMessages = new Map<string, unknown>();
 
+  // JC config and the runtime belong to the workspace captured on activation.
+  // Changing folders requires a host reload rather than reusing old execution paths.
+  private readonly requestWorkspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  private requestWorkflow: RequestWorkflow | null = null;
+  private requestTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Used by the VS Code webview and its browser bridge; never forwards commands back to UI. */
+  private handleRequestMessage(data: unknown, respond: (message: unknown) => void): boolean {
+    const message = data as { type?: string; requestId?: string };
+    if (
+      !['jcRequestSubmit', 'jcRequestConfirmed', 'jcRequestCancel', 'jcWorkSync'].includes(
+        message.type ?? '',
+      )
+    )
+      return false;
+    try {
+      const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const config = getJCConfig();
+      if (!workspaceRoot || !this.context.storageUri)
+        throw new Error('作業フォルダーを開くと、秘書へ依頼できます。');
+      if (workspaceRoot !== this.requestWorkspaceRoot)
+        throw new Error(
+          '作業フォルダーが変更されました。ウィンドウを再読み込みしてから依頼してください。',
+        );
+      if (!vscode.workspace.isTrusted)
+        throw new Error('この作業フォルダーは制限モードです。信頼設定を確認してください。');
+      if (!config)
+        throw new Error('会社の設定を読み込めません。jc-config.jsonを確認してください。');
+      if (!this.requestWorkflow) {
+        const workspaceKey = createHash('sha256').update(path.resolve(workspaceRoot)).digest('hex');
+        this.requestWorkflow = createRequestWorkflow({
+          file: path.join(this.context.storageUri.fsPath, 'requests', workspaceKey + '.json'),
+          config,
+          workspaceRoot,
+          eventsFile: path.join(workspaceRoot, 'jc-events.json'),
+          broadcast: (reply) => this.broadcastMessage(reply),
+          // Scoped drafts still require the stored explicit Owner plan answer.
+          allowDrafts: () => vscode.workspace.isTrusted,
+          history: new TaskHistoryWriter(),
+        });
+        this.requestTimer = setInterval(() => this.requestWorkflow?.expire(), 1000);
+      }
+      return this.requestWorkflow.handle(data, respond);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      respond({ type: 'jcWorkUnavailable', reason });
+      respond({ type: 'jcWorkError', requestId: message.requestId, error: reason });
+      return true;
+    }
+  }
+
   constructor(private readonly context: vscode.ExtensionContext) {}
 
   private get extensionUri(): vscode.Uri {
@@ -139,6 +195,8 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
     };
 
     webviewView.webview.onDidReceiveMessage(async (message) => {
+      if (this.handleRequestMessage(message, (reply) => webviewView.webview.postMessage(reply)))
+        return;
       if (message.type === 'jcRequestPet') {
         // Reply directly: companion text must not enter the shared replay/log buffer.
         origPostMessage(agentPetMessage());
@@ -485,6 +543,9 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         if (isJCActive() && this.webview) {
           sendJCConfig(this.webview);
         }
+        this.handleRequestMessage({ type: 'jcWorkSync' }, (reply) =>
+          this.webview?.postMessage(reply),
+        );
       } else if (message.type === 'jcAssignMapping') {
         // JC: Handle manual member assignment from webview
         // (handled via agent-mapper in jc/index.ts)
@@ -579,12 +640,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           void memberName; // used in events above
         }
       } else if (message.type === 'jcApprovalAnswer') {
-        const {
-          request_id,
-          answer,
-          at: messageAt,
-          company_id,
-        } = message as {
+        const { request_id, answer, company_id } = message as {
           request_id?: unknown;
           answer?: unknown;
           at?: unknown;
@@ -597,10 +653,19 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (!workspaceRoot) return;
 
-        const at =
-          typeof messageAt === 'string' && messageAt ? messageAt : new Date().toISOString();
+        const at = new Date().toISOString();
         const companyId = typeof company_id === 'string' ? company_id : '';
         try {
+          const prior = validateApprovalAnswer(
+            path.join(workspaceRoot, 'jc-events.json'),
+            request_id,
+            answer,
+            companyId,
+          );
+          if (prior) {
+            webviewView.webview.postMessage({ type: 'jcOfficeEvent', event: prior });
+            return;
+          }
           appendAnswer(workspaceRoot, {
             request_id,
             answer,
@@ -626,8 +691,15 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
           const tmp = eventsFile + '.tmp';
           fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
           fs.renameSync(tmp, eventsFile);
-          this.browserServer?.broadcast(approvalResolved);
+          const reply = { type: 'jcOfficeEvent', event: approvalResolved };
+          webviewView.webview.postMessage(reply);
+          this.browserServer?.broadcast(reply);
         } catch (e) {
+          webviewView.webview.postMessage({
+            type: 'jcApprovalAnswerError',
+            requestId: request_id,
+            error: String(e),
+          });
           console.error('[pixel-agents] jcApprovalAnswer write error:', e);
         }
       } else if (message.type === 'task:requestHistory') {
@@ -923,8 +995,8 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 
   /** Send message to webview + all browser clients */
   broadcastMessage(data: unknown): void {
-    this.webview?.postMessage(data);
-    this.trackMessage(data);
+    if (this.webview) this.webview.postMessage(data);
+    else this.trackMessage(data);
   }
 
   /** Start browser viewing: HTTP server + WS bridge, open in external browser */
@@ -1047,6 +1119,12 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
       // Create message bridge with command dispatcher
       this.messageBridge = createMessageBridge({
         onBrowserCommand: (data, respond) => {
+          const message = data as { type?: string };
+          if (message.type === 'webviewReady') {
+            this.handleRequestMessage({ type: 'jcWorkSync' }, respond);
+            return;
+          }
+          if (this.handleRequestMessage(data, respond)) return;
           if (
             handleLayoutCommand(
               data as { type?: string; layout?: unknown },
@@ -1092,6 +1170,10 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
   }
 
   dispose() {
+    this.requestWorkflow?.dispose();
+    this.requestWorkflow = null;
+    if (this.requestTimer) clearInterval(this.requestTimer);
+    this.requestTimer = null;
     this.browserServer?.close();
     this.browserServer = null;
     this.messageBridge = null;

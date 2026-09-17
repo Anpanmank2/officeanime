@@ -18,10 +18,13 @@
 
 import { MOMENTUM_HALFLIFE_MS, WORK_ABANDON_MS, WORK_STALL_MS } from './jc-constants.js';
 import { jcGetAllMembers, jcGetMemberRuntime } from './jc-state.js';
+import { WORK_STATUS_LABEL, WORK_TERMINAL } from './workflow-state.js';
+import { workSnapshot, workSubscribe } from './workflow-state.js';
 
 /** jc-events.json の生イベント (必要フィールドのみ、timestamp は ISO 文字列) */
 export interface KarteRawEvent {
   event: string;
+  workflow_id?: string;
   timestamp?: string;
   from?: string;
   /** 一部の旧 emitter は actor を agent で運ぶ (work_started/task_completed) */
@@ -103,7 +106,7 @@ export function subscribeKarte(fn: () => void): () => void {
 }
 
 function normalize(raw: KarteRawEvent): KarteEvent | null {
-  if (!raw || typeof raw.event !== 'string') return null;
+  if (!raw || typeof raw.event !== 'string' || raw.workflow_id) return null;
   const at = raw.timestamp ? Date.parse(raw.timestamp) : NaN;
   if (!Number.isFinite(at)) return null; // timestamp 無しは集計対象外 (実データ原則)
   const from =
@@ -133,6 +136,10 @@ function keyOf(e: KarteEvent): string {
 
 /** 変更リビジョン (導出 memo の invalidation 用) */
 let revision = 0;
+workSubscribe(() => {
+  revision++;
+  scheduleNotify();
+});
 
 /** client-init の全量 sync (置換) */
 export function bulkSetKarteEvents(raw: KarteRawEvent[]): void {
@@ -347,6 +354,16 @@ export function computeOpenWork(now: number = Date.now()): OpenWork[] {
   // 全セッションを 1 つの jc-events.json に映すため、死んだセッションの掃除が要る)。
   const alive = out.filter((w) => now - w.startedAt < WORK_ABANDON_MS);
   for (const w of alive) w.stalled = now - w.startedAt >= WORK_STALL_MS;
+  for (const row of workSnapshot()) {
+    if (WORK_TERMINAL.has(row.status)) continue;
+    alive.push({
+      memberId: row.memberId,
+      task: `${WORK_STATUS_LABEL[row.status]}: ${row.purpose}`,
+      startedAt: Date.parse(row.createdAt),
+      hasStarted: row.status === 'running',
+      stalled: row.status === 'waiting',
+    });
+  }
   alive.sort((a, b) => b.startedAt - a.startedAt);
   return alive;
 }

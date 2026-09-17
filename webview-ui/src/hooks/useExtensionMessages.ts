@@ -20,14 +20,13 @@ import {
   jcGetDeskSeatUid,
   jcGetMemberRuntime,
   jcGetOwnerDeskAnchor,
-  jcGetPokerSeat,
   jcLoadConfig,
-  jcSyncDeskLayout,
   jcMemberArriving,
   jcMemberDeparted,
   jcMemberLeaving,
   jcMemberStateChange,
   jcRecordActivity,
+  jcSyncDeskLayout,
   jcTasksBulkSync,
   jcTaskUpdate,
   jcTriggerLiaison,
@@ -39,8 +38,6 @@ import {
 } from '../jc/index.js';
 import { IDLE_TINT_STATES, MAIL_FLIGHT_MS, NON_WORKING_STATES } from '../jc/jc-constants.js';
 import { jcGetAllMembers, jcGetApprovalDetails } from '../jc/jc-state.js';
-import { reconcileRegisteredSeats } from '../jc/seat-reconciliation.js';
-import { OWNER_AGENT_ID } from '../jc/owner-avatar-constants.js';
 import {
   appendKarteEvent,
   bulkSetKarteEvents,
@@ -48,7 +45,11 @@ import {
   type KarteRawEvent,
 } from '../jc/karte-state.js';
 import { addLogEntry } from '../jc/office-log-state.js';
+import { OWNER_AGENT_ID } from '../jc/owner-avatar-constants.js';
 import { jcLoadPet, jcSetPet } from '../jc/pet-state.js';
+import { reconcileRegisteredSeats } from '../jc/seat-reconciliation.js';
+import { WORK_TERMINAL } from '../jc/workflow-state.js';
+import { workSnapshot } from '../jc/workflow-state.js';
 import { playDoneSound, setSoundEnabled } from '../notificationSound.js';
 import type { OfficeState } from '../office/engine/officeState.js';
 import { setFloorSprites } from '../office/floorTiles.js';
@@ -905,6 +906,44 @@ export function useExtensionMessages(
             syncCh.jcDesaturated = IDLE_TINT_STATES.has(m.jcState);
           }
         }
+      } else if (msg.type === 'jcWorkSnapshot' || msg.type === 'jcWorkUpdate') {
+        const rows = workSnapshot();
+        jcGetAllMembers().forEach((member, index) => {
+          const all = rows.filter((row) => row.memberId === member.id);
+          if (!all.length) return;
+          const active = all.filter((row) => !WORK_TERMINAL.has(row.status));
+          const agentId = -9000 - index;
+          const dispatch = (data: unknown) =>
+            window.dispatchEvent(new MessageEvent('message', { data }));
+          if (!jcGetMemberRuntime(member.id)?.isPresent)
+            dispatch({
+              type: 'jcMemberArriving',
+              agentId,
+              memberId: member.id,
+              deskId: member.deskId,
+              palette: member.palette,
+              hueShift: member.hueShift,
+            });
+          dispatch({
+            type: 'jcMemberStateChange',
+            agentId,
+            memberId: member.id,
+            jcState: active.some((r) => r.status === 'running')
+              ? 'coding'
+              : active.some((r) => r.status === 'waiting')
+                ? 'reviewing'
+                : active.length
+                  ? 'thinking'
+                  : all[0].status === 'error'
+                    ? 'error'
+                    : 'idle',
+          });
+          dispatch({
+            type: 'jcActivitySummary',
+            memberId: member.id,
+            summary: active.map((r) => r.purpose).join(' / ') || null,
+          });
+        });
       } else if (msg.type === 'jcMemberStateChange') {
         const agentId = msg.agentId as number;
         const jcState = msg.jcState as JCState;
@@ -978,17 +1017,13 @@ export function useExtensionMessages(
           } else if (jcState === 'meeting') {
             ch.currentTool = null;
             ch.isActive = false;
-            // Walk to poker table
-            const seatIdx = Array.from(os.characters.keys()).indexOf(chId);
-            const seat = jcGetPokerSeat(seatIdx >= 0 ? seatIdx : 0);
-            os.walkToTile(chId, seat.col, seat.row);
+            // A state alone does not identify a consultation partner.
+            os.sendToSeat(chId);
           } else if (jcState === 'handoff') {
             ch.currentTool = null;
             ch.isActive = false;
-            // Walk to poker table for handoff discussion
-            const handoffIdx = Array.from(os.characters.keys()).indexOf(chId);
-            const handoffSeat = jcGetPokerSeat(handoffIdx >= 0 ? handoffIdx : 0);
-            os.walkToTile(chId, handoffSeat.col, handoffSeat.row);
+            // A handoff state alone does not identify a meeting partner.
+            os.sendToSeat(chId);
           }
         }
       } else if (msg.type === 'jcTaskCompleted') {

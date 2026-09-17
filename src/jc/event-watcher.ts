@@ -38,6 +38,8 @@ export class EventWatcher {
   private webview: vscode.Webview | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private lastProcessedIndex = 0;
+  private seenEvents = new Set<string>();
+  private replaying = false;
   private fsWatcher: fs.FSWatcher | null = null;
   /** Approval requests are keyed by request id so queue replay remains idempotent. */
   private approvals = new ApprovalState();
@@ -123,8 +125,10 @@ export class EventWatcher {
       // ファイル無し/mid-write — 逐次 push に任せる
     }
 
-    // Initial read
+    // Restore durable history without replaying completion/handoff effects.
+    this.replaying = true;
     this.processEvents();
+    this.replaying = false;
     console.log(`[JC-Events] Watching ${eventFilePath}`);
   }
 
@@ -223,6 +227,9 @@ export class EventWatcher {
         // 1 つの malformed イベント (message 欠落等) がプロセスを殺さないよう
         // per-event で隔離する。壊れたイベントは skip して次へ進む。
         try {
+          const key = JSON.stringify(event);
+          if (this.seenEvents.has(key)) continue;
+          this.seenEvents.add(key);
           this.handleEvent(event);
         } catch (err) {
           console.error('[JC-Events] handleEvent error — event skipped:', err);
@@ -264,6 +271,25 @@ export class EventWatcher {
     // 逐次 push する。演出メッセージと違い、集計用の履歴なので全種別を転送。
     // (接続後クライアント向け。接続前の全量は client-init の jcEventHistory が担う)
     this.webview.postMessage({ type: 'jcHistoryEvent', event });
+
+    if (this.replaying) return;
+
+    // Correlated requests have their own durable lifecycle. Only their observed
+    // handoff animates here; legacy gauges/thoughts must not outlive the request.
+    if ((event as unknown as { workflow_id?: string }).workflow_id) {
+      if (event.event === 'delegate') {
+        const d = event as DelegateEvent;
+        for (const to of d.to) {
+          if (
+            this.config.members.some((m) => m.id === d.from) &&
+            this.config.members.some((m) => m.id === to)
+          ) {
+            this.webview.postMessage({ type: 'jcMailFly', fromMemberId: d.from, toMemberId: to });
+          }
+        }
+      }
+      return;
+    }
 
     switch (event.event) {
       case 'task_received':
