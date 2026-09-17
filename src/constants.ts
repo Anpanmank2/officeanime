@@ -55,3 +55,10 @@ export const WORKSPACE_KEY_AGENTS = 'pixel-agents.agents';
 export const WORKSPACE_KEY_AGENT_SEATS = 'pixel-agents.agentSeats';
 export const WORKSPACE_KEY_LAYOUT = 'pixel-agents.layout';
 export const TERMINAL_NAME_PREFIX = 'Claude Code';
+
+/** Owner confirmation remains resumable for one day. */
+export const REQUEST_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
+export const WORK_TERMINAL: ReadonlySet<import('../shared/workflow/types.js').WorkStatus> = new Set(
+  ['done', 'error', 'cancelled', 'expired', 'interrupted'],
+);

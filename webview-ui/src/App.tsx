@@ -10,7 +10,6 @@ import { useEditorActions } from './hooks/useEditorActions.js';
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js';
 import { useExtensionMessages } from './hooks/useExtensionMessages.js';
 import { CompanyActivationBoard } from './jc/CompanyActivationBoard.js';
-import { CompletionToast } from './jc/CompletionToast.js';
 import { DeptKartePanel } from './jc/DeptKartePanel.js';
 import { DeskCard } from './jc/DeskCard.js';
 import { DeskDocsTray } from './jc/DeskDocsTray.js';
@@ -48,6 +47,7 @@ import { OWNER_AGENT_ID } from './jc/owner-avatar-constants.js';
 import { OwnerAvatar } from './jc/OwnerAvatar.js';
 import { jcGetPet, jcSubscribePet } from './jc/pet-state.js';
 import { PetStatusPanel } from './jc/PetStatusPanel.js';
+import { WorkPanel } from './jc/WorkPanel.js';
 import { OfficeCanvas } from './office/components/OfficeCanvas.js';
 import { ToolOverlay } from './office/components/ToolOverlay.js';
 import { EditorState } from './office/editor/editorState.js';
@@ -487,6 +487,17 @@ function AppContent() {
 
   // 本棚とツールバーから開く、最初は閉じた会社の記録パネル。
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [workOpen, setWorkOpen] = useState(false);
+  useEffect(() => {
+    const open = () => {
+      setWorkOpen(true);
+      setIsLibraryOpen(false);
+      setDeskCard(null);
+    };
+    window.addEventListener('office:open-work', open);
+    return () => window.removeEventListener('office:open-work', open);
+  }, []);
+  const [workResultId, setWorkResultId] = useState<string | null>(null);
 
   // 全社稼働可視化ボード (2026-07-25 藤井spec): 会社ボード ミニパネルのクリックのみで開閉
   const [isBoardOpen, setIsBoardOpen] = useState(false);
@@ -528,6 +539,11 @@ function AppContent() {
 
   const handleDeskCardOpen = useCallback(
     (memberId: string, screenPos: { x: number; y: number }) => {
+      if (memberId === 'exec-sec') {
+        setWorkOpen(true);
+        setIsLibraryOpen(false);
+        return;
+      }
       // In owner avatar mode, skip the DeskCard.
       if (jcGetOwnerAvatarState().active) return;
       setIsLibraryOpen(false);
@@ -672,7 +688,20 @@ function AppContent() {
 
       {/* Slice1: completion toast "本日N件目! 🎉" (screen-space DOM) */}
       <DeskDocsTray />
-      <CompletionToast />
+      <WorkPanel
+        open={workOpen}
+        onOpen={() => {
+          setWorkOpen(true);
+          setIsLibraryOpen(false);
+          setDeskCard(null);
+        }}
+        onClose={() => setWorkOpen(false)}
+        onResult={(id) => {
+          setWorkResultId(id);
+          setWorkOpen(false);
+          setIsLibraryOpen(true);
+        }}
+      />
 
       {/* ── Bottom Toolbar (Tasks + Settings + Owner summon) ── */}
       <BottomToolbar
@@ -849,7 +878,9 @@ function AppContent() {
         />
       )}
 
-      {isLibraryOpen && <OfficeLibraryPanel onClose={() => setIsLibraryOpen(false)} />}
+      {isLibraryOpen && (
+        <OfficeLibraryPanel selectedId={workResultId} onClose={() => setIsLibraryOpen(false)} />
+      )}
 
       {/* ── 全社稼働可視化ボード (会社ボード ミニパネルクリック / 2026-07-25 藤井spec) ── */}
       {isBoardOpen && <CompanyActivationBoard onClose={() => setIsBoardOpen(false)} />}

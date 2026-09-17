@@ -3,7 +3,6 @@
 // Called after the base renderFrame() to add nameplates, exec icons,
 // absence indicators, zone labels, and state bubbles.
 // v2: Neon startup aesthetic — "who, where, what" management dashboard
-
 import type { Character } from '../office/types.js';
 import { isSittingState, TILE_SIZE } from '../office/types.js';
 import {
@@ -68,6 +67,7 @@ import { officeHoursRenderState } from './office-hours-state.js';
 import { petCompanionBounds } from './pet-geometry.js';
 import { drawPetSprite } from './pet-sprite.js';
 import { jcGetPet } from './pet-state.js';
+import { workSnapshot } from './workflow-state.js';
 
 // ── Rendering Constants (overlay-specific) ───────────────────────
 const NAMEPLATE_FONT = '7px "Press Start 2P", monospace';
@@ -1408,6 +1408,7 @@ function renderMemberStatusIcons(
   const now = Date.now();
   const workloads = computeMemberWorkloads(now);
   const approvalWait = jcGetApprovalWaitMemberIds();
+  for (const row of workSnapshot()) if (row.status === 'waiting') approvalWait.add(row.memberId);
   // QC/実機検証フック: 各 member の状態アイコンとキャラ画面座標を毎フレーム公開
   // (描画には無関与 — playwright QC がクリック座標と表示状態を検証するために読む)
   const qcDebug: Array<{ memberId: string; icon: string; x: number; y: number }> = [];

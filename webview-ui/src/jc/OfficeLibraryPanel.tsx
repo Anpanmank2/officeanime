@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { CompletedArchivePanel } from './CompletedArchivePanel.js';
 import { TaskHistoryPanel } from './TaskHistoryPanel.js';
+import { WorkResults } from './WorkPanel.js';
 
 type LibraryTab = 'results' | 'records' | 'research';
 
@@ -16,7 +17,13 @@ const tabs: Array<{ id: LibraryTab; label: string }> = [
 ];
 const RESEARCH_LABELS = ['research'];
 
-export function OfficeLibraryPanel({ onClose }: { onClose: () => void }) {
+export function OfficeLibraryPanel({
+  onClose,
+  selectedId,
+}: {
+  onClose: () => void;
+  selectedId?: string | null;
+}) {
   const [tab, setTab] = useState<LibraryTab>('results');
 
   return (
@@ -91,8 +98,13 @@ export function OfficeLibraryPanel({ onClose }: { onClose: () => void }) {
         ))}
       </nav>
 
-      <div style={{ minHeight: 0, flex: 1 }}>
-        {tab === 'results' && <CompletedArchivePanel embedded />}
+      <div style={{ minHeight: 0, flex: 1, overflowY: 'auto' }}>
+        {tab === 'results' && (
+          <>
+            <WorkResults selectedId={selectedId} />
+            <CompletedArchivePanel embedded />
+          </>
+        )}
         {tab === 'records' && <TaskHistoryPanel embedded />}
         {tab === 'research' && (
           <TaskHistoryPanel

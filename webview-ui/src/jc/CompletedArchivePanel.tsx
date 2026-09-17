@@ -14,6 +14,7 @@ import {
   karteEarliestAt,
   subscribeKarte,
 } from './karte-state.js';
+import { WORK_TERMINAL, workSnapshot } from './workflow-state.js';
 
 const PANEL_W = 380;
 
@@ -47,7 +48,11 @@ export interface CompletedArchivePanelProps {
   embedded?: boolean;
 }
 
-export function CompletedArchivePanel({ position, onClose, embedded = false }: CompletedArchivePanelProps) {
+export function CompletedArchivePanel({
+  position,
+  onClose,
+  embedded = false,
+}: CompletedArchivePanelProps) {
   const [records, setRecords] = useState<CompletionRecord[]>(() => computeCompletionArchive());
   const [earliestAt, setEarliestAt] = useState<number | null>(() => karteEarliestAt());
   const [names, setNames] = useState(() => jcGetMemberNames());
@@ -80,6 +85,13 @@ export function CompletedArchivePanel({ position, onClose, embedded = false }: C
     else groups.push({ dayStart: ds, items: [r] });
   }
 
+  if (
+    embedded &&
+    groups.length === 0 &&
+    workSnapshot().some((row) => WORK_TERMINAL.has(row.status))
+  )
+    return null;
+
   const anchor = position ?? { x: window.innerWidth / 2, y: 40 };
   const left = Math.max(8, Math.min(anchor.x - PANEL_W / 2, window.innerWidth - PANEL_W - 8));
   const top = Math.max(8, Math.min(anchor.y + 10, window.innerHeight * 0.2));
@@ -107,40 +119,42 @@ export function CompletedArchivePanel({ position, onClose, embedded = false }: C
       }}
     >
       {/* ── ヘッダー ── */}
-      {!embedded && <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          padding: '10px 14px 8px',
-          borderBottom: `1px solid ${PANEL_BORDER}`,
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-          <span style={{ fontSize: '15px', fontWeight: 'bold', color: ACCENT_TEXT }}>
-            📚 完了アーカイブ
-          </span>
-          <span style={{ fontSize: '22px', fontWeight: 900, color: ACCENT_TEXT, lineHeight: 1 }}>
-            {records.length}
-          </span>
-          <span style={{ fontSize: '11px', color: MUTED_TEXT }}>件</span>
-        </div>
-        <button
-          onClick={onClose}
-          title="閉じる"
+      {!embedded && (
+        <div
           style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--pixel-close-text)',
-            cursor: 'pointer',
-            fontSize: '14px',
-            padding: '0 2px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '10px 14px 8px',
+            borderBottom: `1px solid ${PANEL_BORDER}`,
+            flexShrink: 0,
           }}
         >
-          ✕
-        </button>
-      </div>}
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+            <span style={{ fontSize: '15px', fontWeight: 'bold', color: ACCENT_TEXT }}>
+              📚 完了アーカイブ
+            </span>
+            <span style={{ fontSize: '22px', fontWeight: 900, color: ACCENT_TEXT, lineHeight: 1 }}>
+              {records.length}
+            </span>
+            <span style={{ fontSize: '11px', color: MUTED_TEXT }}>件</span>
+          </div>
+          <button
+            onClick={onClose}
+            title="閉じる"
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--pixel-close-text)',
+              cursor: 'pointer',
+              fontSize: '14px',
+              padding: '0 2px',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* ── 本文 (日付順の履歴ブラウザ) ── */}
       <div style={{ overflowY: 'auto', minHeight: 0, padding: '10px 14px' }}>

@@ -142,3 +142,116 @@ body,
 * {
   font-family: 'FS Pixel Sans', sans-serif;
 }
+
+/* Phase 2: compact entry; full request details only on demand. */
+.work-entry {
+  position: absolute;
+  bottom: 64px;
+  left: 12px;
+  z-index: 55;
+  max-width: calc(100vw - 24px);
+  background: var(--pixel-bg);
+  color: var(--pixel-text);
+  border: 2px solid var(--pixel-border);
+  padding: 8px;
+  font-size: 12px;
+}
+.work-panel {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  bottom: 8px;
+  width: min(410px, calc(100vw - 16px));
+  z-index: 66;
+  overflow-y: auto;
+  box-sizing: border-box;
+  background: var(--pixel-bg);
+  color: var(--pixel-text);
+  border: 2px solid var(--pixel-border);
+  padding: 12px;
+  font-size: 13px;
+}
+.work-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.work-panel label,
+.work-question {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+.work-panel textarea,
+.work-panel select {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  padding: 6px;
+  background: var(--pixel-bg);
+  color: var(--pixel-text);
+}
+.work-panel textarea {
+  min-height: 56px;
+}
+.work-panel button,
+.work-toast button {
+  font: inherit;
+  cursor: pointer;
+}
+.work-panel button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.work-panel article {
+  border-top: 1px solid var(--pixel-border);
+  padding: 10px 0;
+  overflow-wrap: anywhere;
+}
+.work-panel article p {
+  white-space: pre-wrap;
+}
+.work-row {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: left;
+  gap: 5px;
+  background: transparent;
+  color: inherit;
+  border: 0;
+}
+.work-waiting {
+  border-left: 4px solid var(--pixel-accent);
+  padding-left: 8px !important;
+}
+.work-toast {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  z-index: 67;
+  padding: 10px;
+  background: var(--pixel-bg);
+  color: var(--pixel-text);
+  border: 2px solid var(--pixel-accent);
+  font-size: 13px;
+}
+.work-results {
+  padding: 10px;
+  font-size: 13px;
+}
+.work-results details {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--pixel-border);
+  overflow-wrap: anywhere;
+}
+.work-results pre {
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

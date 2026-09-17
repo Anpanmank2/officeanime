@@ -81,12 +81,15 @@ export function isApprovalEvent(value: unknown): value is ApprovalEvent {
 
 /** Pending approvals keyed by request id. Replayed requests replace, never duplicate. */
 export class ApprovalState {
+  private closed = new Set<string>();
   private pending = new Map<string, ApprovalRequestEvent>();
 
   apply(event: ApprovalEvent): void {
     if (event.event === 'approval_request') {
+      if (this.closed.has(event.id)) return;
       this.pending.set(event.id, event);
     } else {
+      this.closed.add(event.request_id);
       this.pending.delete(event.request_id);
     }
   }
@@ -107,6 +110,7 @@ export class ApprovalState {
           request_id: request.id,
           at: now,
         };
+        this.closed.add(request.id);
         this.pending.delete(request.id);
         expired.push(event);
       }

@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 
-import { vscode } from '../vscodeApi.js';
+import { getConnectionStatus, onConnectionStatusChange, vscode } from '../vscodeApi.js';
 import {
   type ApprovalRequest,
-  jcApplyApprovalEvent,
   jcGetApprovalRequests,
   jcGetMemberRuntime,
   subscribeApprovals,
@@ -15,7 +14,27 @@ function remaining(expires: string): string {
 }
 
 export function DeskDocsTray() {
+  const [error, setError] = useState('');
+  const [sending, setSending] = useState<string | null>(null);
+  const [connected, setConnected] = useState(() => getConnectionStatus() === 'connected');
+  useEffect(() => onConnectionStatusChange((status) => setConnected(status === 'connected')), []);
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.data?.type === 'jcApprovalAnswerError') {
+        setError(e.data.error);
+        setSending(null);
+      }
+      if (e.data?.type === 'jcOfficeEvent' || e.data?.type === 'jcEventHistory') setSending(null);
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener('office:open-approvals', show);
+    return () => window.removeEventListener('office:open-approvals', show);
+  }, []);
   const [requests, setRequests] = useState<ApprovalRequest[]>(jcGetApprovalRequests);
   const [selected, setSelected] = useState<{ request: ApprovalRequest; answer: string } | null>(
     null,
@@ -33,9 +52,12 @@ export function DeskDocsTray() {
   }, []);
 
   const resolve = (request: ApprovalRequest, answer: string) => {
+    if (!connected || sending) return;
+    setSending(request.id);
+    setError('');
     const at = new Date().toISOString();
     // The extension owns filesystem access. It appends the answer and emits this
-    // normalized event back through jc-events; apply locally for responsive UI.
+    // normalized event back through jc-events. Keep the document until that acknowledgement.
     vscode.postMessage({
       type: 'jcApprovalAnswer',
       request_id: request.id,
@@ -43,13 +65,6 @@ export function DeskDocsTray() {
       at,
       via: 'office',
       company_id: request.company_id,
-    });
-    jcApplyApprovalEvent({
-      event: 'approval_resolved',
-      request_id: request.id,
-      answer,
-      at,
-      via: 'office',
     });
     setSelected(null);
   };
@@ -85,6 +100,9 @@ export function DeskDocsTray() {
       >
         UNO の机 ─ 未決裁 <span data-desk-docs-count>{requests.length}</span> 枚
       </button>
+      {error && <p role="alert">{error}</p>}
+      {!connected && <p>接続待ち — 回答は送信できません</p>}
+      {sending && <p role="status">回答の保存を確認中…</p>}
       {requests.length === 0 && <div style={{ color: '#b8b8c8', fontSize: 12 }}>未決裁なし</div>}
       {open && (
         <div data-approval-list>
@@ -129,7 +147,12 @@ export function DeskDocsTray() {
                     <span style={{ color: '#ffcf5c', fontSize: 12 }}>
                       「{request.title}」— この操作は取り消せません。確定しますか？
                     </span>
-                    <button onClick={() => resolve(request, selected?.answer ?? '')}>確定</button>
+                    <button
+                      disabled={!connected || sending !== null}
+                      onClick={() => resolve(request, selected?.answer ?? '')}
+                    >
+                      確定
+                    </button>
                     <button onClick={() => setSelected(null)}>戻る</button>
                   </div>
                 ) : (
@@ -137,6 +160,7 @@ export function DeskDocsTray() {
                     {request.options.map((option) => (
                       <button
                         key={option.key}
+                        disabled={!connected || sending !== null}
                         data-approval-option={option.key}
                         data-approval-recommended={option.recommended ? true : undefined}
                         onClick={() =>

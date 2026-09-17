@@ -30,16 +30,19 @@ check('required DOM and protocol attributes', () => {
   for (const word of ['data-desk-docs', 'data-desk-docs-count', 'data-approval-confirmation', 'jcApprovalAnswer']) assert.ok(source.includes(word), word);
 });
 // Execute the component's actual resolve body with only its I/O dependencies replaced.
-check('resolve posts the complete answer payload before optimistic removal', () => {
+check('resolve posts the complete answer payload and waits for host acknowledgement', () => {
   const body = source.match(/const resolve = \(request: ApprovalRequest, answer: string\) => \{([\s\S]*?)\n  \};/)?.[1];
   assert.ok(body, 'resolve implementation found');
   const sent: unknown[] = [];
+  request.id = 'desk-host-ack';
   state.jcApplyApprovalEvent(request);
-  vm.runInNewContext(body!, {request, answer: 'yes', Date, vscode: {postMessage: (msg: unknown) => sent.push(msg)}, jcApplyApprovalEvent: state.jcApplyApprovalEvent, setSelected: () => {}});
+  vm.runInNewContext('(() => {' + body! + '})()', {request, answer: 'yes', Date, connected: true, sending: null, setSending: () => {}, setError: () => {}, vscode: {postMessage: (msg: unknown) => sent.push(msg)}, jcApplyApprovalEvent: state.jcApplyApprovalEvent, setSelected: () => {}});
   assert.equal(sent.length, 1);
   const payload = sent[0] as Record<string, unknown>;
   assert.deepEqual({...payload, at: 'time'}, {type: 'jcApprovalAnswer', request_id: request.id, answer: 'yes', at: 'time', via: 'office', company_id: request.company_id});
   assert.ok(Number.isFinite(Date.parse(payload.at as string)));
+  assert.equal(state.jcGetApprovalRequests().length, 1, 'request remains until persisted resolution');
+  state.jcApplyApprovalEvent({event:'approval_resolved',request_id:request.id,answer:'yes',at:request.timestamp,via:'office'});
   assert.equal(state.jcGetApprovalRequests().length, 0);
   assert.equal(state.jcGetApprovalDetails(request.id)?.title, request.title);
 });
@@ -63,7 +66,7 @@ check('orphan messages do not warn or error in the actual message handler', () =
   }
   assert.equal(warnings.length, 0);
 });
-check('approval logs retain title/label after optimistic resolve and dedupe all replay paths', () => {
+check('approval logs retain title/label after host resolution and dedupe all replay paths', () => {
   const resolved = {event: 'approval_resolved' as const, request_id: request.id, answer: 'yes', at: request.timestamp, via: 'office' as const};
   state.jcApplyApprovalEvent(request);
   state.jcApplyApprovalEvent(resolved);

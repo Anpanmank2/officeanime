@@ -4,6 +4,9 @@ declare function acquireVsCodeApi(): { postMessage(msg: unknown): void };
 
 // ── Connection status for browser mode ───────────────────────────
 type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting';
+let currentStatus: ConnectionStatus = isBrowserRuntime ? 'reconnecting' : 'connected';
+export const getConnectionStatus = () => currentStatus;
+
 const connectionListeners = new Set<(status: ConnectionStatus) => void>();
 const pendingInboundMessages: unknown[] = [];
 let browserMessageTargetReady = false;
@@ -33,6 +36,7 @@ export function onConnectionStatusChange(listener: (status: ConnectionStatus) =>
 }
 
 function notifyStatus(status: ConnectionStatus): void {
+  currentStatus = status;
   for (const listener of connectionListeners) {
     listener(status);
   }
@@ -66,6 +70,7 @@ function createBrowserApi(): { postMessage(msg: unknown): void } {
       console.log('[WS] Connected to extension');
       reconnectAttempts = 0;
       notifyStatus('connected');
+      ws?.send(JSON.stringify({ type: 'webviewReady' }));
       // Flush queued messages
       while (messageQueue.length > 0) {
         const msg = messageQueue.shift();

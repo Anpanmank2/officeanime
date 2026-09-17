@@ -16,7 +16,6 @@
 //   ★プロフィールの性格/思想 (persona) は config.persona (jc-config.json 手書き) 由来であって
 //    persona-lines.ts (待機ぼやき) ではない — 別系統 (混同禁止)。
 // 新規 postMessage channel 0 (タブは内部 useState)・新規 fs read 0 (persona は jcConfigLoaded 相乗り)。
-
 import { useEffect, useRef, useState } from 'react';
 
 import { CHARACTER_SITTING_OFFSET_PX } from '../constants.js';
@@ -59,6 +58,7 @@ import {
   karteEarliestAt,
 } from './karte-state.js';
 import { MemberPortrait } from './MemberPortrait.js';
+import { workSnapshot } from './workflow-state.js';
 
 // ── 素材トークン (spec §1 = v1 流用) ─────────────────────────────────────────
 const CARD_W = 320;
@@ -254,6 +254,9 @@ export function JCMemberInfoPanel({
   const openCount = openWorks.length;
 
   // 未解決の決裁依頼を同じ供給元から表示する。
+  const hasWorkDecision = workSnapshot().some(
+    (row) => row.memberId === memberId && row.status === 'waiting',
+  );
   const isApproval = jcGetApprovalRequests().some((request) => request.from === memberId);
 
   const isFocus = activeCount >= FOCUS_WORK_COUNT;
@@ -264,7 +267,8 @@ export function JCMemberInfoPanel({
 
   // 状態チップ (単一・優先順): 承認待ち → 集中 → 停滞 → 待機。手空きと停滞/承認待ちを別表示。
   let chip: { emoji: string; label: string; color: string } | null = null;
-  if (isApproval) chip = { emoji: STATUS_APPROVAL_EMOJI, label: '承認待ち', color: '#f59e0b' };
+  if (isApproval || hasWorkDecision)
+    chip = { emoji: STATUS_APPROVAL_EMOJI, label: '承認待ち', color: '#f59e0b' };
   else if (isFocus) chip = { emoji: STATUS_FOCUS_EMOJI, label: '集中', color: '#5ac88c' };
   else if (stalledCount > 0 && activeCount === 0)
     chip = { emoji: '⚠', label: '停滞', color: '#f59e0b' };
@@ -403,6 +407,26 @@ export function JCMemberInfoPanel({
           animation: 'jc-karte-pop 120ms steps(4, end) both',
         }}
       >
+        {(memberId === 'exec-sec' || hasWorkDecision) && (
+          <button
+            onClick={() => {
+              closeCard();
+              window.dispatchEvent(new Event('office:open-work'));
+            }}
+          >
+            {memberId === 'exec-sec' ? '秘書に仕事を依頼' : 'Ownerの判断へ'}
+          </button>
+        )}
+        {isApproval && (
+          <button
+            onClick={() => {
+              closeCard();
+              window.dispatchEvent(new Event('office:open-approvals'));
+            }}
+          >
+            UNOの机で回答する
+          </button>
+        )}
         {/* ── 共有ヘッダ (区画0: 素性 + 状態・タブ外常駐・切替で再描画しない・v1 流用) ── */}
         <div
           style={{
