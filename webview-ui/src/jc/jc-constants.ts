@@ -343,7 +343,7 @@ export const OFFICE_CLOSED_TITLE_COLOR = '#D8D2C4'; // オート (主文)
 export const OFFICE_HEARTBEAT_RING_MS = 900;
 export const OFFICE_HEARTBEAT_RING_COLOR = '228, 195, 110'; // アンバー #E4C36E の RGB (exec identity)
 /** 秘書 (exec-sec) の席座標 — 巡回リングの中心 (jc-state DESK_POSITIONS と一致: 8,4)。 */
-export const OFFICE_SECRETARY_SEAT = { col: 8, row: 4 } as const;
+export const OFFICE_SECRETARY_SEAT = { col: 8, row: 4 };
 
 // ── R2 状態表示 v2 (Owner設計 5種・顔に被せない) ───────────────────
 /** 頭上ステータスアイコンの統一オフセット (world px 換算前・キャラ中心から上へ)。
@@ -441,7 +441,7 @@ export const COMP_BADGE_TOOLTIP_DISCLAIMER = '※匿名workflow経由の作業�
 // 数値はすべて表示専用。育成データ本体 (agent-pet/) は一切変更しない。
 
 /** 相棒が居る執務室のタイル (卵の描画位置 = クリック判定位置)。 */
-export const PET_TILE = { col: 10, row: 4 } as const;
+export const PET_TILE = { col: 10, row: 4 };
 
 /** 段階 0〜5 の呼び名。生データの stage 数値は画面に出さない。 */
 /** ⚠ 呼び名も正本は agent-pet/scripts/lib/stages.mjs の STAGE_LABELS。ここは写し。 */

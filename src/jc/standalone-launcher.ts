@@ -5,6 +5,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
+import { buildAssetIndex } from '../../shared/assets/build.js';
+import { createLayoutStore, handleLayoutCommand } from '../layoutStore.js';
 import { appendAnswer } from './answers-writer.js';
 import { startBrowserServer } from './browser-server.js';
 import { createCommandDispatcher } from './command-dispatcher.js';
@@ -915,6 +917,17 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  const layoutStore = createLayoutStore();
+  const layoutAssets = path.join(extensionPath, 'dist', 'assets');
+  const defaultLayoutFile = buildAssetIndex(layoutAssets).defaultLayout;
+  const defaultLayout = defaultLayoutFile
+    ? (JSON.parse(fs.readFileSync(path.join(layoutAssets, defaultLayoutFile), 'utf8')) as Record<
+        string,
+        unknown
+      >)
+    : null;
+  if (!layoutStore.exists() && defaultLayout) layoutStore.save(defaultLayout);
+
   // Create command dispatcher (read-only mode)
   const dispatcher = createCommandDispatcher();
   dispatcher.setContext({
@@ -1224,10 +1237,22 @@ async function main(): Promise<void> {
 
   // Start browser server
   const server = await startBrowserServer(extensionPath, port, (data, respond) => {
+    if (
+      handleLayoutCommand(
+        data as { type?: string; layout?: unknown },
+        respond,
+        defaultLayout,
+        layoutStore,
+        (layout) => server.broadcast({ type: 'layoutLoaded', layout }),
+      )
+    )
+      return;
     const msg = data as { type?: string };
 
     // When browser signals ready, send ALL current state
     if (msg.type === 'webviewReady') {
+      const savedLayout = layoutStore.read();
+      if (savedLayout) respond({ type: 'layoutLoaded', layout: savedLayout });
       buildClientInitMessages(respond);
       return;
     }

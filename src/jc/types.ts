@@ -144,7 +144,13 @@ export type JCMessageToWebview =
   | { type: 'jcTaskUpdate'; task: TaskDefinition }
   | { type: 'jcTasksBulkSync'; tasks: TaskDefinition[] }
   | { type: 'jcTaskHistory'; tasks: TaskDefinition[]; hasMore: boolean }
-  | { type: 'jcTaskHistoryLog'; entries: unknown[]; hasMore: boolean; totalCount: number }
+  | {
+      type: 'jcTaskHistoryLog';
+      requestId?: string;
+      entries: unknown[];
+      hasMore: boolean;
+      totalCount: number;
+    }
   | { type: 'jcTaskReorder'; tasks: TaskDefinition[] }
   | { type: 'officeLog:history'; entries: unknown[]; hasMore: boolean }
   | { type: 'jcSpeechBubble'; bubble: SpeechBubble }
@@ -202,6 +208,7 @@ export type JCMessageToExtension =
       search?: string;
       limit?: number;
       offset?: number;
+      requestId?: string;
     }
   | { type: 'task:updateLabel'; taskId: string; date: string; label: string }
   | {

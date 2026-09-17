@@ -13,6 +13,7 @@ import { TILE_SIZE } from '../office/types.js';
 import {
   JC_ENTRANCE,
   jcGetDeskPosition,
+  jcGetOwnerDeskAnchor,
   jcGetMemberRuntime,
   jcGetOwnerAvatarState,
   jcSetOwnerAvatarState,
@@ -20,9 +21,6 @@ import {
 } from './jc-state.js';
 import type { OwnerAvatarState } from './jc-types.js';
 import { OWNER_AGENT_ID } from './owner-avatar-constants.js';
-
-/** Secretary desk tile (from DESK_POSITIONS['exec-desk-sec']) */
-const SECRETARY_DESK = { col: 8, row: 4 };
 
 /** Owner character palette + hue shift (gold tint) */
 const OWNER_PALETTE = 0;
@@ -88,7 +86,8 @@ export function OwnerAvatar({ officeState, onExited }: OwnerAvatarProps) {
 
     // Spawn at entrance if not already present
     if (!officeState.characters.has(OWNER_AGENT_ID)) {
-      officeState.addAgent(OWNER_AGENT_ID, OWNER_PALETTE, OWNER_HUE_SHIFT);
+      const ownerDesk = jcGetOwnerDeskAnchor();
+      officeState.addAgent(OWNER_AGENT_ID, OWNER_PALETTE, OWNER_HUE_SHIFT, ownerDesk.seatId);
       const ch = officeState.characters.get(OWNER_AGENT_ID);
       if (ch) {
         ch.x = JC_ENTRANCE.col * TILE_SIZE + TILE_SIZE / 2;
@@ -103,7 +102,8 @@ export function OwnerAvatar({ officeState, onExited }: OwnerAvatarProps) {
 
     // Walk to secretary desk after spawn animation
     walkTimerRef.current = setTimeout(() => {
-      officeState.walkToTile(OWNER_AGENT_ID, SECRETARY_DESK.col, SECRETARY_DESK.row);
+      const ownerDesk = jcGetOwnerDeskAnchor();
+      officeState.walkToTile(OWNER_AGENT_ID, ownerDesk.col, ownerDesk.row);
       jcSetOwnerAvatarState({ position: 'secretary_desk' });
     }, SPAWN_MS);
   }

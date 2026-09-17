@@ -212,7 +212,7 @@ export function createCommandDispatcher(): CommandDispatcher {
         break;
       }
       case 'task:requestHistory': {
-        const { startDate, endDate, status, labels, search, limit, offset } = cmd as {
+        const { startDate, endDate, status, labels, search, limit, offset, requestId } = cmd as {
           type: string;
           startDate?: string;
           endDate?: string;
@@ -221,6 +221,7 @@ export function createCommandDispatcher(): CommandDispatcher {
           search?: string;
           limit?: number;
           offset?: number;
+          requestId?: string;
         };
         // Use JSONL-based query if available, fall back to legacy
         if (context.queryTaskHistory) {
@@ -233,7 +234,7 @@ export function createCommandDispatcher(): CommandDispatcher {
             limit,
             offset,
           });
-          respond?.({ type: 'jcTaskHistoryLog', ...result });
+          respond?.({ type: 'jcTaskHistoryLog', requestId, ...result });
         } else if (context.getTaskHistory) {
           const result = context.getTaskHistory(limit, offset);
           respond?.({ type: 'jcTaskHistory', ...result });

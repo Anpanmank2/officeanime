@@ -418,9 +418,13 @@ export async function initBrowserMock(): Promise<void> {
 
   const avatarAssets = await loadOptionalAvatarAssets(base, avatarPartCatalog, shouldTryDecoded);
 
-  const layout = assetIndex.defaultLayout
+  const bundledLayout = assetIndex.defaultLayout
     ? await fetch(`${base}assets/${assetIndex.defaultLayout}`).then((r) => r.json())
     : null;
+  // The server owns saved layouts in both standalone and extension browser mode.
+  // The Vite-only preview has no persistence endpoint and uses its bundled room.
+  const savedLayout = await fetchJsonOptional<{ layout?: unknown }>(`${base}jc-layout.json`);
+  const layout = savedLayout?.layout ?? bundledLayout;
   const avatarConfig = await loadOptionalAvatarConfig(base, assetIndex.defaultAvatars);
 
   mockPayload = {

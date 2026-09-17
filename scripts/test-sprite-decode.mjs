@@ -308,14 +308,14 @@ const avatarConfigs =
   avatarFile?.avatars && typeof avatarFile.avatars === 'object' ? avatarFile.avatars : {};
 const avatarIds = Object.keys(avatarConfigs);
 
-// QA側修正 2026-09-04: 名簿16名体制（空席10件は vacant:true で残す）に合わせ、稼働メンバー数で判定
+// Phase 1: authoritative 9/16 roster contains 13 AI members plus the Codex system seat.
 const activeRosterIds = Array.isArray(jcConfig?.members)
   ? jcConfig.members.filter((member) => member?.vacant !== true).map((member) => member?.id)
   : [];
-// 2026-09-07: ボット席 codex-01（人ではない・外部実装ジョブの状態を映す）を追加し 16→17
+// Vacant and retired entries do not occupy the compact initial office.
 assert(
-  activeRosterIds.length === 17,
-  `jc-config.json contains exactly 17 active members (got ${activeRosterIds.length})`,
+  activeRosterIds.length === 14,
+  `jc-config.json contains exactly 14 active entries (13 AI + Codex) (got ${activeRosterIds.length})`,
 );
 assert(uniqueRosterIds.size === rosterIds.length, 'jc-config.json member IDs are unique');
 assert(avatarFile?.version === 1, 'default-avatars.json has version 1');

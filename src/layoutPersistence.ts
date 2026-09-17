@@ -1,62 +1,37 @@
 import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import type { ExtensionContext } from 'vscode';
 
-import {
-  LAYOUT_FILE_DIR,
-  LAYOUT_FILE_NAME,
-  LAYOUT_FILE_POLL_INTERVAL_MS,
-  LAYOUT_REVISION_KEY,
-  WORKSPACE_KEY_LAYOUT,
-} from './constants.js';
+import { LAYOUT_FILE_POLL_INTERVAL_MS, WORKSPACE_KEY_LAYOUT } from './constants.js';
+import { createLayoutStore, getLayoutFilePath, isSavedLayout } from './layoutStore.js';
 
 export interface LayoutWatcher {
   markOwnWrite(): void;
   dispose(): void;
 }
 
-function getLayoutFilePath(): string {
-  return path.join(os.homedir(), LAYOUT_FILE_DIR, LAYOUT_FILE_NAME);
-}
-
 export function readLayoutFromFile(): Record<string, unknown> | null {
-  const filePath = getLayoutFilePath();
-  try {
-    if (!fs.existsSync(filePath)) return null;
-    const raw = fs.readFileSync(filePath, 'utf-8');
-    return JSON.parse(raw) as Record<string, unknown>;
-  } catch (err) {
-    console.error('[Pixel Agents] Failed to read layout file:', err);
-    return null;
-  }
+  return createLayoutStore().read();
 }
 
-export function writeLayoutToFile(layout: Record<string, unknown>): void {
-  const filePath = getLayoutFilePath();
-  const dir = path.dirname(filePath);
+export function writeLayoutToFile(layout: Record<string, unknown>): boolean {
   try {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    const json = JSON.stringify(layout, null, 2);
-    const tmpPath = filePath + '.tmp';
-    fs.writeFileSync(tmpPath, json, 'utf-8');
-    fs.renameSync(tmpPath, filePath);
+    createLayoutStore().save(layout);
+    return true;
   } catch (err) {
     console.error('[Pixel Agents] Failed to write layout file:', err);
+    return false;
   }
 }
 
 export interface LayoutLoadResult {
   layout: Record<string, unknown>;
-  /** True when the user's saved layout was replaced by a newer bundled default */
+  /** Kept for protocol compatibility. Loading never resets a saved layout. */
   wasReset: boolean;
 }
 
 /**
  * Load layout with migration from workspace state:
- * 1. If file exists → return it (reset if bundled default has a newer revision)
+ * 1. If file exists → preserve it regardless of the bundled revision
  * 2. Else if workspace state has layout → write to file, clear workspace state, return it
  * 3. Else if defaultLayout provided → write to file, return it
  * 4. Else → return null
@@ -65,28 +40,24 @@ export function migrateAndLoadLayout(
   context: ExtensionContext,
   defaultLayout?: Record<string, unknown> | null,
 ): LayoutLoadResult | null {
-  // 1. Try file — but reset if bundled default has a newer revision
+  // 1. Existing user layouts remain authoritative across upgrades.
   const fromFile = readLayoutFromFile();
   if (fromFile) {
-    const fileRevision = (fromFile[LAYOUT_REVISION_KEY] as number) ?? 0;
-    const defaultRevision = (defaultLayout?.[LAYOUT_REVISION_KEY] as number) ?? 0;
-    if (defaultRevision > fileRevision) {
-      console.log(
-        `[Pixel Agents] Layout revision outdated (${fileRevision} < ${defaultRevision}), resetting to bundled default`,
-      );
-      writeLayoutToFile(defaultLayout!);
-      return { layout: defaultLayout!, wasReset: true };
-    }
     console.log('[Pixel Agents] Layout loaded from file');
     return { layout: fromFile, wasReset: false };
+  }
+
+  // A corrupt save is preserved for recovery, never overwritten by a default.
+  if (createLayoutStore().exists()) {
+    return defaultLayout ? { layout: defaultLayout, wasReset: false } : null;
   }
 
   // 2. Migrate from workspace state
   const fromState = context.workspaceState.get<Record<string, unknown>>(WORKSPACE_KEY_LAYOUT);
   if (fromState) {
     console.log('[Pixel Agents] Migrating layout from workspace state to file');
-    writeLayoutToFile(fromState);
-    context.workspaceState.update(WORKSPACE_KEY_LAYOUT, undefined);
+    if (writeLayoutToFile(fromState))
+      context.workspaceState.update(WORKSPACE_KEY_LAYOUT, undefined);
     return { layout: fromState, wasReset: false };
   }
 
@@ -109,17 +80,14 @@ export function watchLayoutFile(
   onExternalChange: (layout: Record<string, unknown>) => void,
 ): LayoutWatcher {
   const filePath = getLayoutFilePath();
-  let skipNextChange = false;
-  let lastMtime = 0;
+  let lastContent: string | null = null;
   let fsWatcher: fs.FSWatcher | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
   let disposed = false;
 
-  // Initialize lastMtime
+  // Compare contents: atomic replacement and same-timestamp writes are both valid.
   try {
-    if (fs.existsSync(filePath)) {
-      lastMtime = fs.statSync(filePath).mtimeMs;
-    }
+    lastContent = fs.readFileSync(filePath, 'utf8');
   } catch {
     /* ignore */
   }
@@ -128,17 +96,11 @@ export function watchLayoutFile(
     if (disposed) return;
     try {
       if (!fs.existsSync(filePath)) return;
-      const stat = fs.statSync(filePath);
-      if (stat.mtimeMs <= lastMtime) return;
-      lastMtime = stat.mtimeMs;
-
-      if (skipNextChange) {
-        skipNextChange = false;
-        return;
-      }
-
       const raw = fs.readFileSync(filePath, 'utf-8');
-      const layout = JSON.parse(raw) as Record<string, unknown>;
+      if (raw === lastContent) return;
+      lastContent = raw;
+      const layout: unknown = JSON.parse(raw);
+      if (!isSavedLayout(layout)) return;
       console.log('[Pixel Agents] External layout change detected');
       onExternalChange(layout);
     } catch (err) {
@@ -177,12 +139,9 @@ export function watchLayoutFile(
 
   return {
     markOwnWrite(): void {
-      skipNextChange = true;
-      // Update lastMtime preemptively so a near-instant poll doesn't miss the flag
+      // Called after a successful local write; the next external write must still arrive.
       try {
-        if (fs.existsSync(filePath)) {
-          lastMtime = fs.statSync(filePath).mtimeMs;
-        }
+        lastContent = fs.readFileSync(filePath, 'utf8');
       } catch {
         /* ignore */
       }

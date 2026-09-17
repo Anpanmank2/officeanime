@@ -30,7 +30,11 @@ export interface VSCodeSession {
  * Uses an isolated temp HOME and injects the mock `claude` binary at the
  * front of PATH so no real Claude CLI is needed.
  */
-export async function launchVSCode(testTitle: string): Promise<VSCodeSession> {
+export async function launchVSCode(
+  testTitle: string,
+  prepare?: (home: string, workspace: string) => void,
+  resizeWindow = false,
+): Promise<VSCodeSession> {
   const vscodePath = fs.readFileSync(VSCODE_PATH_FILE, 'utf8').trim();
 
   // --- Isolated temp directories ---
@@ -51,24 +55,6 @@ export async function launchVSCode(testTitle: string): Promise<VSCodeSession> {
   // fs.realpathSync only resolves symlinks; .native uses GetFinalPathNameByHandleW
   // which also resolves 8.3 short names to their full form.
   const resolvedWorkspaceDir = IS_WINDOWS ? fs.realpathSync.native(workspaceDir) : workspaceDir;
-
-  // macOS: create a temporary keychain so the OS doesn't show "Keychain Not Found" dialog.
-  // The isolated HOME has no keychain, and VS Code/Electron's safeStorage triggers a system prompt.
-  if (process.platform === 'darwin') {
-    const keychainDir = path.join(tmpHome, 'Library', 'Keychains');
-    fs.mkdirSync(keychainDir, { recursive: true });
-    const keychainPath = path.join(keychainDir, 'login.keychain-db');
-    try {
-      const { execSync } = require('child_process');
-      execSync(`security create-keychain -p "" "${keychainPath}"`, { stdio: 'ignore' });
-      execSync(`security default-keychain -s "${keychainPath}"`, {
-        stdio: 'ignore',
-        env: { ...process.env, HOME: tmpHome },
-      });
-    } catch {
-      // keychain creation failure is non-fatal, test may still work
-    }
-  }
 
   // Copy mock-claude into an isolated bin dir
   if (IS_WINDOWS) {
@@ -111,6 +97,8 @@ export async function launchVSCode(testTitle: string): Promise<VSCodeSession> {
     );
   }
 
+  prepare?.(tmpHome, resolvedWorkspaceDir);
+
   const mockLogFile = path.join(tmpHome, '.claude-mock', 'invocations.log');
 
   // --- Video output dir ---
@@ -122,6 +110,7 @@ export async function launchVSCode(testTitle: string): Promise<VSCodeSession> {
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
     HOME: tmpHome,
+    AGENT_PET_HOME: path.join(tmpHome, '.agent-pet'),
     // Prepend mock bin so 'claude' resolves to our mock
     PATH: `${mockBinDir}${PATH_SEP}${process.env['PATH'] ?? '/usr/local/bin:/usr/bin:/bin'}`,
     // Prevent VS Code from trying to talk to real accounts / telemetry
@@ -136,8 +125,13 @@ export async function launchVSCode(testTitle: string): Promise<VSCodeSession> {
     '--disable-extensions',
     // Isolated user-data (settings, state, etc.)
     `--user-data-dir=${userDataDir}`,
+    `--extensions-dir=${path.join(tmpBase, 'extensions')}`,
+    // Request a basic store where supported. Native macOS UI may still prompt.
+    '--password-store=basic',
     // Skip interactive prompts
     '--disable-workspace-trust',
+    // Keep the explicitly isolated HOME instead of resolving the user's login shell.
+    '--force-disable-user-env',
     '--skip-release-notes',
     '--skip-welcome',
     '--no-sandbox',
@@ -161,16 +155,6 @@ export async function launchVSCode(testTitle: string): Promise<VSCodeSession> {
       }
     } catch {
       // ignore close errors
-    }
-    // macOS: deregister the temporary keychain to avoid orphaned references
-    if (process.platform === 'darwin') {
-      try {
-        const keychainPath = path.join(tmpHome, 'Library', 'Keychains', 'login.keychain-db');
-        const { execSync } = require('child_process');
-        execSync(`security delete-keychain "${keychainPath}"`, { stdio: 'ignore' });
-      } catch {
-        // keychain may not exist or already be removed
-      }
     }
     try {
       fs.rmSync(tmpBase, { recursive: true, force: true });
@@ -205,7 +189,7 @@ export async function launchVSCode(testTitle: string): Promise<VSCodeSession> {
     // The Ozone headless backend ignores --window-size CLI flags, so VS Code
     // opens at a tiny default size on Linux. Resize via the Electron API after
     // the window exists — getAllWindows() is empty before firstWindow() resolves.
-    if (process.platform === 'linux') {
+    if (process.platform === 'linux' || resizeWindow) {
       await app.evaluate(({ BrowserWindow }) => {
         BrowserWindow.getAllWindows()[0]?.setSize(1280, 800);
       });

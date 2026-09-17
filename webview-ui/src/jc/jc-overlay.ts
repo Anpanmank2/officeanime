@@ -60,6 +60,7 @@ import {
   jcGetStateColor,
   jcGetStats,
   jcIsActive,
+  jcIsCompactLayout,
 } from './jc-state.js';
 import type { JCBubbleType, JCState } from './jc-types.js';
 import { computeDeptOccupancy, computeMemberWorkloads } from './karte-state.js';
@@ -138,6 +139,34 @@ const ZONE_AREAS: Array<{
   { zone: 'hall', col: 18, row: 2, width: 7, height: 4 },
 ];
 
+const COMPACT_ZONE_LABELS: Array<{ text: string; col: number; row: number; zone: string }> = [
+  { text: ZONE_LABEL_TEXT.dev, col: 2, row: 1, zone: 'dev' },
+  { text: ZONE_LABEL_TEXT.marketing, col: 8, row: 1, zone: 'marketing' },
+  { text: ZONE_LABEL_TEXT.research, col: 16, row: 1, zone: 'research' },
+  { text: ZONE_LABEL_TEXT.exec, col: 6, row: 9, zone: 'exec' },
+];
+
+const COMPACT_ZONE_AREAS: Array<{
+  zone: string;
+  col: number;
+  row: number;
+  width: number;
+  height: number;
+}> = [
+  { zone: 'dev', col: 1, row: 1, width: 5, height: 7 },
+  { zone: 'marketing', col: 7, row: 1, width: 8, height: 7 },
+  { zone: 'research', col: 15, row: 1, width: 5, height: 7 },
+  { zone: 'exec', col: 5, row: 9, width: 6, height: 4 },
+];
+
+function zoneLabels() {
+  return jcIsCompactLayout() ? COMPACT_ZONE_LABELS : ZONE_LABELS;
+}
+
+function zoneAreas() {
+  return jcIsCompactLayout() ? COMPACT_ZONE_AREAS : ZONE_AREAS;
+}
+
 /** ゾーンの稼働率% (分母=roster)。共用ゾーンは全社稼働率。
  *  稼働の定義は R1 正本 (未完了しごと保有 = computeDeptOccupancy) に統一。 */
 function zoneWorkingRate(
@@ -169,7 +198,7 @@ function renderZoneBackgrounds(
   ctx.save();
   const deptStats = computeDeptOccupancy();
 
-  for (const area of ZONE_AREAS) {
+  for (const area of zoneAreas()) {
     const x = offsetX + area.col * s;
     const y = offsetY + area.row * s;
     const w = area.width * s;
@@ -697,7 +726,7 @@ function renderDepartmentSigns(
   // §2(b) 稼働チップ — R1 統一定義 (未完了しごと保有) から導出
   const deptStats = computeDeptOccupancy();
 
-  for (const label of ZONE_LABELS) {
+  for (const label of zoneLabels()) {
     const cx = offsetX + (label.col + 0.5) * s;
     const y = offsetY + label.row * s;
 

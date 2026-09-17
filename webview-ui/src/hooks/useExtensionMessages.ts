@@ -17,9 +17,12 @@ import {
   jcAddSpeechBubble,
   jcGetBreakTarget,
   jcGetDeskPosition,
+  jcGetDeskSeatUid,
   jcGetMemberRuntime,
+  jcGetOwnerDeskAnchor,
   jcGetPokerSeat,
   jcLoadConfig,
+  jcSyncDeskLayout,
   jcMemberArriving,
   jcMemberDeparted,
   jcMemberLeaving,
@@ -36,6 +39,8 @@ import {
 } from '../jc/index.js';
 import { IDLE_TINT_STATES, MAIL_FLIGHT_MS, NON_WORKING_STATES } from '../jc/jc-constants.js';
 import { jcGetAllMembers, jcGetApprovalDetails } from '../jc/jc-state.js';
+import { reconcileRegisteredSeats } from '../jc/seat-reconciliation.js';
+import { OWNER_AGENT_ID } from '../jc/owner-avatar-constants.js';
 import {
   appendKarteEvent,
   bulkSetKarteEvents,
@@ -243,12 +248,25 @@ function reconcileWorkloadPresence(): void {
 function resolveSeatUid(os: OfficeState, deskId: string): string | null {
   if (!deskId) return null;
   if (os.seats.has(deskId)) return deskId;
+  const registeredSeatUid = jcGetDeskSeatUid(deskId);
+  if (registeredSeatUid && os.seats.has(registeredSeatUid)) return registeredSeatUid;
   const pos = jcGetDeskPosition(deskId);
   if (!pos) return null;
   for (const [uid, seat] of os.seats) {
     if (seat.seatCol === pos.col && seat.seatRow === pos.row) return uid;
   }
   return null;
+}
+
+function reconcileLiveJCSeats(os: OfficeState): void {
+  const seatByMemberId = new Map<string, string>();
+  for (const character of os.characters.values()) {
+    if (!character.jcMemberId) continue;
+    const deskId = jcGetMemberRuntime(character.jcMemberId)?.config.deskId;
+    const seatId = deskId ? resolveSeatUid(os, deskId) : null;
+    if (seatId) seatByMemberId.set(character.jcMemberId, seatId);
+  }
+  reconcileRegisteredSeats(os, seatByMemberId, OWNER_AGENT_ID, jcGetOwnerDeskAnchor().seatId);
 }
 
 function saveAgentSeats(os: OfficeState): void {
@@ -331,9 +349,13 @@ export function useExtensionMessages(
         const layout = rawLayout && rawLayout.version === 1 ? migrateLayoutColors(rawLayout) : null;
         if (layout) {
           os.rebuildFromLayout(layout);
+          jcSyncDeskLayout(layout);
+          reconcileLiveJCSeats(os);
           onLayoutLoaded?.(layout);
         } else {
           // Default layout — snapshot whatever OfficeState built
+          jcSyncDeskLayout(os.getLayout());
+          reconcileLiveJCSeats(os);
           onLayoutLoaded?.(os.getLayout());
         }
         // Add buffered agents now that layout (and seats) are correct

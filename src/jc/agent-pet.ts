@@ -47,6 +47,40 @@ const PET_MEMORY_FILE_RE = /^(\d{4}-\d{2}-\d{2})\.md$/;
 const PET_NOTE_LINE_RE = /^-\s+(\d{2}:\d{2})\s+\[([a-z]+)\]\s+(.*)$/;
 /** Learned-habit file extension. */
 const PET_LEARNED_EXT = '.md';
+/** Per-file read budgets; optional oversized data is omitted, never truncated. */
+const PET_RECORD_MAX_BYTES = 64 * 1024;
+const PET_TIMELINE_MAX_BYTES = 512 * 1024;
+
+function ordinaryDirectory(dir: string): boolean {
+  try {
+    return fs.lstatSync(dir).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** Check the opened file too, and bound the read even if it grows after stat. */
+function readPetFile(file: string, maxBytes: number): string | null {
+  let fd: number | undefined;
+  try {
+    if (!fs.lstatSync(file).isFile()) return null;
+    fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    const stat = fs.fstatSync(fd);
+    if (!stat.isFile() || stat.size > maxBytes) return null;
+    const buffer = Buffer.alloc(maxBytes + 1);
+    let used = 0;
+    while (used < buffer.length) {
+      const count = fs.readSync(fd, buffer, used, buffer.length - used, null);
+      if (!count) break;
+      used += count;
+    }
+    return used <= maxBytes ? buffer.toString('utf8', 0, used) : null;
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
 
 /** One sticky note ("付箋") the companion wrote to itself. */
 export interface AgentPetNote {
@@ -104,9 +138,12 @@ function asDateString(value: unknown): string | null {
 /** Sorted list of days (YYYY-MM-DD) that have a sticky-note file. */
 function listMemoryDates(petDir: string): string[] {
   try {
+    const dir = path.join(petDir, PET_MEMORY_DIR);
+    if (!ordinaryDirectory(dir)) return [];
     return fs
-      .readdirSync(path.join(petDir, PET_MEMORY_DIR))
-      .map((f) => PET_MEMORY_FILE_RE.exec(f)?.[1])
+      .readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => PET_MEMORY_FILE_RE.exec(entry.name)?.[1])
       .filter((d): d is string => Boolean(d))
       .sort();
   } catch {
@@ -117,7 +154,10 @@ function listMemoryDates(petDir: string): string[] {
 /** Last sticky note written on the given day, or null. */
 function readLastNoteOfDay(petDir: string, date: string): AgentPetNote | null {
   try {
-    const raw = fs.readFileSync(path.join(petDir, PET_MEMORY_DIR, `${date}.md`), 'utf-8');
+    const dir = path.join(petDir, PET_MEMORY_DIR);
+    if (!ordinaryDirectory(dir)) return null;
+    const raw = readPetFile(path.join(dir, `${date}.md`), PET_RECORD_MAX_BYTES);
+    if (raw === null) return null;
     const notes: AgentPetNote[] = [];
     for (const line of raw.split(/\r?\n/)) {
       const m = PET_NOTE_LINE_RE.exec(line);
@@ -133,6 +173,7 @@ function readLastNoteOfDay(petDir: string, date: string): AgentPetNote | null {
 function readLearned(petDir: string): { count: number; recent: string[] } {
   try {
     const dir = path.join(petDir, PET_LEARNED_DIR);
+    if (!ordinaryDirectory(dir)) return { count: 0, recent: [] };
     const files = fs
       .readdirSync(dir, { withFileTypes: true })
       .filter((e) => e.isFile() && e.name.endsWith(PET_LEARNED_EXT))
@@ -161,7 +202,8 @@ function readLearned(petDir: string): { count: number; recent: string[] } {
 /** Birthday from the append-only timeline (first `hatch` entry). */
 function readBornAt(petDir: string): string | null {
   try {
-    const raw = fs.readFileSync(path.join(petDir, PET_TIMELINE_FILE), 'utf-8');
+    const raw = readPetFile(path.join(petDir, PET_TIMELINE_FILE), PET_TIMELINE_MAX_BYTES);
+    if (raw === null) return null;
     for (const line of raw.split(/\r?\n/)) {
       if (!line.trim()) continue;
       try {
@@ -191,7 +233,7 @@ export function readAgentPet(
 ): AgentPetInfo | null {
   try {
     const root = path.join(home, PET_ROOT_DIR);
-    if (!fs.existsSync(root)) return null;
+    if (!ordinaryDirectory(root)) return null;
 
     const entries = fs
       .readdirSync(root, { withFileTypes: true })
@@ -201,11 +243,14 @@ export function readAgentPet(
 
     for (const name of entries) {
       const petDir = path.join(root, name);
+      if (!ordinaryDirectory(petDir)) continue;
       const growthPath = path.join(petDir, PET_GROWTH_FILE);
       if (!fs.existsSync(growthPath)) continue;
       let raw: Record<string, unknown>;
       try {
-        const value: unknown = JSON.parse(fs.readFileSync(growthPath, 'utf-8'));
+        const contents = readPetFile(growthPath, PET_RECORD_MAX_BYTES);
+        if (contents === null) continue;
+        const value: unknown = JSON.parse(contents);
         if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
         raw = value as Record<string, unknown>;
       } catch {
@@ -259,9 +304,8 @@ export function readAgentPet(
 /** Bounded, ordinary files only; never follow display-record symlinks. */
 function readDisplayJson(file: string): unknown {
   try {
-    const stat = fs.lstatSync(file);
-    if (!stat.isFile() || stat.size > 4096) return null;
-    return JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
+    const contents = readPetFile(file, 4096);
+    return contents === null ? null : (JSON.parse(contents) as unknown);
   } catch {
     return null;
   }

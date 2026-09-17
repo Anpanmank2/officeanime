@@ -20,6 +20,6 @@ const activeCount = (department: string) =>
 assert.equal(occupancy.marketing?.total, activeCount('marketing'), 'marketing denominator excludes vacancies');
 assert.equal(occupancy.research?.total, activeCount('research'), 'research denominator excludes vacancies');
 assert.equal(occupancy.marketing?.total, 6, 'marketing active roster is 6');
-assert.equal(occupancy.research?.total, 7, 'research active roster is 7');
+assert.equal(occupancy.research?.total, 4, 'research active roster is 4');
 
-console.log('PASS: department denominators match non-vacant roster (marketing=6, research=7)');
+console.log('PASS: department denominators match non-vacant roster (marketing=6, research=4)');
