@@ -145,7 +145,7 @@ export interface OfficeLayout {
   furniture: PlacedFurniture[];
   /** Per-tile color settings, parallel to tiles array. null = wall/no color */
   tileColors?: Array<FloorColor | null>;
-  /** Bumped when the bundled default layout changes; forces a reset on existing installs */
+  /** Identifies the bundled template; newer revisions never reset saved layouts. */
   layoutRevision?: number;
 }
 

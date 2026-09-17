@@ -1,6 +1,6 @@
 // ── Settings Modal — Unified settings (zoom/sound) ──
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { isSoundEnabled, setSoundEnabled } from '../notificationSound.js';
 import { vscode } from '../vscodeApi.js';
@@ -60,13 +60,40 @@ const sectionLabel: React.CSSProperties = {
 export function SettingsModal({ onClose, zoom, onZoomChange }: SettingsModalProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [soundLocal, setSoundLocal] = useState(isSoundEnabled);
+  const [layoutStatus, setLayoutStatus] = useState({ canUseDefault: false, hasPrevious: false });
+  const [layoutBusy, setLayoutBusy] = useState(false);
+  const [layoutNotice, setLayoutNotice] = useState('現在の配置を残して切り替えます。');
+
+  useEffect(() => {
+    const receive = (event: MessageEvent) => {
+      const message = event.data;
+      if (message?.type !== 'layout:status') return;
+      setLayoutStatus({
+        canUseDefault: !!message.canUseDefault,
+        hasPrevious: !!message.hasPrevious,
+      });
+      setLayoutBusy(false);
+      if (!message.success) setLayoutNotice(message.error || '配置を保存できませんでした。');
+      else if (message.action === 'layout:useDefault')
+        setLayoutNotice('新しい初期配置に切り替えました。前の配置にも戻せます。');
+      else if (message.action === 'layout:restore') setLayoutNotice('前の配置に戻しました。');
+    };
+    window.addEventListener('message', receive);
+    vscode.postMessage({ type: 'layout:status' });
+    return () => window.removeEventListener('message', receive);
+  }, []);
+
+  function changeLayout(type: 'layout:useDefault' | 'layout:restore') {
+    setLayoutBusy(true);
+    vscode.postMessage({ type });
+  }
 
   return (
     <>
       {/* Backdrop */}
       <div
         onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.5)', zIndex: 49 }}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.5)', zIndex: 80 }}
       />
       {/* Modal */}
       <div
@@ -75,7 +102,7 @@ export function SettingsModal({ onClose, zoom, onZoomChange }: SettingsModalProp
           top: '50%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          zIndex: 50,
+          zIndex: 81,
           background: 'rgba(38, 43, 47, 0.96)',
           border: '2px solid rgba(46, 158, 144, 0.4)',
           borderRadius: 0,
@@ -143,6 +170,41 @@ export function SettingsModal({ onClose, zoom, onZoomChange }: SettingsModalProp
             +
           </button>
         </div>
+
+        <div style={sectionLabel}>オフィスの配置</div>
+        <button
+          disabled={layoutBusy || !layoutStatus.canUseDefault}
+          onClick={() => changeLayout('layout:useDefault')}
+          style={{
+            ...menuItemBase,
+            fontSize: '20px',
+            opacity: layoutBusy || !layoutStatus.canUseDefault ? 0.45 : 1,
+          }}
+        >
+          新しい初期配置を使う
+        </button>
+        <button
+          disabled={layoutBusy || !layoutStatus.hasPrevious}
+          onClick={() => changeLayout('layout:restore')}
+          style={{
+            ...menuItemBase,
+            fontSize: '20px',
+            opacity: layoutBusy || !layoutStatus.hasPrevious ? 0.45 : 1,
+          }}
+        >
+          前の配置に戻す
+        </button>
+        <p
+          role="status"
+          style={{
+            maxWidth: 280,
+            margin: '4px 10px 8px',
+            fontSize: '16px',
+            color: 'var(--pixel-text-dim)',
+          }}
+        >
+          {layoutNotice}
+        </p>
 
         {/* ── Display ── */}
         <div style={sectionLabel}>Display</div>

@@ -1,10 +1,8 @@
 #!/usr/bin/env node
-import {
-  ApprovalState,
-  isApprovalEvent,
-  parseApprovalEvent,
-  type ApprovalEvent,
-} from '../src/jc/approval-state.ts';
+import type { ApprovalEvent } from '../src/jc/approval-state.js';
+
+const { ApprovalState, isApprovalEvent, parseApprovalEvent } =
+  await import('../src/jc/approval-state.js');
 
 let passed = 0;
 let failed = 0;

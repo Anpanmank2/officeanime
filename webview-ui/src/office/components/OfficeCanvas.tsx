@@ -10,7 +10,7 @@ import {
 } from '../../constants.js';
 import { PET_TILE } from '../../jc/jc-constants.js';
 import { renderJCOverlay } from '../../jc/jc-overlay.js';
-import { jcGetDeptBoardAtTile, jcGetMemberAtDesk, jcIsBookshelfAtTile } from '../../jc/jc-state.js';
+import { jcGetDeptBoardAtTile, jcGetMemberAtDesk } from '../../jc/jc-state.js';
 import { petCompanionBounds, petContainsPoint } from '../../jc/pet-geometry.js';
 import { jcGetPet } from '../../jc/pet-state.js';
 import { PetSpeechBubble } from '../../jc/PetSpeechBubble.js';
@@ -852,7 +852,23 @@ export function OfficeCanvas({
       // ±1 近傍判定に吸われないよう早期 return する (dept board と同じ規約)。
       if (onBookshelfClick) {
         const tile = screenToTile(e.clientX, e.clientY);
-        if (tile && jcIsBookshelfAtTile(tile.col, tile.row)) {
+        const bookshelfAtTile = tile
+          ? officeState.getLayout().furniture.some((item) => {
+              if (!['BOOKSHELF', 'DOUBLE_BOOKSHELF', 'WHISKEY_SHELF'].includes(item.type)) {
+                return false;
+              }
+              const entry = getCatalogEntry(item.type);
+              const width = entry?.footprintW ?? 1;
+              const height = entry?.footprintH ?? 1;
+              return (
+                tile.col >= item.col &&
+                tile.col < item.col + width &&
+                tile.row >= item.row &&
+                tile.row < item.row + height
+              );
+            })
+          : false;
+        if (tile && bookshelfAtTile) {
           const el = containerRef.current;
           if (el) {
             const rect = el.getBoundingClientRect();

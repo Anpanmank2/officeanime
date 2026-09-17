@@ -10,7 +10,6 @@ import { useEditorActions } from './hooks/useEditorActions.js';
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js';
 import { useExtensionMessages } from './hooks/useExtensionMessages.js';
 import { CompanyActivationBoard } from './jc/CompanyActivationBoard.js';
-import { CompletedArchivePanel } from './jc/CompletedArchivePanel.js';
 import { CompletionToast } from './jc/CompletionToast.js';
 import { DeptKartePanel } from './jc/DeptKartePanel.js';
 import { DeskCard } from './jc/DeskCard.js';
@@ -43,12 +42,12 @@ import {
   subscribeOfficeHours,
 } from './jc/office-hours-state.js';
 import { getLogEntries, subscribeLog } from './jc/office-log-state.js';
+import { OfficeLibraryPanel } from './jc/OfficeLibraryPanel.js';
 import { OfficeLog } from './jc/OfficeLog.js';
 import { OWNER_AGENT_ID } from './jc/owner-avatar-constants.js';
 import { OwnerAvatar } from './jc/OwnerAvatar.js';
 import { jcGetPet, jcSubscribePet } from './jc/pet-state.js';
 import { PetStatusPanel } from './jc/PetStatusPanel.js';
-import { TaskHistoryPanel } from './jc/TaskHistoryPanel.js';
 import { OfficeCanvas } from './office/components/OfficeCanvas.js';
 import { ToolOverlay } from './office/components/ToolOverlay.js';
 import { EditorState } from './office/editor/editorState.js';
@@ -186,7 +185,7 @@ function formatHeartbeatHHMM(ms: number | null): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function CommandBoard({ onToggleBoard }: { onToggleBoard: () => void }) {
+function CommandBoard({ onToggleBoard, compact }: { onToggleBoard: () => void; compact: boolean }) {
   const [tickerEntries, setTickerEntries] = useState(selectTickerEntries);
   const [companyScore, setCompanyScore] = useState(() => gameGetCompanyScore());
   const [todayCount, setTodayCount] = useState(() => gameGetTodayCount());
@@ -351,74 +350,75 @@ function CommandBoard({ onToggleBoard }: { onToggleBoard: () => void }) {
           style={{
             fontSize: '11px',
             color: OFFICE_HEARTBEAT_LABEL_COLOR,
-            marginBottom: 10,
+            marginBottom: compact ? 0 : 10,
             textAlign: 'right',
           }}
         >
           最終確認 {formatHeartbeatHHMM(lastHeartbeatAt)}
         </div>
-        {companyScore === 0 && todayCount === 0 ? (
-          // ゼロ状態: 「0」を2つ見せるより、最初のおしごとへ誘う (藤井 spec §2)
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <span style={{ fontSize: '13px', color: '#5FC2B4' }}>
-              {UI_TEXT.companyBoardZeroLine1}
-            </span>
-            <span
+        {!compact &&
+          (companyScore === 0 && todayCount === 0 ? (
+            // ゼロ状態: 「0」を2つ見せるより、最初のおしごとへ誘う (藤井 spec §2)
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <span style={{ fontSize: '13px', color: '#5FC2B4' }}>
+                {UI_TEXT.companyBoardZeroLine1}
+              </span>
+              <span
+                style={{
+                  fontSize: '11px',
+                  color: 'rgba(200,210,240,0.85)',
+                  whiteSpace: 'pre-line', // 定数内 \n の制御改行を有効化 (1字孤立の折返し防止)
+                }}
+              >
+                {UI_TEXT.companyBoardZeroLine2}
+              </span>
+            </div>
+          ) : (
+            <div
               style={{
-                fontSize: '11px',
-                color: 'rgba(200,210,240,0.85)',
-                whiteSpace: 'pre-line', // 定数内 \n の制御改行を有効化 (1字孤立の折返し防止)
+                display: 'flex',
+                justifyContent: 'flex-start',
+                alignItems: 'flex-end',
+                gap: 32,
+                fontSize: '13px',
               }}
             >
-              {UI_TEXT.companyBoardZeroLine2}
-            </span>
-          </div>
-        ) : (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'flex-start',
-              alignItems: 'flex-end',
-              gap: 32,
-              fontSize: '13px',
-            }}
-          >
-            {/* Number is the hero: large + bold so a "0" reads as a digit, not a period.
+              {/* Number is the hero: large + bold so a "0" reads as a digit, not a period.
                 The pixel font's small "0" glyph is near-identical to "。" at 13px. */}
-            <span
-              style={{
-                color: '#39ff14',
-                display: 'inline-flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 2,
-              }}
-            >
-              <span style={{ fontSize: '11px', opacity: 0.85 }}>
-                {UI_TEXT.companyBoardScoreLabel}
+              <span
+                style={{
+                  color: '#39ff14',
+                  display: 'inline-flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 2,
+                }}
+              >
+                <span style={{ fontSize: '11px', opacity: 0.85 }}>
+                  {UI_TEXT.companyBoardScoreLabel}
+                </span>
+                <b style={{ fontSize: '26px', fontWeight: 900, lineHeight: 1 }}>
+                  {companyScore.toLocaleString()}
+                </b>
               </span>
-              <b style={{ fontSize: '26px', fontWeight: 900, lineHeight: 1 }}>
-                {companyScore.toLocaleString()}
-              </b>
-            </span>
-            <span
-              style={{
-                color: '#E4C36E',
-                display: 'inline-flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 2,
-              }}
-            >
-              <span style={{ fontSize: '11px', opacity: 0.85 }}>
-                {UI_TEXT.companyBoardTodayLabel}
+              <span
+                style={{
+                  color: '#E4C36E',
+                  display: 'inline-flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 2,
+                }}
+              >
+                <span style={{ fontSize: '11px', opacity: 0.85 }}>
+                  {UI_TEXT.companyBoardTodayLabel}
+                </span>
+                <b style={{ fontSize: '26px', fontWeight: 900, lineHeight: 1 }}>
+                  {todayCount.toLocaleString()}
+                </b>
               </span>
-              <b style={{ fontSize: '26px', fontWeight: 900, lineHeight: 1 }}>
-                {todayCount.toLocaleString()}
-              </b>
-            </span>
-          </div>
-        )}
+            </div>
+          ))}
       </div>
     </>
   );
@@ -461,8 +461,7 @@ function AppContent() {
   const [alwaysShowOverlay, setAlwaysShowOverlay] = useState(false);
 
   // ── New panel states ──
-  const [isTaskHistoryOpen, setIsTaskHistoryOpen] = useState(false);
-  const [isOfficeLogOpen, setIsOfficeLogOpen] = useState(true); // always open by default
+  const [isOfficeLogOpen, setIsOfficeLogOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   // Owner avatar state (reactive sync from imperative store)
@@ -472,10 +471,6 @@ function AppContent() {
     return subscribeOwnerAvatar(() => {
       setOwnerAvatarStateLocal(jcGetOwnerAvatarState());
     });
-  }, []);
-
-  const handleToggleTaskHistory = useCallback(() => {
-    setIsTaskHistoryOpen((prev) => !prev);
   }, []);
 
   // DeskCard state
@@ -490,10 +485,8 @@ function AppContent() {
     position: { x: number; y: number };
   } | null>(null);
 
-  // R4 本棚 = 完了アーカイブ (保存ボックス): 本棚クリックで開く
-  const [archivePanel, setArchivePanel] = useState<{
-    position: { x: number; y: number };
-  } | null>(null);
+  // 本棚とツールバーから開く、最初は閉じた会社の記録パネル。
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
   // 全社稼働可視化ボード (2026-07-25 藤井spec): 会社ボード ミニパネルのクリックのみで開閉
   const [isBoardOpen, setIsBoardOpen] = useState(false);
@@ -504,18 +497,28 @@ function AppContent() {
   const [petPanel, setPetPanel] = useState<{ position: { x: number; y: number } } | null>(null);
 
   const handleBookshelfClick = useCallback((screenPos: { x: number; y: number }) => {
-    // 再クリックはトグルで閉じる
-    setArchivePanel((prev) => (prev ? null : { position: screenPos }));
+    void screenPos;
+    // 再クリックはトグルで閉じる。物理本棚とメニューは同じ記録に通じる。
+    setDeskCard(null);
+    setDeptKarte(null);
+    setPetPanel(null);
+    setIsLibraryOpen((prev) => !prev);
   }, []);
 
   // 相棒カルテ (agent-pet): 卵クリックで開閉。相棒不在なら発火しない
   const handlePetClick = useCallback((screenPos: { x: number; y: number }) => {
+    setIsLibraryOpen(false);
+    setDeskCard(null);
+    setDeptKarte(null);
     setPetPanel((prev) => (prev ? null : { position: screenPos }));
   }, []);
 
   const handleDeptBoardClick = useCallback(
     (department: string, screenPos: { x: number; y: number }) => {
       // 同じ部署のボード再クリックはトグルで閉じる
+      setIsLibraryOpen(false);
+      setDeskCard(null);
+      setPetPanel(null);
       setDeptKarte((prev) =>
         prev?.department === department ? null : { department, position: screenPos },
       );
@@ -527,6 +530,9 @@ function AppContent() {
     (memberId: string, screenPos: { x: number; y: number }) => {
       // In owner avatar mode, skip the DeskCard.
       if (jcGetOwnerAvatarState().active) return;
+      setIsLibraryOpen(false);
+      setDeptKarte(null);
+      setPetPanel(null);
       setDeskCard({ memberId, position: screenPos });
     },
     [],
@@ -670,8 +676,13 @@ function AppContent() {
 
       {/* ── Bottom Toolbar (Tasks + Settings + Owner summon) ── */}
       <BottomToolbar
-        isTaskHistoryOpen={isTaskHistoryOpen}
-        onToggleTaskHistory={handleToggleTaskHistory}
+        isLibraryOpen={isLibraryOpen}
+        onToggleLibrary={() => {
+          setDeskCard(null);
+          setDeptKarte(null);
+          setPetPanel(null);
+          setIsLibraryOpen((prev) => !prev);
+        }}
         onOpenSettings={() => setIsSettingsOpen(!isSettingsOpen)}
         isSettingsOpen={isSettingsOpen}
         ownerAvatarActive={ownerAvatarState.active}
@@ -706,10 +717,10 @@ function AppContent() {
       />
 
       {/* ── Command Mode: operation board placeholder + ticker (DEFER: mode fixed to command) ── */}
-      <CommandBoard onToggleBoard={() => setIsBoardOpen((prev) => !prev)} />
-
-      {/* ── Task History (left slide-in) ── */}
-      <TaskHistoryPanel isOpen={isTaskHistoryOpen} onClose={() => setIsTaskHistoryOpen(false)} />
+      <CommandBoard
+        compact={getOfficeState().getLayout().layoutRevision === 4}
+        onToggleBoard={() => setIsBoardOpen((prev) => !prev)}
+      />
 
       {editor.isEditMode && editor.isDirty && (
         <EditActionBar editor={editor} editorState={editorState} />
@@ -800,7 +811,12 @@ function AppContent() {
           containerRef={containerRef}
           zoom={editor.zoom}
           panRef={editor.panRef}
-          onOpenArchive={() => setArchivePanel({ position: { x: window.innerWidth / 2, y: 40 } })}
+          onOpenArchive={() => {
+            setDeskCard(null);
+            setDeptKarte(null);
+            setPetPanel(null);
+            setIsLibraryOpen(true);
+          }}
         />
       )}
 
@@ -833,13 +849,7 @@ function AppContent() {
         />
       )}
 
-      {/* ── R4 本棚 = 完了アーカイブ (保存ボックス / 本棚クリック) ── */}
-      {archivePanel && (
-        <CompletedArchivePanel
-          position={archivePanel.position}
-          onClose={() => setArchivePanel(null)}
-        />
-      )}
+      {isLibraryOpen && <OfficeLibraryPanel onClose={() => setIsLibraryOpen(false)} />}
 
       {/* ── 全社稼働可視化ボード (会社ボード ミニパネルクリック / 2026-07-25 藤井spec) ── */}
       {isBoardOpen && <CompanyActivationBoard onClose={() => setIsBoardOpen(false)} />}

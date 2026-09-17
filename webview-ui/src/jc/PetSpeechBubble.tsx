@@ -84,7 +84,9 @@ export function PetSpeechBubble({ anchor }: { anchor: React.RefObject<PetBubbleA
       aria-live="polite"
       style={{
         position: 'absolute',
-        zIndex: 45,
+        // Keep the greeting and its close button above the persistent office log
+        // in narrow extension panels, but below the companion's status card (62).
+        zIndex: 51,
         width: 'min(340px, calc(100% - 16px))',
         boxSizing: 'border-box',
         padding: '10px 14px',

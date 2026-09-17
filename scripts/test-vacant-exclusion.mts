@@ -1,39 +1,55 @@
-// vacant members must never be selected for automatic office activity.
-// Run: npx tsx scripts/test-vacant-exclusion.mts
-
+// Retired/vacant rows retained in an older config cannot revive their characters.
+// Run: node --import tsx scripts/test-vacant-exclusion.mts
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import type { JCConfig, OfficeEvent } from '../src/jc/types.js';
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const config = JSON.parse(fs.readFileSync(path.join(root, 'jc-config.json'), 'utf8')) as {
-  members: Array<{ id: string; vacant?: boolean }>;
+const { EventWatcher } = await import('../src/jc/event-watcher.js');
+const config = JSON.parse(
+  fs.readFileSync(new URL('../jc-config.json', import.meta.url), 'utf8'),
+) as JCConfig;
+const active = config.members.find((member) => member.id === 'res-01')!;
+const vacant = { ...active, id: 'legacy-vacant', vacant: true };
+const watcher = new EventWatcher(
+  { ...config, members: [...config.members, vacant] },
+  process.cwd(),
+);
+const posted: unknown[] = [];
+const internals = watcher as unknown as {
+  webview: { postMessage(message: unknown): void };
+  handleEvent(event: OfficeEvent): void;
 };
-const source = fs.readFileSync(path.join(root, 'src/jc/standalone-launcher.ts'), 'utf8');
-const watcherSource = fs.readFileSync(path.join(root, 'src/jc/event-watcher.ts'), 'utf8');
-const vacantIds = config.members.filter((member) => member.vacant).map((member) => member.id);
-
-assert.ok(vacantIds.length > 0, 'fixture must include vacant member IDs');
-assert.match(
-  source,
-  /permanentRoles\.includes\(m\.role\)\s*&&\s*!m\.vacant/,
-  'permanent residents must exclude vacant members',
-);
-assert.match(
-  source,
-  /cfg\.members\s*\.filter\(\s*\(m\)\s*=>\s*!m\.vacant,?\s*\)\s*\.map/,
-  'jcMembers initialization must exclude vacant members',
-);
-assert.match(
-  source,
-  /jcMembers\.find\(\(m\)\s*=>\s*!assignedMembers\.has\(m\.id\)\)/,
-  'JSONL automatic assignment must consume the already vacancy-filtered jcMembers list',
-);
-assert.match(
-  watcherSource,
-  /console\.warn\(`\[JC-Events\] Ignoring \$\{event\.event\} for vacant member:/,
-  'stale vacant-member events must warn instead of throwing',
-);
-
-console.log(`PASS: ${vacantIds.length} vacant IDs are excluded from auto-arrival and assignment`);
+internals.webview = {
+  postMessage: (message) => {
+    posted.push(message);
+  },
+};
+const staleEvents = [
+  { event: 'work_started', agent: vacant.id, task: 'stale task', department: 'research' },
+  { event: 'delegate', from: vacant.id, to: [active.id], task: 'stale task', message: 'stale' },
+  { event: 'delegate', from: 'exec-sec', to: [vacant.id], task: 'stale task', message: 'stale' },
+  { event: 'cross_dept_message', from: active.id, to: vacant.id, message: 'stale' },
+];
+try {
+  for (const event of staleEvents) {
+    internals.handleEvent(event as OfficeEvent);
+    assert.equal(posted.length, 0, `${event.event} must not revive a vacant seat or enter history`);
+  }
+  internals.handleEvent({
+    event: 'work_started',
+    agent: active.id,
+    task: 'current task',
+    department: 'research',
+  } as OfficeEvent);
+  assert.ok(
+    posted.some((message) => (message as { type?: string }).type === 'jcHistoryEvent'),
+    'current member work still reaches history',
+  );
+  assert.ok(
+    posted.some((message) => (message as { type?: string }).type === 'jcMemberStateChange'),
+    'current member work still animates',
+  );
+  console.log('PASS: stale vacant events are ignored while current members still work');
+} finally {
+  watcher.dispose();
+}

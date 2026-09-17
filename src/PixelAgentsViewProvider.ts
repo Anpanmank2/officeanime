@@ -63,8 +63,10 @@ import {
 } from './jc/index.js';
 import type { MessageBridge } from './jc/message-bridge.js';
 import { createMessageBridge } from './jc/message-bridge.js';
+import { TaskHistoryWriter } from './jc/task-history-writer.js';
 import type { LayoutWatcher } from './layoutPersistence.js';
 import { readLayoutFromFile, watchLayoutFile, writeLayoutToFile } from './layoutPersistence.js';
+import { handleLayoutCommand } from './layoutStore.js';
 import type { AgentState } from './types.js';
 
 export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
@@ -192,9 +194,21 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         // Store seat assignments in a separate key (never touched by persistAgents)
         console.log(`[Pixel Agents] saveAgentSeats:`, JSON.stringify(message.seats));
         this.context.workspaceState.update(WORKSPACE_KEY_AGENT_SEATS, message.seats);
-      } else if (message.type === 'saveLayout') {
-        this.layoutWatcher?.markOwnWrite();
-        writeLayoutToFile(message.layout as Record<string, unknown>);
+      } else if (
+        ['saveLayout', 'layout:useDefault', 'layout:restore', 'layout:status'].includes(
+          message.type,
+        )
+      ) {
+        handleLayoutCommand(
+          message,
+          (reply) => webviewView.webview.postMessage(reply),
+          this.defaultLayout,
+          undefined,
+          (layout) => {
+            this.layoutWatcher?.markOwnWrite();
+            webviewView.webview.postMessage({ type: 'layoutLoaded', layout });
+          },
+        );
       } else if (message.type === 'saveAvatars') {
         this.saveAvatarConfig(message.avatars);
       } else if (message.type === 'setSoundEnabled') {
@@ -616,6 +630,12 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
         } catch (e) {
           console.error('[pixel-agents] jcApprovalAnswer write error:', e);
         }
+      } else if (message.type === 'task:requestHistory') {
+        const historyDispatcher = createCommandDispatcher();
+        historyDispatcher.setContext({
+          queryTaskHistory: (options) => new TaskHistoryWriter().query(options),
+        });
+        historyDispatcher.dispatch(message, (reply) => webviewView.webview.postMessage(reply));
       } else if (
         message.type === 'agent:instruct' ||
         message.type === 'agent:directive' ||
@@ -714,8 +734,11 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
             vscode.window.showErrorMessage('Pixel Agents: Invalid layout file.');
             return;
           }
+          if (!writeLayoutToFile(imported)) {
+            vscode.window.showErrorMessage('Pixel Agents: Failed to save the imported layout.');
+            return;
+          }
           this.layoutWatcher?.markOwnWrite();
-          writeLayoutToFile(imported);
           this.webview?.postMessage({ type: 'layoutLoaded', layout: imported });
           vscode.window.showInformationMessage('Pixel Agents: Layout imported successfully.');
         } catch {
@@ -937,6 +960,7 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
       const dispatcher = createCommandDispatcher();
       dispatcher.setContext({
         saveAvatars: (avatars) => this.saveAvatarConfig(avatars),
+        queryTaskHistory: (options) => new TaskHistoryWriter().query(options),
         sendToTerminal: (agentId, text) => {
           const agent = this.agents.get(agentId);
           if (agent?.terminalRef) {
@@ -1022,7 +1046,22 @@ export class PixelAgentsViewProvider implements vscode.WebviewViewProvider {
 
       // Create message bridge with command dispatcher
       this.messageBridge = createMessageBridge({
-        onBrowserCommand: (data, respond) => dispatcher.dispatch(data, respond),
+        onBrowserCommand: (data, respond) => {
+          if (
+            handleLayoutCommand(
+              data as { type?: string; layout?: unknown },
+              respond,
+              this.defaultLayout,
+              undefined,
+              (layout) => {
+                this.layoutWatcher?.markOwnWrite();
+                this.webview?.postMessage({ type: 'layoutLoaded', layout });
+              },
+            )
+          )
+            return;
+          dispatcher.dispatch(data, respond);
+        },
       });
 
       this.browserServer = await startBrowserServer(extensionPath);

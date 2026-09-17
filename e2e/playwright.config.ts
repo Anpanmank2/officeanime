@@ -6,6 +6,8 @@ const artifactsDir = path.join(__dirname, '../test-results/e2e');
 
 export default defineConfig({
   testDir: path.join(__dirname, 'tests'),
+  // Companion QA has an explicit producer input and separate native-UI opt-in.
+  testIgnore: 'pet-*.spec.ts',
   timeout: 120_000,
   globalSetup: path.join(__dirname, 'global-setup.ts'),
   reporter: [

@@ -109,8 +109,8 @@ function mapStatus(status: string): 'done' | 'failed' | 'cancelled' | 'incident'
 export class TaskHistoryWriter {
   private dir: string;
 
-  constructor() {
-    this.dir = getHistoryDir();
+  constructor(directory = getHistoryDir()) {
+    this.dir = directory;
     ensureDir(this.dir);
   }
 

@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { appendAnswer } from '../src/jc/answers-writer.ts';
+const { appendAnswer } = await import('../src/jc/answers-writer.js');
 
 let passed = 0;
 let failed = 0;

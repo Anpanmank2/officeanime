@@ -4,12 +4,15 @@ import {
   DEPT_COLORS,
   IDLE_TIMEOUT_MS,
   NON_WORKING_STATES,
+  OFFICE_SECRETARY_SEAT,
   PERMANENT_ROLES,
+  PET_TILE,
   SPEECH_BUBBLE_BASE_MS,
   SPEECH_BUBBLE_MAX_MS,
   SPEECH_BUBBLE_PER_10_CHARS_MS,
   STATE_COLORS,
 } from './jc-constants.js';
+import { COMPACT_DESK_SEAT_UIDS, resolveCompactDeskSeatPositions } from './desk-seat-registry.js';
 import type {
   JCBubbleType,
   JCConfigData,
@@ -155,20 +158,21 @@ export const POKER_TABLE_SEATS = [
  *  coffee=(21,16) 移設後エスプレッソ(21,15)前 / sofa=ラウンジソファ(22,20)前 /
  *  arcade=ダーツボード(20,14)前 / bookshelf=ウィスキー棚(14,14)前 /
  *  meeting=検証室の応接テーブル脇 (応接兼用のため現状維持)。 */
-const BREAK_TARGETS: Record<string, { col: number; row: number }> = {
+const LEGACY_BREAK_TARGETS: Record<string, { col: number; row: number }> = {
   coffee: { col: 21, row: 16 },
   sofa: { col: 22, row: 19 },
   arcade: { col: 20, row: 15 },
   bookshelf: { col: 14, row: 15 },
   meeting: { col: 3, row: 3 },
 };
+let breakTargets = LEGACY_BREAK_TARGETS;
 
 /**
  * Desk positions — must match CUSHIONED_BENCH uid+col+row in default-layout-3.json
  * and the extension-side desk-registry.ts.
  * Nameplate text is derived from jc-config.json at runtime via jcGetNameplates().
  */
-const DESK_POSITIONS: Record<string, { col: number; row: number; facingDir: number }> = {
+const LEGACY_DESK_POSITIONS: Record<string, { col: number; row: number; facingDir: number }> = {
   // ── Executive — Exec Zone (cols 8-16, rows 2-5) ──
   'exec-desk-sec': { col: 8, row: 4, facingDir: 3 }, // Secretary
   'exec-desk-pm': { col: 12, row: 4, facingDir: 3 }, // PM Yamamoto
@@ -201,6 +205,111 @@ const DESK_POSITIONS: Record<string, { col: number; row: number; facingDir: numb
   'dev-desk-06': { col: 5, row: 20, facingDir: 3 }, // Shota
   'dev-desk-07': { col: 7, row: 20, facingDir: 3 }, // Codex (implementation bot seat)
 };
+
+/** Phase 1 compact office. IDs deliberately stay stable so member history and saved assignments survive. */
+const COMPACT_DESK_POSITIONS: Record<string, { col: number; row: number; facingDir: number }> = {
+  'exec-desk-sec': { col: 8, row: 12, facingDir: 3 },
+  'exec-desk-pm': { col: 4, row: 2, facingDir: 0 },
+  'dev-desk-01': { col: 2, row: 2, facingDir: 0 },
+  'dev-desk-07': { col: 2, row: 7, facingDir: 3 },
+  'mkt-desk-01': { col: 8, row: 2, facingDir: 0 },
+  'mkt-desk-02': { col: 10, row: 2, facingDir: 0 },
+  'mkt-desk-03': { col: 12, row: 2, facingDir: 0 },
+  'mkt-desk-04': { col: 8, row: 7, facingDir: 3 },
+  'mkt-desk-12': { col: 10, row: 7, facingDir: 3 },
+  'mkt-desk-05': { col: 12, row: 7, facingDir: 3 },
+  'res-desk-01': { col: 16, row: 2, facingDir: 0 },
+  'res-desk-02': { col: 18, row: 2, facingDir: 0 },
+  'res-desk-07': { col: 16, row: 7, facingDir: 3 },
+  'res-desk-09': { col: 18, row: 7, facingDir: 3 },
+};
+
+/** In Phase 1 there is no lounge: breaks use an ordinary open floor tile. */
+const COMPACT_IDLE_TILE = { col: 14, row: 9 };
+let compactIdleTile: { col: number; row: number } | null = null;
+
+/** Legacy API name; Phase 1 uses these as neutral open-floor gathering tiles. */
+const COMPACT_POKER_TABLE_SEATS = [
+  { col: 13, row: 9 },
+  { col: 14, row: 9 },
+  { col: 13, row: 10 },
+  { col: 14, row: 10 },
+];
+
+let DESK_POSITIONS = LEGACY_DESK_POSITIONS;
+let usesCompactSeatAliases = false;
+let ownerDeskAnchor: { col: number; row: number; seatId?: string } = { col: 8, row: 4 };
+let currentLayoutFurniture: Array<{ uid: string; type: string; col: number; row: number }> = [];
+
+/**
+ * Select position metadata that matches the loaded layout. Old saved layouts keep
+ * their original coordinates; the compact bundle is identified by layout revision 4.
+ */
+export function jcSyncDeskLayout(
+  layout: {
+    layoutRevision?: number;
+    furniture?: Array<{ uid: string; type: string; col: number; row: number }>;
+  } | null,
+): void {
+  const compact = layout?.layoutRevision === 4;
+  currentLayoutFurniture = layout?.furniture ?? [];
+  usesCompactSeatAliases = compact;
+  DESK_POSITIONS = { ...(compact ? COMPACT_DESK_POSITIONS : LEGACY_DESK_POSITIONS) };
+  if (compact) {
+    for (const [deskId, chair] of Object.entries(
+      resolveCompactDeskSeatPositions(layout?.furniture),
+    )) {
+      const fallback = DESK_POSITIONS[deskId];
+      if (fallback) {
+        DESK_POSITIONS[deskId] = { ...fallback, col: chair.col, row: chair.row };
+      }
+    }
+  }
+  breakTargets = LEGACY_BREAK_TARGETS;
+  compactIdleTile = compact ? COMPACT_IDLE_TILE : null;
+  const secretaryChair = layout?.furniture?.find((item) => item.uid === 'exec-bench-01');
+  const ownerChair = layout?.furniture?.find((item) => item.uid === 'owner-chair');
+  if (compact) {
+    JC_ENTRANCE.col = 14;
+    JC_ENTRANCE.row = 9;
+    ownerDeskAnchor = ownerChair
+      ? { col: ownerChair.col, row: ownerChair.row, seatId: 'owner-chair' }
+      : { col: JC_ENTRANCE.col, row: JC_ENTRANCE.row };
+    OFFICE_SECRETARY_SEAT.col = secretaryChair?.col ?? 8;
+    OFFICE_SECRETARY_SEAT.row = secretaryChair?.row ?? 12;
+    PET_TILE.col = secretaryChair ? secretaryChair.col + 2 : JC_ENTRANCE.col;
+    PET_TILE.row = secretaryChair ? secretaryChair.row : JC_ENTRANCE.row;
+  } else {
+    ownerDeskAnchor = { col: 8, row: 4 };
+    OFFICE_SECRETARY_SEAT.col = 8;
+    OFFICE_SECRETARY_SEAT.row = 4;
+    PET_TILE.col = 10;
+    PET_TILE.row = 4;
+    JC_ENTRANCE.col = 12;
+    JC_ENTRANCE.row = 6;
+  }
+  POKER_TABLE_SEATS.splice(
+    0,
+    POKER_TABLE_SEATS.length,
+    ...(compact
+      ? COMPACT_POKER_TABLE_SEATS
+      : [
+          { col: 16, row: 17 },
+          { col: 18, row: 17 },
+          { col: 17, row: 16 },
+          { col: 17, row: 18 },
+        ]),
+  );
+}
+
+/** Owner and secretary only receive adjacent desks in the compact Phase 1 layout. */
+export function jcGetOwnerDeskAnchor(): { col: number; row: number; seatId?: string } {
+  return ownerDeskAnchor;
+}
+
+export function jcIsCompactLayout(): boolean {
+  return usesCompactSeatAliases;
+}
 
 /** Exec positions — icon-only (no character), shown in Exec Area */
 const EXEC_POSITIONS: Array<{ id: string; col: number; row: number; label: string }> = [];
@@ -388,6 +497,11 @@ export function jcGetDeskPosition(deskId: string): { col: number; row: number } 
   return pos ? { col: pos.col, row: pos.row } : undefined;
 }
 
+/** Stable chair UID for a member desk, including when the chair moves in the editor. */
+export function jcGetDeskSeatUid(deskId: string): string | undefined {
+  return usesCompactSeatAliases ? COMPACT_DESK_SEAT_UIDS[deskId] : undefined;
+}
+
 /** Get all nameplates for rendering (names derived from config) */
 export function jcGetNameplates(): NameplateInfo[] {
   const nameplates: NameplateInfo[] = [];
@@ -463,23 +577,24 @@ export function jcGetDeptStats(): Record<
   return deptStats;
 }
 
-// ── 部署ホワイトボード (部署カルテ) ────────────────────────────
-// 2026-07-03 藤井 layout spec §3: WB クリック → 部署カルテパネル。
-// footprint はいずれも WHITEBOARD 2x2 (top-left 起点)。
-// default-layout-3.json の mkt-whiteboard-01(6,13) / res-whiteboard-01(18,13) /
-// eng-whiteboard-01(8,15) と同期必須 (skill: pixel-office-spatial-registry-map)。
-const DEPT_BOARD_TILES: Array<{ department: string; col: number; row: number }> = [
-  { department: 'marketing', col: 6, row: 13 },
-  { department: 'research', col: 18, row: 13 },
-  { department: 'engineering', col: 8, row: 15 },
-];
-
-/** タイルが部署ホワイトボード上なら department 名を返す (exact footprint match) */
+/**
+ * A department board is a real WHITEBOARD in the current layout. This keeps the
+ * click target correct after editing and leaves compact Phase 1 free of phantom boards.
+ */
 export function jcGetDeptBoardAtTile(col: number, row: number): string | null {
-  for (const b of DEPT_BOARD_TILES) {
-    if (col >= b.col && col <= b.col + 1 && row >= b.row && row <= b.row + 1) {
-      return b.department;
+  for (const board of currentLayoutFurniture) {
+    if (
+      board.type !== 'WHITEBOARD' ||
+      col < board.col ||
+      col > board.col + 1 ||
+      row < board.row ||
+      row > board.row + 1
+    ) {
+      continue;
     }
+    if (board.uid.startsWith('mkt-')) return 'marketing';
+    if (board.uid.startsWith('res-')) return 'research';
+    if (board.uid.startsWith('eng-') || board.uid.startsWith('dev-')) return 'engineering';
   }
   return null;
 }
@@ -604,9 +719,10 @@ function getMemberZone(memberId: string): string {
 
 /** Get break zone target position for a member based on their breakBehavior */
 export function jcGetBreakTarget(memberId: string): { col: number; row: number } {
+  if (compactIdleTile) return compactIdleTile;
   const runtime = memberRuntimes.get(memberId);
   const behavior = runtime?.config?.breakBehavior ?? 'coffee';
-  return BREAK_TARGETS[behavior] ?? BREAK_TARGETS['coffee'];
+  return breakTargets[behavior] ?? breakTargets['coffee'];
 }
 
 /** Get the next available poker table seat */

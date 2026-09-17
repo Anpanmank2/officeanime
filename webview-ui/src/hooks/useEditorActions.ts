@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 
 import { LAYOUT_SAVE_DEBOUNCE_MS, ZOOM_MAX, ZOOM_MIN } from '../constants.js';
+import { jcSyncDeskLayout } from '../jc/jc-state.js';
 import type { ExpandDirection } from '../office/editor/editorActions.js';
 import {
   canPlaceFurniture,
@@ -98,6 +99,7 @@ export function useEditorActions(
       editorState.isDirty = true;
       setIsDirty(true);
       os.rebuildFromLayout(newLayout);
+      jcSyncDeskLayout(newLayout);
       saveLayout(newLayout);
       setEditorTick((n) => n + 1);
     },
@@ -176,6 +178,7 @@ export function useEditorActions(
         editorState.isDirty = true;
         setIsDirty(true);
         os.rebuildFromLayout(newLayout);
+        jcSyncDeskLayout(newLayout);
         saveLayout(newLayout);
       }
       setEditorTick((n) => n + 1);
@@ -218,6 +221,7 @@ export function useEditorActions(
       editorState.isDirty = true;
       setIsDirty(true);
       os.rebuildFromLayout(newLayout);
+      jcSyncDeskLayout(newLayout);
       saveLayout(newLayout);
       setEditorTick((n) => n + 1);
     },
@@ -297,6 +301,7 @@ export function useEditorActions(
     // Push current layout to redo stack before restoring
     editorState.pushRedo(os.getLayout());
     os.rebuildFromLayout(prev);
+    jcSyncDeskLayout(prev);
     saveLayout(prev);
     editorState.isDirty = true;
     setIsDirty(true);
@@ -310,6 +315,7 @@ export function useEditorActions(
     // Push current layout to undo stack before restoring
     editorState.pushUndo(os.getLayout());
     os.rebuildFromLayout(next);
+    jcSyncDeskLayout(next);
     saveLayout(next);
     editorState.isDirty = true;
     setIsDirty(true);
@@ -424,6 +430,7 @@ export function useEditorActions(
           effectiveRow = expansion.row;
           // Rebuild from expanded layout first, shifting character positions
           os.rebuildFromLayout(layout, expansion.shift);
+          jcSyncDeskLayout(layout);
         }
       }
 

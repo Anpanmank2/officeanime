@@ -80,6 +80,7 @@ function formatTime(ts: number): string {
 }
 
 const PROMPT_PREVIEW_LEN = 200;
+let historyRequestSerial = 0;
 
 function ExpandablePrompt({ prompt }: { prompt: string }) {
   const [open, setOpen] = useState(false);
@@ -266,7 +267,24 @@ function HistoryEntry({ entry }: { entry: TaskLogEntry }) {
   );
 }
 
-export function TaskHistoryPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+export interface TaskHistoryPanelProps {
+  /** Omit only when this panel is rendered inside OfficeLibraryPanel. */
+  isOpen?: boolean;
+  onClose?: () => void;
+  /** Use the library's frame instead of creating a second fixed panel. */
+  embedded?: boolean;
+  /** Restrict the query to stored task labels, for example `research`. */
+  labels?: string[];
+  emptyMessage?: string;
+}
+
+export function TaskHistoryPanel({
+  isOpen = true,
+  onClose,
+  embedded = false,
+  labels,
+  emptyMessage = '完了したしごとの記録は まだありません',
+}: TaskHistoryPanelProps) {
   const [entries, setEntries] = useState<TaskLogEntry[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -281,10 +299,14 @@ export function TaskHistoryPanel({ isOpen, onClose }: { isOpen: boolean; onClose
   // Request history from server on open
   useEffect(() => {
     if (!isOpen) return;
+    // Tabs unmount/remount their panels, so this must not be component-local.
+    const requestId = `task-history-${++historyRequestSerial}`;
 
     const handler = (event: MessageEvent) => {
       const msg = event.data;
-      if (msg.type === 'jcTaskHistoryLog' && msg.entries) {
+      // A tab can change before an earlier server reply arrives. Only the
+      // latest request is allowed to replace the currently visible records.
+      if (msg.type === 'jcTaskHistoryLog' && msg.requestId === requestId && msg.entries) {
         setEntries(msg.entries);
       }
     };
@@ -292,13 +314,15 @@ export function TaskHistoryPanel({ isOpen, onClose }: { isOpen: boolean; onClose
 
     vscode.postMessage({
       type: 'task:requestHistory',
+      requestId,
       limit: 100,
       status: statusFilter !== 'all' ? [statusFilter] : undefined,
+      labels,
       search: search || undefined,
     });
 
     return () => window.removeEventListener('message', handler);
-  }, [isOpen, statusFilter, search]);
+  }, [isOpen, statusFilter, labels, search]);
 
   if (!isOpen) return null;
 
@@ -315,45 +339,47 @@ export function TaskHistoryPanel({ isOpen, onClose }: { isOpen: boolean; onClose
   return (
     <div
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: 320,
-        height: '100%',
+        position: embedded ? 'relative' : 'fixed',
+        top: embedded ? undefined : 0,
+        left: embedded ? undefined : 0,
+        width: embedded ? '100%' : 320,
+        height: embedded ? '100%' : '100%',
         background: 'rgba(38, 43, 47, 0.95)',
-        borderRight: '2px solid rgba(90, 140, 255, 0.3)',
-        zIndex: 50,
+        borderRight: embedded ? 0 : '2px solid rgba(90, 140, 255, 0.3)',
+        zIndex: embedded ? undefined : 50,
         display: 'flex',
         flexDirection: 'column',
       }}
     >
       {/* Header */}
-      <div
-        style={{
-          padding: '8px 10px',
-          borderBottom: '2px solid rgba(90, 140, 255, 0.2)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <span style={{ fontSize: '18px', color: 'var(--pixel-accent)', fontWeight: 'bold' }}>
-          TASK HISTORY
-        </span>
-        <button
-          onClick={onClose}
+      {!embedded && (
+        <div
           style={{
-            background: 'none',
-            border: 'none',
-            color: 'var(--pixel-close-text)',
-            fontSize: '20px',
-            cursor: 'pointer',
-            padding: '0 4px',
+            padding: '8px 10px',
+            borderBottom: '2px solid rgba(90, 140, 255, 0.2)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
           }}
         >
-          X
-        </button>
-      </div>
+          <span style={{ fontSize: '18px', color: 'var(--pixel-accent)', fontWeight: 'bold' }}>
+            TASK HISTORY
+          </span>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--pixel-close-text)',
+              fontSize: '20px',
+              cursor: 'pointer',
+              padding: '0 4px',
+            }}
+          >
+            X
+          </button>
+        </div>
+      )}
 
       {/* Search */}
       <div style={{ padding: '6px 10px' }}>
@@ -410,7 +436,7 @@ export function TaskHistoryPanel({ isOpen, onClose }: { isOpen: boolean; onClose
               textAlign: 'center',
             }}
           >
-            No completed tasks
+            {emptyMessage}
           </div>
         ) : (
           [...grouped.entries()].map(([date, items]) => (

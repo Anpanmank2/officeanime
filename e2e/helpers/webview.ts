@@ -5,7 +5,7 @@ const WEBVIEW_TIMEOUT_MS = 30_000;
 const PANEL_OPEN_TIMEOUT_MS = 15_000;
 const MIN_PANEL_HEIGHT_PX = 320;
 
-async function runCommand(window: Page, command: string): Promise<void> {
+export async function runCommand(window: Page, command: string): Promise<void> {
   // Retry the full command palette interaction up to 3 times.
   // macOS CI can swallow keypresses or fail to populate results.
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -95,7 +95,8 @@ export async function openPixelAgentsPanel(window: Page): Promise<void> {
  * webviews, we wait until one frame exposes the "+ Agent" button before
  * returning it.
  */
-export async function getPixelAgentsFrame(window: Page): Promise<Frame> {
+export async function getPixelAgentsFrame(window: Page, readySelector?: string): Promise<Frame> {
+  const selector = readySelector ?? 'button:has-text("+ Agent")';
   const deadline = Date.now() + WEBVIEW_TIMEOUT_MS;
 
   while (Date.now() < deadline) {
@@ -104,7 +105,10 @@ export async function getPixelAgentsFrame(window: Page): Promise<Frame> {
       if (!url.startsWith('vscode-webview://')) continue;
 
       try {
-        const btn = await frame.waitForSelector('button:has-text("+ Agent")', { timeout: 2_000 });
+        const btn = await frame.waitForSelector(selector, {
+          state: readySelector ? 'attached' : 'visible',
+          timeout: 2_000,
+        });
         if (btn) return frame;
       } catch {
         // not this frame, keep looking
@@ -115,7 +119,7 @@ export async function getPixelAgentsFrame(window: Page): Promise<Frame> {
     await window.waitForTimeout(500);
   }
 
-  throw new Error('Timed out waiting for Pixel Agents webview frame with "+ Agent" button');
+  throw new Error(`Timed out waiting for Pixel Agents webview frame with ${selector}`);
 }
 
 /**

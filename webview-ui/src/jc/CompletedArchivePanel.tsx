@@ -41,11 +41,13 @@ function localDayStart(at: number): number {
 }
 
 export interface CompletedArchivePanelProps {
-  position: { x: number; y: number };
-  onClose: () => void;
+  position?: { x: number; y: number };
+  onClose?: () => void;
+  /** Use the OfficeLibraryPanel frame instead of a floating panel. */
+  embedded?: boolean;
 }
 
-export function CompletedArchivePanel({ position, onClose }: CompletedArchivePanelProps) {
+export function CompletedArchivePanel({ position, onClose, embedded = false }: CompletedArchivePanelProps) {
   const [records, setRecords] = useState<CompletionRecord[]>(() => computeCompletionArchive());
   const [earliestAt, setEarliestAt] = useState<number | null>(() => karteEarliestAt());
   const [names, setNames] = useState(() => jcGetMemberNames());
@@ -78,21 +80,23 @@ export function CompletedArchivePanel({ position, onClose }: CompletedArchivePan
     else groups.push({ dayStart: ds, items: [r] });
   }
 
-  const left = Math.max(8, Math.min(position.x - PANEL_W / 2, window.innerWidth - PANEL_W - 8));
-  const top = Math.max(8, Math.min(position.y + 10, window.innerHeight * 0.2));
+  const anchor = position ?? { x: window.innerWidth / 2, y: 40 };
+  const left = Math.max(8, Math.min(anchor.x - PANEL_W / 2, window.innerWidth - PANEL_W - 8));
+  const top = Math.max(8, Math.min(anchor.y + 10, window.innerHeight * 0.2));
 
   return (
     <div
       data-completed-archive
       style={{
-        position: 'absolute',
-        left,
-        top,
-        width: PANEL_W,
-        maxHeight: '66vh',
+        position: embedded ? 'relative' : 'absolute',
+        left: embedded ? undefined : left,
+        top: embedded ? undefined : top,
+        width: embedded ? '100%' : PANEL_W,
+        height: embedded ? '100%' : undefined,
+        maxHeight: embedded ? undefined : '66vh',
         display: 'flex',
         flexDirection: 'column',
-        zIndex: 62,
+        zIndex: embedded ? undefined : 62,
         background: PANEL_BG,
         border: `2px solid ${PANEL_BORDER}`,
         borderRadius: 0,
@@ -103,7 +107,7 @@ export function CompletedArchivePanel({ position, onClose }: CompletedArchivePan
       }}
     >
       {/* ── ヘッダー ── */}
-      <div
+      {!embedded && <div
         style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -136,7 +140,7 @@ export function CompletedArchivePanel({ position, onClose }: CompletedArchivePan
         >
           ✕
         </button>
-      </div>
+      </div>}
 
       {/* ── 本文 (日付順の履歴ブラウザ) ── */}
       <div style={{ overflowY: 'auto', minHeight: 0, padding: '10px 14px' }}>

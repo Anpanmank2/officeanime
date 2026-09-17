@@ -6,6 +6,8 @@ import * as path from 'path';
 import type { WebSocket } from 'ws';
 import { WebSocketServer } from 'ws';
 
+import type { LayoutStore } from '../layoutStore.js';
+import { createLayoutStore } from '../layoutStore.js';
 import { readAgentPet } from './agent-pet.js';
 
 const MIME_TYPES: Record<string, string> = {
@@ -30,13 +32,20 @@ export interface BrowserServer {
   close: () => void;
 }
 
+export interface BrowserServerOptions {
+  layoutStore?: LayoutStore;
+  petHome?: string;
+}
+
 export function startBrowserServer(
   extensionPath: string,
   port = 8432,
   onMessage?: (data: unknown, respond: (msg: unknown) => void) => void,
+  options: BrowserServerOptions = {},
 ): Promise<BrowserServer> {
   const webviewRoot = path.join(extensionPath, 'dist', 'webview');
   const assetsRoot = path.join(extensionPath, 'dist', 'assets');
+  const layoutStore = options.layoutStore ?? createLayoutStore();
 
   return new Promise((resolve, reject) => {
     const server = http.createServer((req, res) => {
@@ -47,11 +56,19 @@ export function startBrowserServer(
 
       if (urlPath === '/') urlPath = '/index.html';
 
+      if (urlPath === '/jc-layout.json') {
+        res.writeHead(200, { 'Content-Type': MIME_TYPES['.json'], 'Cache-Control': 'no-store' });
+        res.end(
+          JSON.stringify({ layout: layoutStore.read(), hasPrevious: layoutStore.hasPrevious() }),
+        );
+        return;
+      }
+
       // Optional companion (agent-pet). Always answers JSON; `null` when the
       // user has no pet, so the client can degrade to "render nothing".
       if (urlPath === `/${PET_ENDPOINT}`) {
         res.writeHead(200, { 'Content-Type': MIME_TYPES['.json'], 'Cache-Control': 'no-store' });
-        res.end(JSON.stringify(readAgentPet()));
+        res.end(JSON.stringify(readAgentPet(options.petHome)));
         return;
       }
 
@@ -78,7 +95,7 @@ export function startBrowserServer(
         let html = fs.readFileSync(filePath, 'utf-8');
         html = html.replace(
           '<head>',
-          `<head><script>window.__PIXEL_AGENTS_WS_PORT__=${port}</script>`,
+          `<head><script>window.__PIXEL_AGENTS_WS_PORT__=${(server.address() as import('net').AddressInfo).port}</script>`,
         );
         res.writeHead(200, { 'Content-Type': contentType });
         res.end(html);
@@ -132,9 +149,10 @@ export function startBrowserServer(
     });
 
     server.listen(port, '127.0.0.1', () => {
-      console.log(`[JC] Browser server listening on http://localhost:${port}`);
+      const listeningPort = (server.address() as import('net').AddressInfo).port;
+      console.log(`[JC] Browser server listening on http://localhost:${listeningPort}`);
       resolve({
-        port,
+        port: listeningPort,
         broadcast,
         wss,
         close: () => {

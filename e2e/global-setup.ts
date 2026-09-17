@@ -64,10 +64,12 @@ function patchProductJsonForWindows(vscodePath: string): void {
 
 export default async function globalSetup(): Promise<void> {
   console.log('[e2e] Ensuring VS Code is downloaded...');
-  const vscodePath = await downloadAndUnzipVSCode({
-    version: 'stable',
-    cachePath: VSCODE_CACHE_DIR,
-  });
+  const vscodePath =
+    process.env.OFFICE_VSCODE_EXECUTABLE ||
+    (await downloadAndUnzipVSCode({
+      version: process.env.OFFICE_VSCODE_VERSION || 'stable',
+      cachePath: VSCODE_CACHE_DIR,
+    }));
   console.log(`[e2e] VS Code executable: ${vscodePath}`);
 
   patchProductJsonForWindows(vscodePath);

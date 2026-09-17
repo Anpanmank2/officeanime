@@ -38,6 +38,9 @@ export const CONFIG_FILE_NAME = 'config.json';
 export const AVATAR_FILE_NAME = 'avatars.json';
 export const LAYOUT_FILE_POLL_INTERVAL_MS = 2000;
 export const LAYOUT_REVISION_KEY = 'layoutRevision';
+export const LAYOUT_MAX_DIMENSION = 64;
+export const PREVIOUS_LAYOUT_SUFFIX = '.previous';
+export const LAYOUT_DATA_DIR_ENV = 'OFFICEANIME_DATA_DIR';
 
 // ── Settings Persistence ────────────────────────────────────
 export const GLOBAL_KEY_SOUND_ENABLED = 'pixel-agents.soundEnabled';

@@ -5,8 +5,9 @@
 import { UI_TEXT } from '../jc/jc-constants.js';
 
 interface BottomToolbarProps {
-  isTaskHistoryOpen: boolean;
-  onToggleTaskHistory: () => void;
+  isLibraryOpen?: boolean;
+  /** Menu fallback for the physical bookshelf. */
+  onToggleLibrary?: () => void;
   onOpenSettings: () => void;
   isSettingsOpen: boolean;
   /** Whether the Owner avatar is currently active in the office */
@@ -69,14 +70,16 @@ export function BottomToolbar(props: BottomToolbarProps) {
             {props.ownerAvatarActive ? UI_TEXT.ownerLeave : UI_TEXT.ownerArrive}
           </button>
         )}
-        {/* しごと帳 (task history) button */}
-        <button
-          style={{ ...btnBase, ...(props.isTaskHistoryOpen ? btnActive : {}) }}
-          onClick={props.onToggleTaskHistory}
-          title={UI_TEXT.tasksButtonTitle}
-        >
-          {UI_TEXT.tasksButton}
-        </button>
+        {props.onToggleLibrary !== undefined && (
+          <button
+            style={{ ...btnBase, ...(props.isLibraryOpen ? btnActive : {}) }}
+            onClick={props.onToggleLibrary}
+            title="本棚を開く"
+            aria-label="本棚を開く"
+          >
+            本棚
+          </button>
+        )}
 
         {/* 設定 (settings) button */}
         <button
