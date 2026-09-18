@@ -200,8 +200,8 @@ function main() {
   const avatars = JSON.parse(readFileSync(join(ASSETS, 'default-avatars.json'), 'utf8')).avatars;
   const ids = Object.keys(avatars);
   assert(
-    ids.length === 14 && ids.includes('res-01') && ids.includes('eng-01'),
-    'hypothetical assignment has 14 members including eng-01/res-01',
+    ids.length === 13 && ids.includes('res-01') && ids.includes('eng-01'),
+    'hypothetical assignment has 13 members including eng-01/res-01',
   );
   const composites = new Map();
   for (const id of ids) {
@@ -240,9 +240,9 @@ function main() {
   for (let i = 0; i < masks.length; i++)
     for (let j = i + 1; j < masks.length; j++)
       minimum = Math.min(minimum, distance(masks[i], masks[j]));
-  assert(composites.size === 14 && minimum > 0, 'hypothetical 14 member silhouettes are unique');
+  assert(composites.size === 13 && minimum > 0, 'hypothetical 13 member silhouettes are unique');
   assert(
-    composites.size === 14 && minimum >= 27,
+    composites.size === 13 && minimum >= 27,
     `hypothetical minimum pair distance ${minimum}px >= 27px`,
   );
   const pairDistance =

@@ -309,14 +309,14 @@ const avatarConfigs =
   avatarFile?.avatars && typeof avatarFile.avatars === 'object' ? avatarFile.avatars : {};
 const avatarIds = Object.keys(avatarConfigs);
 
-// Phase 1: authoritative 9/16 roster contains 13 AI members plus the Codex system seat.
+// Phase 1: authoritative 9/16 roster contains 12 AI members plus the Codex system seat.
 const activeRosterIds = Array.isArray(jcConfig?.members)
   ? jcConfig.members.filter((member) => member?.vacant !== true).map((member) => member?.id)
   : [];
 // Vacant and retired entries do not occupy the compact initial office.
 assert(
-  activeRosterIds.length === 14,
-  `jc-config.json contains exactly 14 active entries (13 AI + Codex) (got ${activeRosterIds.length})`,
+  activeRosterIds.length === 13,
+  `jc-config.json contains exactly 13 active entries (12 AI + Codex) (got ${activeRosterIds.length})`,
 );
 assert(uniqueRosterIds.size === rosterIds.length, 'jc-config.json member IDs are unique');
 assert(avatarFile?.version === 1, 'default-avatars.json has version 1');

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "avatarRevision": 2,
+  "avatarRevision": 3,
   "avatars": {
     "eng-01": {
       "base": {
@@ -326,64 +326,6 @@
         {
           "slot": "accessory",
           "part": "chest_pen",
-          "color": null
-        }
-      ]
-    },
-    "mkt-12": {
-      "base": {
-        "part": "body_neutral",
-        "color": {
-          "h": 0,
-          "s": -9,
-          "b": 11,
-          "c": -2
-        }
-      },
-      "layers": [
-        {
-          "slot": "bottom",
-          "part": "pants_tailored",
-          "color": {
-            "h": -145,
-            "s": 20,
-            "b": -12,
-            "c": 3
-          }
-        },
-        {
-          "slot": "top",
-          "part": "blouse_clean",
-          "color": {
-            "h": -150,
-            "s": 48,
-            "b": -2,
-            "c": 2
-          }
-        },
-        {
-          "slot": "face",
-          "part": "face_calm",
-          "color": null
-        },
-        {
-          "slot": "hair",
-          "part": "hair_medium_straight",
-          "color": {
-            "h": 18,
-            "s": 28,
-            "b": -2,
-            "c": 3
-          }
-        },
-        {
-          "slot": "accessory",
-          "part": "handheld_pad",
-          "color": null
-        },
-        {
-          "slot": "accessory",
-          "part": "swatch_strap",
           "color": null
         }
       ]
