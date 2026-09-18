@@ -19,6 +19,7 @@ import { composeAvatar } from '../webview-ui/src/office/sprites/avatarComposite.
 import {
   parseAvatarConfigFile,
   type LoadedAvatarParts,
+  type AvatarConfig,
 } from '../webview-ui/src/office/sprites/avatarTypes.js';
 import { Direction, type SpriteData } from '../webview-ui/src/office/types.js';
 
@@ -86,6 +87,49 @@ function requestedOutputPath(args: string[]): string {
 
   const positional = args.find((arg) => !arg.startsWith('-'));
   return positional ? path.resolve(positional) : DEFAULT_OUTPUT_PATH;
+}
+
+function requestedPreviewPart(args: string[]): string | undefined {
+  const index = args.indexOf('--preview-part');
+  if (index < 0) return undefined;
+  const id = args[index + 1];
+  if (!id || id.startsWith('-')) throw new Error('--preview-part requires a hair id');
+  return id;
+}
+
+function buildPreviewMember(partId: string): GalleryMember {
+  const catalog = buildAvatarPartCatalog(ASSETS_DIR);
+  if (!catalog.some((part) => part.id === partId && part.slot === 'hair')) {
+    throw new Error(`Unknown preview hair: ${partId}`);
+  }
+  const decoded = decodeAllAvatarParts(ASSETS_DIR, catalog);
+  const config: AvatarConfig = {
+    base: { part: 'body_neutral', color: null },
+    layers: [
+      { slot: 'bottom', part: 'pants_tailored', color: null },
+      { slot: 'top', part: 'shirt_button', color: null },
+      { slot: 'face', part: 'face_calm', color: null },
+      { slot: 'hair', part: partId, color: null },
+    ],
+  };
+  for (const id of [config.base.part, ...config.layers.map((layer) => layer.part)]) {
+    if (!decoded[id]) throw new Error(`Missing decoded preview part: ${id}`);
+  }
+  const sprites = composeAvatar(config, {
+    catalog, sprites: new Map<string, CharacterDirectionSprites>(Object.entries(decoded)),
+  });
+  return {
+    id: partId, name: partId, role: 'Hair preview', department: 'Prototype',
+    frames: [
+      { label: 'DOWN · WALK2', sprite: sprites.walk[Direction.DOWN][1] },
+      { label: 'UP · WALK2', sprite: sprites.walk[Direction.UP][1] },
+      { label: 'RIGHT · WALK2', sprite: sprites.walk[Direction.RIGHT][1] },
+      { label: 'TYPE 1', sprite: sprites.typing[Direction.DOWN][0] },
+      { label: 'TYPE 2', sprite: sprites.typing[Direction.DOWN][1] },
+      { label: 'READ 1', sprite: sprites.reading[Direction.DOWN][0] },
+      { label: 'READ 2', sprite: sprites.reading[Direction.DOWN][1] },
+    ],
+  };
 }
 
 function readJson<T>(filePath: string): T {
@@ -232,7 +276,7 @@ async function renderGallery(outputPath: string, members: GalleryMember[]): Prom
   </head>
   <body>
     <h1>Persona-Consistent Character Gallery</h1>
-    <p class="subtitle">Real avatar-parts loader + composeAvatar · 23 members · walk2 directions and complete type/read pairs</p>
+    <p class="subtitle">Real avatar-parts loader + composeAvatar · ${members.length} members · walk2 directions and complete type/read pairs</p>
     <main id="gallery"></main>
   </body>
 </html>`);
@@ -302,7 +346,12 @@ async function renderGallery(outputPath: string, members: GalleryMember[]): Prom
   }
 }
 
-const outputPath = requestedOutputPath(process.argv.slice(2));
-const members = buildGalleryMembers();
+const args = process.argv.slice(2);
+const previewPart = requestedPreviewPart(args);
+const previewIndex = args.indexOf('--preview-part');
+const outputArgs = previewPart ? args.filter((_, index) => index !== previewIndex && index !== previewIndex + 1) : args;
+const outputPath = requestedOutputPath(outputArgs);
+// --preview-part composes one standalone config without roster/default-avatar checks.
+const members = previewPart ? [buildPreviewMember(previewPart)] : buildGalleryMembers();
 await renderGallery(outputPath, members);
 console.log(`Rendered ${members.length.toString()} members to ${outputPath}`);

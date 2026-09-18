@@ -11,7 +11,7 @@
 
 import { WebSocketServer } from 'ws';
 import { execSync, spawn } from 'child_process';
-import { existsSync, writeFileSync, readFileSync } from 'fs';
+import { existsSync, writeFileSync, readFileSync, readdirSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -166,7 +166,12 @@ async function run() {
 
     // Persona avatars must travel through the real browser message path, not
     // merely exist on disk while the canvas silently uses legacy characters.
-    const avatarPartsLog = logs.find((l) => l.includes('Received 41 avatar parts'));
+    const expectedAvatarPartsCount = readdirSync(resolve(WEBVIEW, 'public/assets/avatar-parts'), {
+      recursive: true,
+    }).filter((file) => file.endsWith('/manifest.json')).length;
+    const avatarPartsLog = logs.find((l) =>
+      l.includes(`Received ${expectedAvatarPartsCount} avatar parts`),
+    );
     // QA側修正 2026-09-07: 名簿は default-avatars.json から導出（16名体制+空席10=26。固定値23は旧名簿）
     const expectedAvatarCount = Object.keys(
       JSON.parse(
@@ -179,7 +184,7 @@ async function run() {
     const avatarConfigsLog = logs.find((l) =>
       l.includes(`Received ${expectedAvatarCount} avatar configs`),
     );
-    assert(!!avatarPartsLog, '41 avatar parts loaded into the webview');
+    assert(!!avatarPartsLog, `${expectedAvatarPartsCount} avatar parts loaded into the webview`);
     assert(
       !!avatarConfigsLog,
       `All ${expectedAvatarCount} persona avatar configs loaded into the webview`,

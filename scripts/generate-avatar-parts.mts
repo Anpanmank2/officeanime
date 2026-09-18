@@ -505,7 +505,41 @@ function drawHair(style: string, canvas: CellCanvas, pose: Pose): void {
   const y = pose.headDy;
   const side = pose.direction === 'right';
 
-  if (style === 'hair_crop_plain') {
+  if (style === 'hair_swept_undercut') {
+    // Down: viewer-right is cropped; the opposite fringe descends in two steps.
+    // Every mark uses the head anchor, including think and the down-facing error cells.
+    if (side) {
+      canvas.hLine(6 + x, 8 + y, 5, p.dark);
+      canvas.rect(5 + x, 9 + y, 7, 2, p.dark);
+      canvas.hLine(6 + x, 11 + y, 7, p.dark);
+      canvas.hLine(6 + x, 12 + y, 8, p.dark);
+      canvas.vLine(6 + x, 13 + y, 2, p.dark);
+      canvas.hLine(7 + x, 15 + y, 2, p.dark);
+      canvas.rect(6 + x, 9 + y, 5, 2, p.mid);
+      canvas.hLine(7 + x, 9 + y, 3, p.light);
+      canvas.hLine(9 + x, 11 + y, 3, p.mid);
+    } else {
+      const back = pose.direction === 'up';
+      const left = back ? 5 : 2;
+      canvas.hLine(5 + x, 8 + y, 5, p.dark);
+      canvas.hLine((back ? 5 : 3) + x, 9 + y, 8, p.dark);
+      canvas.hLine(left + x, 10 + y, 9, p.dark);
+      canvas.hLine(left + x, 11 + y, 9, p.dark);
+      canvas.hLine((back ? 5 : 3) + x, 12 + y, 8, p.dark);
+      canvas.vLine((back ? 5 : 10) + x, 13 + y, 2, p.mid);
+      if (back) {
+        canvas.rect(6 + x, 13 + y, 5, 2, p.dark);
+        canvas.hLine(7 + x, 15 + y, 3, p.dark);
+      } else {
+        canvas.vLine(3 + x, 13 + y, 2, p.dark);
+        canvas.pixel(4 + x, 15 + y, p.dark);
+      }
+      canvas.hLine(5 + x, 9 + y, 5, p.mid);
+      canvas.hLine((back ? 7 : 3) + x, 10 + y, 5, p.mid);
+      canvas.hLine(6 + x, 9 + y, 3, p.light);
+      canvas.hLine((back ? 9 : 3) + x, 11 + y, 3, p.mid);
+    }
+  } else if (style === 'hair_crop_plain') {
     drawBasicCap(canvas, pose, p);
     if (side) canvas.vLine(6 + x, 11 + y, 3, p.mid);
     else
@@ -1090,6 +1124,7 @@ const FACE_PARTS: PartDefinition[] = FACE_IDS.map(([id, name]) => ({
 }));
 
 const HAIR_IDS = [
+  ['hair_swept_undercut', 'Swept Undercut'],
   ['hair_sidepart_neat', 'Neat Side Part'],
   ['hair_crop_plain', 'Plain Crop'],
   ['hair_bob_streak', 'Bob with Color Streak'],
@@ -1694,26 +1729,80 @@ function writeGeneratedAssets(
   );
 }
 
+function writePartsOnly(rendered: ReadonlyMap<string, PNG>): void {
+  const missing: PartDefinition[] = [];
+  const changed: string[] = [];
+  let identical = 0;
+  for (const part of PARTS) {
+    const partDir = path.join(AVATAR_ROOT, part.slot, part.id);
+    const manifestPath = path.join(partDir, 'manifest.json');
+    const file = fs.existsSync(manifestPath)
+      ? (JSON.parse(fs.readFileSync(manifestPath, 'utf8')).file ?? `${part.id}.png`)
+      : `${part.id}.png`;
+    const pngPath = path.join(partDir, file);
+    if (!fs.existsSync(pngPath)) {
+      missing.push(part);
+      continue;
+    }
+    try {
+      const existing = PNG.sync.read(fs.readFileSync(pngPath));
+      const generated = rendered.get(part.id)!;
+      if (existing.width === generated.width && existing.height === generated.height &&
+          existing.data.equals(generated.data)) identical += 1;
+      else changed.push(part.id);
+    } catch {
+      changed.push(part.id);
+    }
+  }
+  // Compare every existing part before writing anything; never overwrite an existing asset.
+  if (changed.length > 0) {
+    console.log(`new: 0 / identical: ${identical} / changed: ${changed.length}`);
+    throw new Error(`Changed avatar parts: ${changed.join(', ')}`);
+  }
+  for (const part of missing) {
+    const partDir = path.join(AVATAR_ROOT, part.slot, part.id);
+    fs.mkdirSync(partDir, { recursive: true });
+    const manifestPath = path.join(partDir, 'manifest.json');
+    const file = fs.existsSync(manifestPath)
+      ? (JSON.parse(fs.readFileSync(manifestPath, 'utf8')).file ?? `${part.id}.png`)
+      : `${part.id}.png`;
+    fs.writeFileSync(path.join(partDir, file), PNG.sync.write(rendered.get(part.id)!));
+    if (!fs.existsSync(manifestPath)) {
+      fs.writeFileSync(manifestPath, `${JSON.stringify({
+        id: part.id, slot: part.slot, name: part.name, file,
+        width: AVATAR_ATLAS_WIDTH, height: AVATAR_ATLAS_HEIGHT,
+        frames: CHAR_FRAMES_PER_ROW, colorable: part.colorable, zOverride: null,
+      }, null, 2)}\n`, 'utf8');
+    }
+  }
+  console.log(`new: ${missing.length} / identical: ${identical} / changed: 0`);
+}
+
 function main(): void {
+  const partsOnly = process.argv.slice(2).includes('--parts-only') || process.env.AVATAR_PARTS_ONLY === '1';
   const expectedCounts: Record<AvatarSlot, number> = {
     base: 1,
     bottom: 2,
     top: 8,
     face: 3,
-    hair: 14,
+    hair: 15,
     accessory: 13,
   };
   for (const [slot, expected] of Object.entries(expectedCounts)) {
     const actual = PARTS.filter((part) => part.slot === slot).length;
     if (actual !== expected) throw new Error(`${slot}: expected ${expected} parts, got ${actual}`);
   }
-  if (PARTS.length !== 41) throw new Error(`Expected 41 parts, got ${PARTS.length}`);
+  if (PARTS.length !== 42) throw new Error(`Expected 42 parts, got ${PARTS.length}`);
   const rendered = new Map<string, PNG>();
   for (const part of PARTS) {
     if (rendered.has(part.id)) throw new Error(`Duplicate part id: ${part.id}`);
     const png = renderPart(part);
     validatePart(part, png);
     rendered.set(part.id, png);
+  }
+  if (partsOnly) { // --parts-only bypasses roster validation and destructive full generation.
+    writePartsOnly(rendered);
+    return;
   }
   const { avatars, nearestPairs } = validateAndBuildConfigs(rendered);
   writeGeneratedAssets(rendered, avatars);
