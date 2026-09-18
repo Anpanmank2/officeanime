@@ -249,6 +249,45 @@ function main() {
     composites.has('eng-01') && composites.has('res-01')
       ? distance(composites.get('eng-01'), composites.get('res-01'))
       : -1;
+  if (pairDistance >= 0 && fresh && catalog.has('hair_sidepart_neat')) {
+    const pair = ['eng-01', 'res-01'];
+    const nonHairParts = pair.map((id) => [
+      avatars[id].base.part,
+      ...avatars[id].layers.filter((layer) => layer.slot !== 'hair').map((layer) => layer.part),
+    ]);
+    const headParts = pair.flatMap((id) => [
+      avatars[id].base.part,
+      ...avatars[id].layers.filter((layer) => layer.slot === 'face').map((layer) => layer.part),
+    ]);
+    const outside = [0, 0, 0];
+    let nonHair = 0,
+      covered = 0,
+      hairOnly = 0,
+      sidepartOutside = 0,
+      overlap = 0;
+    for (let row = 0; row < ROWS; row++)
+      for (let y = 0; y < H; y++)
+        for (let x = 0; x < W; x++) {
+          const occupied = (partId) => alpha(catalog.get(partId).png, row, 1, x, y) > 0;
+          const before = nonHairParts[0].some(occupied) !== nonHairParts[1].some(occupied);
+          const index = row * W * H + y * W + x;
+          const after = composites.get(pair[0])[index] !== composites.get(pair[1])[index];
+          if (before) nonHair++;
+          if (before && !after) covered++;
+          if (!before && after) hairOnly++;
+          // Outside means beyond body/face, excluding glasses from the reference outline.
+          if (!headParts.some(occupied)) {
+            const newPixel = occupied(NEW_HAIR);
+            const oldPixel = occupied('hair_sidepart_neat');
+            if (newPixel) outside[row]++;
+            if (oldPixel) sidepartOutside++;
+            if (newPixel && oldPixel) overlap++;
+          }
+        }
+    console.log(
+      `  INFO: eng-01/res-01 non-hair=${nonHair} covered=${covered} hair-only=${hairOnly} new-outside down=${outside[0]} up=${outside[1]} right=${outside[2]} total=${outside.reduce((sum, count) => sum + count, 0)} sidepart-outside=${sidepartOutside} overlap=${overlap} distance=${pairDistance}px target=130px`,
+    );
+  }
   assert(pairDistance >= 130, `hypothetical eng-01/res-01 distance ${pairDistance}px >= 130px`);
 }
 try {

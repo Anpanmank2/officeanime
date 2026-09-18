@@ -9,7 +9,8 @@
  */
 
 import { chromium } from '@playwright/test';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { PNG } from 'pngjs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,7 +66,6 @@ const DEFAULT_OUTPUT_PATH = path.join(
   'persona-characters',
   'avatar-gallery.png',
 );
-const EXPECTED_ROSTER_SIZE = 23;
 const SPRITE_SCALE = 3;
 
 function requestedOutputPath(args: string[]): string {
@@ -97,7 +97,7 @@ function requestedPreviewPart(args: string[]): string | undefined {
   return id;
 }
 
-function buildPreviewMember(partId: string): GalleryMember {
+function buildPreviewMember(partId: string): GalleryMember[] {
   const catalog = buildAvatarPartCatalog(ASSETS_DIR);
   if (!catalog.some((part) => part.id === partId && part.slot === 'hair')) {
     throw new Error(`Unknown preview hair: ${partId}`);
@@ -118,18 +118,30 @@ function buildPreviewMember(partId: string): GalleryMember {
   const sprites = composeAvatar(config, {
     catalog, sprites: new Map<string, CharacterDirectionSprites>(Object.entries(decoded)),
   });
-  return {
-    id: partId, name: partId, role: 'Hair preview', department: 'Prototype',
-    frames: [
-      { label: 'DOWN · WALK2', sprite: sprites.walk[Direction.DOWN][1] },
-      { label: 'UP · WALK2', sprite: sprites.walk[Direction.UP][1] },
-      { label: 'RIGHT · WALK2', sprite: sprites.walk[Direction.RIGHT][1] },
-      { label: 'TYPE 1', sprite: sprites.typing[Direction.DOWN][0] },
-      { label: 'TYPE 2', sprite: sprites.typing[Direction.DOWN][1] },
-      { label: 'READ 1', sprite: sprites.reading[Direction.DOWN][0] },
-      { label: 'READ 2', sprite: sprites.reading[Direction.DOWN][1] },
-    ],
-  };
+  return [Direction.DOWN, Direction.UP, Direction.RIGHT].map((dir, cardIndex) => {
+    const direction = ['DOWN', 'UP', 'RIGHT'][cardIndex];
+    return {
+      id: `${partId}-${direction.toLowerCase()}`,
+      name: partId,
+      role: `${direction} · Hair preview`,
+      department: 'Prototype',
+      frames: [
+        ...sprites.walk[dir].slice(0, 3).map((sprite, index) => ({
+          label: `${direction} · WALK ${index + 1}`, sprite,
+        })),
+        ...sprites.typing[dir].slice(0, 2).map((sprite, index) => ({
+          label: `${direction} · TYPE ${index + 1}`, sprite,
+        })),
+        ...sprites.reading[dir].slice(0, 2).map((sprite, index) => ({
+          label: `${direction} · READ ${index + 1}`, sprite,
+        })),
+        ...sprites.thinking[dir].slice(0, 3).map((sprite, index) => ({
+          label: `${direction} · THINK ${index + 1}`, sprite,
+        })),
+        { label: `${direction} · ERROR ${cardIndex + 1}`, sprite: sprites.error[Direction.DOWN][cardIndex] },
+      ],
+    };
+  });
 }
 
 function readJson<T>(filePath: string): T {
@@ -140,11 +152,7 @@ function readJson<T>(filePath: string): T {
 function buildGalleryMembers(): GalleryMember[] {
   const rosterFile = readJson<{ members?: RosterMember[] }>(JC_CONFIG_PATH);
   const roster = rosterFile.members ?? [];
-  if (roster.length !== EXPECTED_ROSTER_SIZE) {
-    throw new Error(
-      `Expected ${EXPECTED_ROSTER_SIZE.toString()} jc-config members, got ${roster.length.toString()}`,
-    );
-  }
+  if (roster.length === 0) throw new Error('jc-config roster is empty');
 
   const avatarConfigPath = path.join(ASSETS_DIR, DEFAULT_AVATARS_FILE_NAME);
   const avatarConfig = parseAvatarConfigFile(readJson<unknown>(avatarConfigPath));
@@ -196,17 +204,20 @@ function buildGalleryMembers(): GalleryMember[] {
   });
 }
 
-async function renderGallery(outputPath: string, members: GalleryMember[]): Promise<void> {
+async function renderGallery(outputPath: string, members: GalleryMember[], preview = false): Promise<void> {
   const extension = path.extname(outputPath).toLowerCase();
   if (extension !== '.png' && extension !== '.jpg' && extension !== '.jpeg') {
     throw new Error(`Output path must end in .png, .jpg, or .jpeg: ${outputPath}`);
   }
   mkdirSync(path.dirname(outputPath), { recursive: true });
 
+  const capturePath = extension === '.png' ? outputPath : `${outputPath}.validation.png`;
   const browser = await chromium.launch({ headless: true });
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-    await page.setContent(`<!doctype html>
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+      try {
+        await page.setContent(`<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
@@ -225,7 +236,7 @@ async function renderGallery(outputPath: string, members: GalleryMember[]): Prom
       .subtitle { margin: 0 0 24px; color: #aeb5cc; font-size: 13px; }
       #gallery {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(${preview ? 1 : 2}, minmax(0, 1fr));
         gap: 14px;
       }
       .member {
@@ -246,7 +257,7 @@ async function renderGallery(outputPath: string, members: GalleryMember[]): Prom
       }
       .member-name { min-width: 0; font-size: 14px; font-weight: 800; }
       .member-meta { color: #9ba4c1; font-size: 10px; text-align: right; white-space: nowrap; }
-      .frames { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+      .frames { display: grid; gap: 5px; }
       .frame { min-width: 0; text-align: center; }
       .sprite-shell {
         display: flex;
@@ -276,71 +287,130 @@ async function renderGallery(outputPath: string, members: GalleryMember[]): Prom
   </head>
   <body>
     <h1>Persona-Consistent Character Gallery</h1>
-    <p class="subtitle">Real avatar-parts loader + composeAvatar · ${members.length} members · walk2 directions and complete type/read pairs</p>
+    <p class="subtitle">Real avatar-parts loader + composeAvatar · ${members.length} ${preview ? 'direction cards · all 33 atlas frames' : 'members · walk2 directions and complete type/read pairs'}</p>
     <main id="gallery"></main>
   </body>
 </html>`);
 
-    await page.evaluate(
-      ({ galleryMembers, scale }) => {
-        const gallery = document.querySelector<HTMLElement>('#gallery');
-        if (!gallery) throw new Error('Gallery root is missing');
+        await page.evaluate(
+          ({ galleryMembers, scale }) => {
+            const gallery = document.querySelector<HTMLElement>('#gallery');
+            if (!gallery) throw new Error('Gallery root is missing');
 
-        for (const member of galleryMembers) {
-          const card = document.createElement('section');
-          card.className = 'member';
-          card.dataset.memberId = member.id;
+            for (const member of galleryMembers) {
+              const card = document.createElement('section');
+              card.className = 'member';
+              card.dataset.memberId = member.id;
 
-          const heading = document.createElement('div');
-          heading.className = 'member-heading';
-          const name = document.createElement('div');
-          name.className = 'member-name';
-          name.textContent = member.name;
-          const meta = document.createElement('div');
-          meta.className = 'member-meta';
-          meta.textContent = `${member.id} · ${member.department} · ${member.role}`;
-          heading.append(name, meta);
-          card.append(heading);
+              const heading = document.createElement('div');
+              heading.className = 'member-heading';
+              const name = document.createElement('div');
+              name.className = 'member-name';
+              name.textContent = member.name;
+              const meta = document.createElement('div');
+              meta.className = 'member-meta';
+              meta.textContent = `${member.id} · ${member.department} · ${member.role}`;
+              heading.append(name, meta);
+              card.append(heading);
 
-          const frames = document.createElement('div');
-          frames.className = 'frames';
-          for (const frame of member.frames) {
-            const frameElement = document.createElement('div');
-            frameElement.className = 'frame';
-            const shell = document.createElement('div');
-            shell.className = 'sprite-shell';
-            const canvas = document.createElement('canvas');
-            const rows = frame.sprite.length;
-            const columns = frame.sprite[0]?.length ?? 0;
-            canvas.width = columns * scale;
-            canvas.height = rows * scale;
-            canvas.setAttribute('aria-label', `${member.id} ${frame.label}`);
-            const context = canvas.getContext('2d');
-            if (!context) throw new Error('Could not create a 2D canvas context');
-            context.imageSmoothingEnabled = false;
-            for (let row = 0; row < rows; row++) {
-              for (let column = 0; column < columns; column++) {
-                const color = frame.sprite[row][column];
-                if (color === '') continue;
-                context.fillStyle = color;
-                context.fillRect(column * scale, row * scale, scale, scale);
+              const frames = document.createElement('div');
+              frames.className = 'frames';
+              frames.style.gridTemplateColumns = `repeat(${member.frames.length}, minmax(0, 1fr))`;
+              for (const frame of member.frames) {
+                const frameElement = document.createElement('div');
+                frameElement.className = 'frame';
+                const shell = document.createElement('div');
+                shell.className = 'sprite-shell';
+                const canvas = document.createElement('canvas');
+                const rows = frame.sprite.length;
+                const columns = frame.sprite[0]?.length ?? 0;
+                canvas.width = columns * scale;
+                canvas.height = rows * scale;
+                canvas.setAttribute('aria-label', `${member.id} ${frame.label}`);
+                const context = canvas.getContext('2d');
+                if (!context) throw new Error('Could not create a 2D canvas context');
+                context.imageSmoothingEnabled = false;
+                for (let row = 0; row < rows; row++) {
+                  for (let column = 0; column < columns; column++) {
+                    const color = frame.sprite[row][column];
+                    if (color === '') continue;
+                    context.fillStyle = color;
+                    context.fillRect(column * scale, row * scale, scale, scale);
+                  }
+                }
+                const label = document.createElement('div');
+                label.className = 'frame-label';
+                label.textContent = frame.label;
+                shell.append(canvas);
+                frameElement.append(shell, label);
+                frames.append(frameElement);
               }
+              card.append(frames);
+              gallery.append(card);
             }
-            const label = document.createElement('div');
-            label.className = 'frame-label';
-            label.textContent = frame.label;
-            shell.append(canvas);
-            frameElement.append(shell, label);
-            frames.append(frameElement);
-          }
-          card.append(frames);
-          gallery.append(card);
-        }
-      },
-      { galleryMembers: members, scale: SPRITE_SCALE },
-    );
+          },
+          { galleryMembers: members, scale: SPRITE_SCALE },
+        );
 
-    await page.screenshot({ path: outputPath, fullPage: true, animations: 'disabled' });
+        const canvasCounts = await page.evaluate(async () => {
+          await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+          return Array.from(document.querySelectorAll('canvas'), (canvas, index) => {
+            const context = canvas.getContext('2d');
+            if (!context) throw new Error(`Canvas ${index + 1} (${canvas.width}x${canvas.height}): no 2D context`);
+            const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+            let opaque = 0;
+            for (let offset = 3; offset < pixels.length; offset += 4) {
+              if (pixels[offset] > 0) opaque += 1;
+            }
+            return { index: index + 1, width: canvas.width, height: canvas.height, opaque };
+          });
+        });
+        for (const canvas of canvasCounts) {
+          if (canvas.opaque === 0) {
+            throw new Error(`Canvas ${canvas.index} (${canvas.width}x${canvas.height}): 0 opaque pixels`);
+          }
+        }
+        await page.screenshot({ path: capturePath, type: 'png', fullPage: true, animations: 'disabled' });
+        const captured = PNG.sync.read(readFileSync(capturePath));
+        let white = 0;
+        for (let offset = 0; offset < captured.data.length; offset += 4) {
+          // Pure white (255, 255, 255) is never part of the gallery or avatar palette.
+          if (captured.data[offset] === 255 && captured.data[offset + 1] === 255 && captured.data[offset + 2] === 255) white += 1;
+        }
+        if (white > 0) {
+          rmSync(capturePath, { force: true });
+          if (attempt === 3) throw new Error(`Gallery capture failed after 3 attempts: ${white} pure-white pixels`);
+          console.warn(`Gallery capture ${attempt}/3: ${white} pure-white pixels; recreating page`);
+          continue;
+        }
+        if (capturePath !== outputPath) {
+          // Encode the validated pixels, avoiding a second, unchecked screenshot for JPEG.
+          const jpeg = await page.evaluate(async (pngDataUrl) => {
+            const bitmap = await createImageBitmap(await (await fetch(pngDataUrl)).blob());
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width = bitmap.width;
+              canvas.height = bitmap.height;
+              const context = canvas.getContext('2d');
+              if (!context) throw new Error('Could not create JPEG conversion context');
+              context.drawImage(bitmap, 0, 0);
+              return canvas.toDataURL('image/jpeg').split(',')[1];
+            } finally {
+              bitmap.close();
+            }
+          }, `data:image/png;base64,${readFileSync(capturePath).toString('base64')}`);
+          writeFileSync(outputPath, Buffer.from(jpeg, 'base64'));
+          rmSync(capturePath, { force: true });
+        }
+        return;
+      } finally {
+        await page.close();
+      }
+    }
+  } catch (error) {
+    rmSync(capturePath, { force: true });
+    rmSync(outputPath, { force: true });
+    throw error;
   } finally {
     await browser.close();
   }
@@ -352,6 +422,6 @@ const previewIndex = args.indexOf('--preview-part');
 const outputArgs = previewPart ? args.filter((_, index) => index !== previewIndex && index !== previewIndex + 1) : args;
 const outputPath = requestedOutputPath(outputArgs);
 // --preview-part composes one standalone config without roster/default-avatar checks.
-const members = previewPart ? [buildPreviewMember(previewPart)] : buildGalleryMembers();
-await renderGallery(outputPath, members);
+const members = previewPart ? buildPreviewMember(previewPart) : buildGalleryMembers();
+await renderGallery(outputPath, members, Boolean(previewPart));
 console.log(`Rendered ${members.length.toString()} members to ${outputPath}`);
