@@ -5,6 +5,7 @@
 // color-independent silhouette uniqueness.
 
 import { existsSync, readFileSync, readdirSync } from 'fs';
+import { spawnSync } from 'node:child_process';
 import { PNG } from 'pngjs';
 import { fileURLToPath } from 'url';
 import { dirname, join, resolve, sep } from 'path';
@@ -440,6 +441,12 @@ assert(
   duplicateSilhouettes.length === 0,
   `All ${rosterIds.length} members have unique combined down/up/right walk2 alpha silhouettes${duplicateSilhouettes.length > 0 ? ` — ${duplicateSilhouettes.join('; ')}` : ''}`,
 );
+
+// Run the independent anchor lint before the existing summary/exit.
+const anchorLint = spawnSync(process.execPath, [join(__dirname, 'test-avatar-anchors.mjs')], {
+  stdio: 'inherit',
+});
+assert(anchorLint.status === 0 && !anchorLint.error, 'Avatar anchor lint exits successfully');
 
 // Summary
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===`);

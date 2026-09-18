@@ -1,0 +1,11 @@
+{
+  "id": "hair_swept_undercut",
+  "slot": "hair",
+  "name": "Swept Undercut",
+  "file": "hair_swept_undercut.png",
+  "width": 176,
+  "height": 96,
+  "frames": 11,
+  "colorable": true,
+  "zOverride": null
+}
