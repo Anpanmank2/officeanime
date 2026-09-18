@@ -509,10 +509,11 @@ function drawHair(style: string, canvas: CellCanvas, pose: Pose): void {
     // Down: viewer-right is cropped; the opposite fringe descends in two steps.
     // Every mark uses the head anchor, including think and the down-facing error cells.
     if (side) {
-      canvas.hLine(6 + x, 8 + y, 5, p.dark);
-      canvas.rect(5 + x, 9 + y, 7, 2, p.dark);
-      canvas.hLine(6 + x, 11 + y, 7, p.dark);
-      canvas.hLine(6 + x, 12 + y, 8, p.dark);
+      canvas.hLine(6 + x, 8 + y, 7, p.dark);
+      canvas.rect(5 + x, 9 + y, 9, 2, p.dark);
+      canvas.hLine(6 + x, 11 + y, 8, p.dark);
+      canvas.hLine(6 + x, 12 + y, 9, p.dark);
+      canvas.hLine(13 + x, 13 + y, 2, p.dark);
       canvas.vLine(6 + x, 13 + y, 2, p.dark);
       canvas.hLine(7 + x, 15 + y, 2, p.dark);
       canvas.rect(6 + x, 9 + y, 5, 2, p.mid);
@@ -521,18 +522,23 @@ function drawHair(style: string, canvas: CellCanvas, pose: Pose): void {
     } else {
       const back = pose.direction === 'up';
       const left = back ? 5 : 2;
-      canvas.hLine(5 + x, 8 + y, 5, p.dark);
-      canvas.hLine((back ? 5 : 3) + x, 9 + y, 8, p.dark);
-      canvas.hLine(left + x, 10 + y, 9, p.dark);
-      canvas.hLine(left + x, 11 + y, 9, p.dark);
-      canvas.hLine((back ? 5 : 3) + x, 12 + y, 8, p.dark);
+      canvas.hLine((back ? 5 : 3) + x, 8 + y, 7, p.dark);
+      canvas.hLine((back ? 5 : 2) + x, 9 + y, back ? 8 : 9, p.dark);
+      canvas.hLine(left + x, 10 + y, back ? 8 : 9, p.dark);
+      canvas.hLine(left + x, 11 + y, back ? 8 : 9, p.dark);
+      canvas.hLine((back ? 5 : 2) + x, 12 + y, back ? 8 : 9, p.dark);
       canvas.vLine((back ? 5 : 10) + x, 13 + y, 2, p.mid);
       if (back) {
         canvas.rect(6 + x, 13 + y, 5, 2, p.dark);
         canvas.hLine(7 + x, 15 + y, 3, p.dark);
+        // Rounded heavy side tapers back into the neck before row 18.
+        canvas.rect(11 + x, 13 + y, 2, 3, p.dark);
+        canvas.hLine(10 + x, 16 + y, 2, p.dark);
+        canvas.hLine(9 + x, 17 + y, 2, p.dark);
       } else {
-        canvas.vLine(3 + x, 13 + y, 2, p.dark);
-        canvas.pixel(4 + x, 15 + y, p.dark);
+        // Continuous heavy fringe; keep the cropped-side glasses point (11,11) free.
+        canvas.rect(2 + x, 13 + y, 3, 2, p.dark);
+        canvas.hLine(3 + x, 15 + y, 2, p.dark);
       }
       canvas.hLine(5 + x, 9 + y, 5, p.mid);
       canvas.hLine((back ? 7 : 3) + x, 10 + y, 5, p.mid);
@@ -1729,8 +1735,9 @@ function writeGeneratedAssets(
   );
 }
 
-function writePartsOnly(rendered: ReadonlyMap<string, PNG>): void {
+function writePartsOnly(rendered: ReadonlyMap<string, PNG>, rewrite: ReadonlySet<string>): void {
   const missing: PartDefinition[] = [];
+  const rewritten: PartDefinition[] = [];
   const changed: string[] = [];
   let identical = 0;
   for (const part of PARTS) {
@@ -1749,17 +1756,19 @@ function writePartsOnly(rendered: ReadonlyMap<string, PNG>): void {
       const generated = rendered.get(part.id)!;
       if (existing.width === generated.width && existing.height === generated.height &&
           existing.data.equals(generated.data)) identical += 1;
+      else if (rewrite.has(part.id)) rewritten.push(part);
       else changed.push(part.id);
     } catch {
-      changed.push(part.id);
+      if (rewrite.has(part.id)) rewritten.push(part);
+      else changed.push(part.id);
     }
   }
-  // Compare every existing part before writing anything; never overwrite an existing asset.
+  // Compare all parts before writing; only explicitly requested ids may be overwritten.
   if (changed.length > 0) {
-    console.log(`new: 0 / identical: ${identical} / changed: ${changed.length}`);
+    console.log(`new: 0 / identical: ${identical} / rewritten: 0 / changed: ${changed.length}`);
     throw new Error(`Changed avatar parts: ${changed.join(', ')}`);
   }
-  for (const part of missing) {
+  for (const part of [...missing, ...rewritten]) {
     const partDir = path.join(AVATAR_ROOT, part.slot, part.id);
     fs.mkdirSync(partDir, { recursive: true });
     const manifestPath = path.join(partDir, 'manifest.json');
@@ -1775,11 +1784,23 @@ function writePartsOnly(rendered: ReadonlyMap<string, PNG>): void {
       }, null, 2)}\n`, 'utf8');
     }
   }
-  console.log(`new: ${missing.length} / identical: ${identical} / changed: 0`);
+  console.log(`new: ${missing.length} / identical: ${identical} / rewritten: ${rewritten.length} / changed: 0`);
 }
 
 function main(): void {
-  const partsOnly = process.argv.slice(2).includes('--parts-only') || process.env.AVATAR_PARTS_ONLY === '1';
+  const args = process.argv.slice(2);
+  const partsOnly = args.includes('--parts-only') || process.env.AVATAR_PARTS_ONLY === '1';
+  const rewrite = new Set<string>();
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] !== '--rewrite') continue;
+    const id = args[++index];
+    if (!id || id.startsWith('-')) throw new Error('--rewrite requires a part id');
+    if (!PARTS.some((part) => part.id === id)) throw new Error(`Unknown rewrite part: ${id}`);
+    rewrite.add(id);
+  }
+  if (rewrite.size > 0 && !args.includes('--parts-only')) {
+    throw new Error('--rewrite requires --parts-only');
+  }
   const expectedCounts: Record<AvatarSlot, number> = {
     base: 1,
     bottom: 2,
@@ -1801,7 +1822,7 @@ function main(): void {
     rendered.set(part.id, png);
   }
   if (partsOnly) { // --parts-only bypasses roster validation and destructive full generation.
-    writePartsOnly(rendered);
+    writePartsOnly(rendered, rewrite);
     return;
   }
   const { avatars, nearestPairs } = validateAndBuildConfigs(rendered);
