@@ -179,36 +179,36 @@ let breakTargets = LEGACY_BREAK_TARGETS;
  */
 const LEGACY_DESK_POSITIONS: Record<string, { col: number; row: number; facingDir: number }> = {
   // ── Executive — Exec Zone (cols 8-16, rows 2-5) ──
-  'exec-desk-sec': { col: 8, row: 4, facingDir: 3 }, // Secretary
-  'exec-desk-pm': { col: 12, row: 4, facingDir: 3 }, // PM Yamamoto
+  'exec-desk-sec': { col: 8, row: 4, facingDir: 3 }, // 宮本
+  'exec-desk-pm': { col: 12, row: 4, facingDir: 3 }, // カイゼン・アキオ
 
   // ── Marketing — Marketing Zone (cols 1-12, rows 6-13) ──
-  'mkt-desk-01': { col: 2, row: 8, facingDir: 3 }, // Ryo.K (Dir)
-  'mkt-desk-04': { col: 8, row: 8, facingDir: 3 }, // Sasha
+  'mkt-desk-01': { col: 2, row: 8, facingDir: 3 }, // スティーブ・ジョブ
+  'mkt-desk-04': { col: 8, row: 8, facingDir: 3 }, // レオ・ヴィンチ
   'mkt-desk-07': { col: 4, row: 12, facingDir: 3 }, // Mei
   'mkt-desk-09': { col: 8, row: 12, facingDir: 3 }, // Hana
   'mkt-desk-10': { col: 10, row: 12, facingDir: 3 }, // Daichi
   'mkt-desk-11': { col: 2, row: 10, facingDir: 1 }, // Lena
-  'mkt-desk-12': { col: 11, row: 10, facingDir: 2 }, // Langley Aoi
+  'mkt-desk-12': { col: 11, row: 10, facingDir: 2 }, // 空席
 
   // ── Research — Research Zone (cols 13-24, rows 6-13) ──
-  'res-desk-01': { col: 14, row: 9, facingDir: 3 }, // Haruki (Dir)
-  'res-desk-02': { col: 16, row: 9, facingDir: 3 }, // Sora
+  'res-desk-01': { col: 14, row: 9, facingDir: 3 }, // 倉内
+  'res-desk-02': { col: 16, row: 9, facingDir: 3 }, // 千の休
   'res-desk-03': { col: 18, row: 9, facingDir: 3 }, // Marina
   'res-desk-04': { col: 20, row: 9, facingDir: 3 }, // Kai
   'res-desk-05': { col: 14, row: 12, facingDir: 3 }, // Priya
   'res-desk-06': { col: 16, row: 12, facingDir: 3 }, // Yuto
-  'res-desk-07': { col: 18, row: 12, facingDir: 3 }, // Marcus
+  'res-desk-07': { col: 18, row: 12, facingDir: 3 }, // シバセン
   'res-desk-08': { col: 20, row: 12, facingDir: 3 }, // Ayane
-  'res-desk-09': { col: 22, row: 12, facingDir: 3 }, // Ren Fujisawa
+  'res-desk-09': { col: 22, row: 12, facingDir: 3 }, // はにゃ
 
   // ── Engineering — Dev Zone (cols 1-12, rows 15-21) ──
-  'dev-desk-01': { col: 3, row: 17, facingDir: 3 }, // Kenta (TL)
+  'dev-desk-01': { col: 3, row: 17, facingDir: 3 }, // 伊藤
   'dev-desk-02': { col: 5, row: 17, facingDir: 3 }, // Ryo.S
   'dev-desk-03': { col: 7, row: 17, facingDir: 3 }, // Hina
   'dev-desk-05': { col: 3, row: 20, facingDir: 3 }, // Ren Fujii
   'dev-desk-06': { col: 5, row: 20, facingDir: 3 }, // Shota
-  'dev-desk-07': { col: 7, row: 20, facingDir: 3 }, // Codex (implementation bot seat)
+  'dev-desk-07': { col: 7, row: 20, facingDir: 3 }, // るあ（お茶汲み）
 };
 
 /** Phase 1 compact office. IDs deliberately stay stable so member history and saved assignments survive. */

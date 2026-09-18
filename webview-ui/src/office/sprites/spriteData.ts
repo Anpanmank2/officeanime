@@ -50,9 +50,9 @@ export const BUBBLE_WAITING_SPRITE: SpriteData = resolveBubbleSprite(bubbleWaiti
 // (Members sharing a palette share idle frames; hueShift differentiates)
 //
 // Priority candidates for custom idle animations:
-//   - Secretary: ペン回し (pen spin) — 2-frame oscillation
-//   - Marcus: ポーカーチップ回し (chip flip) — 2-frame rotation
-//   - Sora: スマホスクロール (phone scroll) — 2-frame thumb movement
+//   - 宮本: ペン回し (pen spin) — 2-frame oscillation
+//   - シバセン: ポーカーチップ回し (chip flip) — 2-frame rotation
+//   - 千の休: スマホスクロール (phone scroll) — 2-frame thumb movement
 //   - Kai: TikTokスワイプ (swipe) — 2-frame hand gesture
 // ────────────────────────────────────────────────────────────────
 

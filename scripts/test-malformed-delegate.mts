@@ -28,8 +28,8 @@ const config = {
   members: [
     {
       id: 'exec-sec',
-      name: '秘書',
-      nameEn: 'Sec',
+      name: '宮本',
+      nameEn: 'Miyamoto',
       role: 'Secretary',
       department: 'exec',
       zone: 'exec',
@@ -39,8 +39,8 @@ const config = {
     },
     {
       id: 'res-01',
-      name: '古賀',
-      nameEn: 'Haruki',
+      name: '倉内',
+      nameEn: 'Kurauchi',
       role: 'Director',
       department: 'research',
       zone: 'research',

@@ -37,8 +37,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
     seatCol: 8,
     seatRow: 4,
     facingDir: UP,
-    nameplate: '秘書',
-    nameplateEn: 'Secretary',
+    nameplate: '宮本',
+    nameplateEn: 'Miyamoto',
   },
   {
     deskId: 'exec-desk-pm',
@@ -47,8 +47,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
     seatCol: 12,
     seatRow: 4,
     facingDir: UP,
-    nameplate: '山本 真帆',
-    nameplateEn: 'M.Yamamoto',
+    nameplate: 'カイゼン・アキオ',
+    nameplateEn: 'Kaizen Akio',
   },
 
   // ═══════════════════════════════════════════════════
@@ -61,8 +61,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
     seatCol: 2,
     seatRow: 8,
     facingDir: UP,
-    nameplate: '黒田 涼',
-    nameplateEn: 'R.Kuroda',
+    nameplate: 'スティーブ・ジョブ',
+    nameplateEn: 'Steve Job',
   },
   {
     deskId: 'mkt-desk-02',
@@ -71,8 +71,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
     seatCol: 4,
     seatRow: 12,
     facingDir: UP,
-    nameplate: '清水 夏希',
-    nameplateEn: 'N.Shimizu',
+    nameplate: '亀井',
+    nameplateEn: 'Kamei',
   },
   {
     deskId: 'mkt-desk-03',
@@ -81,8 +81,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
     seatCol: 8,
     seatRow: 12,
     facingDir: UP,
-    nameplate: 'トマス・ベガ',
-    nameplateEn: 'T.Vega',
+    nameplate: 'ナイチン・ゲイル',
+    nameplateEn: 'Nightin Gale',
   },
   {
     deskId: 'mkt-desk-05',
@@ -91,8 +91,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
     seatCol: 10,
     seatRow: 12,
     facingDir: UP,
-    nameplate: '足立 賢治',
-    nameplateEn: 'K.Adachi',
+    nameplate: 'ソクラ・テツオ',
+    nameplateEn: 'Sokura Tetsuo',
   },
   {
     deskId: 'mkt-desk-04',
@@ -101,8 +101,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
     seatCol: 8,
     seatRow: 8,
     facingDir: UP,
-    nameplate: 'サーシャ・ブレナン',
-    nameplateEn: 'S.Brennan',
+    nameplate: 'レオ・ヴィンチ',
+    nameplateEn: 'Leo Vinci',
   },
   {
     deskId: 'mkt-desk-07',
@@ -146,13 +146,13 @@ export const DESK_REGISTRY: DeskEntry[] = [
   },
   {
     deskId: 'mkt-desk-12',
-    memberId: 'mkt-12',
+    memberId: 'vacant:mkt-12',
     zone: 'marketing',
     seatCol: 11,
     seatRow: 10,
     facingDir: RIGHT,
-    nameplate: 'ラングレー葵',
-    nameplateEn: 'A.Langley',
+    nameplate: '空席',
+    nameplateEn: 'Vacant',
   },
 
   // ═══════════════════════════════════════════════════
@@ -165,8 +165,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
     seatCol: 14,
     seatRow: 9,
     facingDir: UP,
-    nameplate: '古賀 春樹',
-    nameplateEn: 'H.Koga',
+    nameplate: '倉内',
+    nameplateEn: 'Kurauchi',
   },
   {
     deskId: 'res-desk-02',
@@ -175,8 +175,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
     seatCol: 16,
     seatRow: 9,
     facingDir: UP,
-    nameplate: 'Sora Miyake',
-    nameplateEn: 'S.Miyake',
+    nameplate: '千の休',
+    nameplateEn: 'Sen no Kyu',
   },
   {
     deskId: 'res-desk-03',
@@ -225,8 +225,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
     seatCol: 18,
     seatRow: 12,
     facingDir: UP,
-    nameplate: 'マーカス Wei-Tanaka',
-    nameplateEn: 'M.Wei-Tanaka',
+    nameplate: 'シバセン',
+    nameplateEn: 'Shibasen',
   },
   {
     deskId: 'res-desk-08',
@@ -245,8 +245,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
     seatCol: 22,
     seatRow: 12,
     facingDir: UP,
-    nameplate: '藤沢 蓮',
-    nameplateEn: 'R.Fujisawa',
+    nameplate: 'はにゃ',
+    nameplateEn: 'Hanya',
   },
 
   // ═══════════════════════════════════════════════════
@@ -259,8 +259,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
     seatCol: 3,
     seatRow: 17,
     facingDir: UP,
-    nameplate: '田中 健太',
-    nameplateEn: 'K.Tanaka',
+    nameplate: '伊藤',
+    nameplateEn: 'Ito',
   },
   {
     deskId: 'dev-desk-02',
@@ -309,8 +309,8 @@ export const DESK_REGISTRY: DeskEntry[] = [
     seatCol: 7,
     seatRow: 20,
     facingDir: UP,
-    nameplate: 'Codex',
-    nameplateEn: 'Codex',
+    nameplate: 'るあ（お茶汲み）',
+    nameplateEn: 'Rua (Tea Runner)',
   },
 ];
 
