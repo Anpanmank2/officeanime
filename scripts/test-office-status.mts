@@ -35,7 +35,7 @@ const config = {
   members: [
     { id: 'eng-01', name: '田中', nameEn: 'Kenta', role: 'Tech Lead', department: 'engineering', zone: 'dev', hueShift: 0, deskId: 'dev-desk-01' },
     { id: 'eng-03', name: '中村', nameEn: 'Hina', role: 'Frontend', department: 'engineering', zone: 'dev', hueShift: 0, deskId: 'dev-desk-03' },
-    { id: 'exec-sec', name: '秘書', nameEn: 'Yui', role: 'Secretary', department: 'exec', zone: 'exec', hueShift: 0, deskId: 'exec-desk-01' },
+    { id: 'exec-sec', name: '秘書', nameEn: 'Yui', role: '副社長', department: 'exec', zone: 'exec', hueShift: 0, deskId: 'exec-desk-01' },
   ],
   exec: [],
 } as unknown as JCConfigData;

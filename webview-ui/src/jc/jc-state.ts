@@ -6,7 +6,7 @@ import {
   IDLE_TIMEOUT_MS,
   NON_WORKING_STATES,
   OFFICE_SECRETARY_SEAT,
-  PERMANENT_ROLES,
+  PERMANENT_MEMBER_ID_SET,
   PET_TILE,
   SPEECH_BUBBLE_BASE_MS,
   SPEECH_BUBBLE_MAX_MS,
@@ -194,9 +194,9 @@ const LEGACY_DESK_POSITIONS: Record<string, { col: number; row: number; facingDi
   // ── Research — Research Zone (cols 13-24, rows 6-13) ──
   'res-desk-01': { col: 14, row: 9, facingDir: 3 }, // 倉内
   'res-desk-02': { col: 16, row: 9, facingDir: 3 }, // 千の休
-  'res-desk-03': { col: 18, row: 9, facingDir: 3 }, // Marina
-  'res-desk-04': { col: 20, row: 9, facingDir: 3 }, // Kai
-  'res-desk-05': { col: 14, row: 12, facingDir: 3 }, // Priya
+  'res-desk-03': { col: 18, row: 9, facingDir: 3 }, // vacant (res-03)
+  'res-desk-04': { col: 20, row: 9, facingDir: 3 }, // vacant (res-04)
+  'res-desk-05': { col: 14, row: 12, facingDir: 3 }, // vacant (res-05)
   'res-desk-06': { col: 16, row: 12, facingDir: 3 }, // Yuto
   'res-desk-07': { col: 18, row: 12, facingDir: 3 }, // シバセン
   'res-desk-08': { col: 20, row: 12, facingDir: 3 }, // Ayane
@@ -1024,13 +1024,13 @@ export function jcGetSpeechBubbles(): SpeechBubble[] {
 
 // ── Permanent Resident Tracking ─────────────────────────────────
 
-// PERMANENT_ROLES imported from jc-constants.ts
+// PERMANENT_MEMBER_ID_SET imported from jc-constants.ts
 
 /** Check if a member is a permanent resident (never departs) */
 export function jcIsPermanentResident(memberId: string): boolean {
   if (!jcConfig) return false;
   const member = jcConfig.members.find((m) => m.id === memberId);
-  return member ? PERMANENT_ROLES.has(member.role) : false;
+  return member ? PERMANENT_MEMBER_ID_SET.has(member.id) : false;
 }
 
 // ── Idle Timeout Tracking ───────────────────────────────────────

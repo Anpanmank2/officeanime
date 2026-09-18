@@ -84,7 +84,7 @@ The office layout is divided into zones — `entrance`, `exec`, `poker`, `break`
 
 ### Desk Nameplates & Permanent Residents
 
-Members have assigned desks with rendered nameplates. The roles in `PERMANENT_ROLES` (`jc-constants.ts` — 2026-09-03: Secretary and PM / Director) are permanent residents that never auto-depart on idle timeout.
+Members have assigned desks with rendered nameplates. Permanent residents are identified by member ID, not by job title: the IDs in `PERMANENT_MEMBER_IDS` (`shared/jc-roster.ts` — the secretary desk and the PM desk) never auto-depart on idle timeout, so renaming a job title cannot break them.
 
 ### Desk Documents & Approvals
 
