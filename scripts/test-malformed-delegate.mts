@@ -30,7 +30,7 @@ const config = {
       id: 'exec-sec',
       name: '宮本',
       nameEn: 'Miyamoto',
-      role: 'Secretary',
+      role: '副社長',
       department: 'exec',
       zone: 'exec',
       hueShift: 0,

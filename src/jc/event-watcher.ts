@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type * as vscode from 'vscode';
 
+import { SECRETARY_MEMBER_ID } from '../../shared/jc-roster.js';
 import { type AffinityResult, computeFit } from './affinity.js';
 import { scoreGain, TIER_GLYPH } from './affinity-constants.js';
 import { ApprovalState, parseApprovalEvent } from './approval-state.js';
@@ -352,7 +353,7 @@ export class EventWatcher {
     // Secretary receives task — show speech bubble on Secretary
     // R6 防御: task 欠落 (malformed writer) でも落とさない — 空文字 fallback。
     const taskText = event.task ?? '';
-    const secretary = this.config.members.find((m) => m.role === 'Secretary');
+    const secretary = this.config.members.find((m) => m.id === SECRETARY_MEMBER_ID);
     if (secretary) {
       const bubble: SpeechBubble = {
         id: `task-recv-${Date.now()}`,
@@ -662,7 +663,7 @@ export class EventWatcher {
     const to = this.config.members.find((m) => m.id === toId);
     if (!from || !to) return { color: '#ffffff', duration: 2000 };
 
-    if (from.role === 'Secretary') return EventWatcher.BEAM_COLORS['secretary_to_lead'];
+    if (from.id === SECRETARY_MEMBER_ID) return EventWatcher.BEAM_COLORS['secretary_to_lead'];
     if (from.department !== to.department) return EventWatcher.BEAM_COLORS['cross_dept'];
     // Lead → Agent or Agent → Lead based on layer
     if (from.layer < to.layer) return EventWatcher.BEAM_COLORS['lead_to_agent'];
