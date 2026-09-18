@@ -14,9 +14,12 @@
 
 import { chromium, type Browser, type Page } from '@playwright/test';
 import { existsSync, mkdirSync, statSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const require = createRequire(import.meta.url);
+const { PERMANENT_MEMBER_IDS } = require('../shared/jc-roster.ts') as typeof import('../shared/jc-roster.ts');
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(SCRIPT_DIR, '..');
 const DEFAULT_URL = 'http://localhost:8432';
@@ -209,7 +212,7 @@ async function dispatchRoster(
   reopenedOffice: boolean;
 }> {
   return page.evaluate(
-    ({ rosterConfig, expectedSize, stableBase }) => {
+    ({ rosterConfig, expectedSize, stableBase, permanentIds }) => {
       const members = rosterConfig.members as JCMember[];
       if (members.length !== expectedSize) {
         throw new Error(`Refusing to dispatch ${members.length} members; expected ${expectedSize}`);
@@ -222,10 +225,10 @@ async function dispatchRoster(
       // Match the app's deterministic negative-ID conventions so startup
       // permanent residents and workload-restored residents update in place.
       let permanentIndex = 0;
-      const permanentRoles = new Set(['Secretary', 'PM / Director']);
+      const permanentIdSet = new Set(permanentIds);
       const targetAgentIds = new Map<string, number>();
       members.forEach((member, index) => {
-        const agentId = permanentRoles.has(member.role)
+        const agentId = permanentIdSet.has(member.id)
           ? -100 - permanentIndex++
           : stableBase - index;
         targetAgentIds.set(member.id, agentId);
@@ -304,6 +307,7 @@ async function dispatchRoster(
       rosterConfig: config,
       expectedSize: EXPECTED_ROSTER_SIZE,
       stableBase: STABLE_AGENT_ID_BASE,
+      permanentIds: [...PERMANENT_MEMBER_IDS],
     },
   );
 }

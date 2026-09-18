@@ -6,6 +6,7 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { buildAssetIndex } from '../../shared/assets/build.js';
+import { PERMANENT_MEMBER_ID_SET } from '../../shared/jc-roster.js';
 import { createLayoutStore, handleLayoutCommand } from '../layoutStore.js';
 import { appendAnswer } from './answers-writer.js';
 import { validateApprovalAnswer } from './approval-answer-validation.js';
@@ -124,8 +125,7 @@ function buildClientInitMessages(respond: (msg: unknown) => void): void {
       lastSeenVersion: '1.2',
     });
 
-    // Auto-arrive permanent residents (Secretary, PM / Director)
-    const permanentRoles = ['Secretary', 'PM / Director'];
+    // Auto-arrive permanent residents by member ID
     const cfg = jcConfig as {
       members?: Array<{
         id: string;
@@ -137,7 +137,7 @@ function buildClientInitMessages(respond: (msg: unknown) => void): void {
       }>;
     };
     const permanentMembers = (cfg.members ?? []).filter(
-      (m) => permanentRoles.includes(m.role) && !m.vacant,
+      (m) => PERMANENT_MEMBER_ID_SET.has(m.id) && !m.vacant,
     );
     permanentMembers.forEach((member, idx) => {
       respond({

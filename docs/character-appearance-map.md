@@ -19,14 +19,6 @@ These are silhouette and styling choices for the pixel office, not biographical 
 | res-07 | シバセン (Shibasen) | research | 茶色の羽織＋大きな巻物、黒髪に長い黒ひげ | 長い目で物事を見る記録役 |
 | res-09 | はにゃ (Hanya) | research | ピンクのワンピース、黒髪ロングで前髪はシースルー、背は低め | 小さくてかわいいまとめ役 |
 
-## Retained entries (outside the active roster)
-
-| Member ID | Name | Dept | Appearance direction | Vibe |
-|---|---|---|---|---|
-| res-03 | マリナ・リオス=デルガド (Marina Ríos-Delgado) | research | Wavy medium hair, colorful style, swatch book | Sharp-eyed visual observer |
-| res-04 | 中村=陳 海 (Kai Nakamura-Chen) | research | Trend-forward short cut, streetwear, headset | Energetic and direct |
-| res-05 | プリヤ・オコンクォ=シン博士 (Dr. Priya Okonkwo-Singh) | research | Gathered hair, intellectual styling, glasses | Calm and evidence-led |
-
 ## Vacant desks (appearance retained, not assigned)
 
 The following entries have vacant desk assignments; their desks display
@@ -45,3 +37,6 @@ The following entries have vacant desk assignments; their desks display
 | res-06 | 空席 |
 | res-08 | 空席 |
 | mkt-12 | 空席 |
+| res-03 | 空席 |
+| res-04 | 空席 |
+| res-05 | 空席 |

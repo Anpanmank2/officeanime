@@ -152,9 +152,16 @@ export const TASK_STATUS_COLORS: Record<string, string> = {
   error: '#ff3d3d',
 };
 
-// ── Permanent Resident Roles ────────────────────────────────────
-// Members with these roles never auto-depart on idle timeout.
-export const PERMANENT_ROLES = new Set(['Secretary', 'PM / Director']);
+// ── Permanent Residents ─────────────────────────────────────────
+// これらの ID のメンバーはアイドルタイムアウトで退出しない。
+// Mirrors shared/jc-roster.ts. The webview keeps runtime copies because it is an
+// ESM package while the extension host's shared package is CommonJS (named
+// re-exports from it are not visible under Node/tsx). scripts/test-roster-current.mjs
+// asserts both sides stay identical.
+export const SECRETARY_MEMBER_ID = 'exec-sec';
+export const PM_MEMBER_ID = 'eng-04';
+export const PERMANENT_MEMBER_IDS: readonly string[] = [SECRETARY_MEMBER_ID, PM_MEMBER_ID];
+export const PERMANENT_MEMBER_ID_SET: ReadonlySet<string> = new Set(PERMANENT_MEMBER_IDS);
 
 // ── Timing ──────────────────────────────────────────────────────
 export const IDLE_TIMEOUT_MS = 3 * 60 * 1000; // 3 minutes (v1 spec)

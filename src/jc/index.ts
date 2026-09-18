@@ -3,6 +3,7 @@
 
 import type * as vscode from 'vscode';
 
+import { PERMANENT_MEMBER_ID_SET, SECRETARY_MEMBER_ID } from '../../shared/jc-roster.js';
 import { readConfig } from '../configPersistence.js';
 import type { AgentState } from '../types.js';
 import { ActivitySummarizer } from './activity-summarizer.js';
@@ -293,9 +294,8 @@ export function getTaskWatcher(): TaskWatcher | null {
 /** Get member IDs that should always be present in the office */
 export function getPermanentResidents(): string[] {
   if (!jcConfig) return [];
-  // v1.3: CEO removed — Secretary + PM are permanent residents
-  const permanentRoles = ['Secretary', 'PM / Director'];
-  return jcConfig.members.filter((m) => permanentRoles.includes(m.role)).map((m) => m.id);
+  // v1.3: CEO removed — 常駐は ID で判定（肩書の変更に影響されない）
+  return jcConfig.members.filter((m) => PERMANENT_MEMBER_ID_SET.has(m.id)).map((m) => m.id);
 }
 
 /** Send JC config to webview on initialization */
@@ -397,7 +397,7 @@ function checkIdleMembers(webview: vscode.Webview): void {
   }
 
   // v1.3: Secretary progress monitoring (every 2 minutes)
-  const secretaryMember = jcConfig.members.find((m) => m.role === 'Secretary');
+  const secretaryMember = jcConfig.members.find((m) => m.id === SECRETARY_MEMBER_ID);
   if (secretaryMember && now - lastSecretaryMonitor >= SECRETARY_MONITOR_MS) {
     lastSecretaryMonitor = now;
     const secState = memberStates.get(secretaryMember.id);

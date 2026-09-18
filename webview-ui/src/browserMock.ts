@@ -27,6 +27,7 @@ import type {
   CharacterDirectionSprites,
 } from '../../shared/assets/types.ts';
 import { loadAvailableAvatarParts, withAvatarFallback } from './browserAvatarFailsoft.js';
+import { PERMANENT_MEMBER_ID_SET, SECRETARY_MEMBER_ID } from './jc/jc-constants.js';
 
 interface MockPayload {
   characters: CharacterDirectionSprites[];
@@ -494,8 +495,7 @@ export function dispatchMockMessages(): void {
   // Use setTimeout to ensure layoutReadyRef is true before arrivals are dispatched.
   if (jcConfigData?.members) {
     setTimeout(() => {
-      const permanentRoles = ['Secretary', 'PM / Director'];
-      const residents = jcConfigData!.members!.filter((m) => permanentRoles.includes(m.role));
+      const residents = jcConfigData!.members!.filter((m) => PERMANENT_MEMBER_ID_SET.has(m.id));
       residents.forEach((member, idx) => {
         dispatch({
           type: 'jcMemberArriving',
@@ -644,7 +644,7 @@ function handleBrowserEvent(event: Record<string, unknown>): void {
 
     case 'task_received': {
       // Secretary gets speech bubble
-      const secretary = jcConfigData?.members?.find((m) => m.role === 'Secretary');
+      const secretary = jcConfigData?.members?.find((m) => m.id === SECRETARY_MEMBER_ID);
       if (secretary) {
         dispatch({
           type: 'jcSpeechBubble',

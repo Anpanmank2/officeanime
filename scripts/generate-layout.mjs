@@ -150,10 +150,10 @@ furniture.push({ uid: 'mkt-desk-11', type: 'CUSHIONED_BENCH', col: 22, row: 9 })
 // Row A: tables at row 15, benches at row 17
 addDeskStation(1, 15, 'res-desk-01'); // res-01 Kurauchi (back)
 addDeskStation(4, 15, 'res-desk-02'); // res-02 Sen no Kyu (left)
-addDeskStation(7, 15, 'res-desk-03'); // res-03 Marina Ríos-Delgado (center)
+addDeskStation(7, 15, 'res-desk-03'); // res-03 Vacant
 // Row B: tables at row 18, benches at row 20
-addDeskStation(2, 18, 'res-desk-04'); // res-04 Kai Nakamura-Chen (right)
-addDeskStation(5, 18, 'res-desk-05'); // res-05 Dr. Priya Okonkwo-Singh (right-back)
+addDeskStation(2, 18, 'res-desk-04'); // res-04 Vacant
+addDeskStation(5, 18, 'res-desk-05'); // res-05 Vacant
 addDeskStation(8, 18, 'res-desk-06'); // res-06 Vacant
 
 // ━━━ POKER TABLE / MEETING ROOM (cols 8-16, rows 2-5) ━━━

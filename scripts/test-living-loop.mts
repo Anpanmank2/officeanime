@@ -56,7 +56,7 @@ console.log('§2 archetype fallback for members without an explicit voice');
   // mkt-09 has no explicit voice → falls back to marketing archetype (not generic exec).
   ok('mkt-09 uses archetype', !hasExplicitVoice('mkt-09'));
   const mk = reactionLine('mkt-09', 'marketing', 'great', 0);
-  const rs = reactionLine('res-05', 'research', 'great', 0);
+  const rs = reactionLine('res-09', 'research', 'great', 0);
   ok('archetype reaction non-empty', mk.length > 0 && rs.length > 0, `${mk} / ${rs}`);
   // Marketing vs research archetypes are distinct (persona-fit, not one generic line).
   ok('dept archetypes differ', mk !== rs, `${mk} / ${rs}`);

@@ -201,7 +201,7 @@
       "id": "exec-sec",
       "name": "宮本",
       "nameEn": "Miyamoto",
-      "role": "Secretary",
+      "role": "副社長",
       "department": "exec",
       "layer": "L2",
       "zone": "exec",
@@ -245,7 +245,7 @@
     {
       "id": "exec-03",
       "name": "宮本",
-      "role": "Secretary",
+      "role": "副社長",
       "zone": "exec"
     },
     {
