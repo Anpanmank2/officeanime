@@ -12,7 +12,7 @@
 //   affinity*.ts / affinity-preview.ts / routing-target.ts / persona-lines.ts /
 //   ResearchResultPanel.tsx / research-result-state.ts
 //
-// コンペバッジ (古賀design §6 反映・spec §3): 絶対件数バッジのみ (🥉🥈🥇)。
+// コンペバッジ (倉内design §6 反映・spec §3): 絶対件数バッジのみ (🥉🥈🥇)。
 // %表示・相対順位は一切実装しない。報酬=演出のみ (評価接続ロジックは未実装)。
 // 主指標は「通算完了件数 (named route集計・PM PASS未検証)」の proxy — 正式主指標
 // (PM PASS紐付き実働ヒット数) は jc-events に検証フィールドが無く needs_wiring (spec §7)。
@@ -132,7 +132,7 @@ function computeBadge(
     };
   }
 
-  // 常時固定表示 (N=0でも表示・誠実性 — 古賀design §6 / spec §3)。
+  // 常時固定表示 (N=0でも表示・誠実性 — 倉内design §6 / spec §3)。
   const earliestLabel = earliestAt !== null ? `${formatMD(earliestAt)}` : '記録なし';
   const tooltip = `実働完了${completionCount}件（named route集計・${earliestLabel}〜現在）\n${COMP_BADGE_TOOLTIP_DISCLAIMER}`;
 

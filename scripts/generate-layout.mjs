@@ -123,21 +123,21 @@ function addDeskStation(col, row, seatUid) {
 // ━━━ DEV ZONE (6 desks, cols 1-11, rows 7-13) ━━━
 // Row A: tables at row 7, benches at row 9
 addDeskStation(1, 7, 'dev-desk-02'); // eng-02 R.Sato (left)
-addDeskStation(4, 7, 'dev-desk-01'); // eng-01 K.Tanaka (center) — Tech Lead
+addDeskStation(4, 7, 'dev-desk-01'); // eng-01 Ito (center) — Tech Lead
 addDeskStation(7, 7, 'dev-desk-03'); // eng-03 H.Nakamura (right)
 // Row B: tables at row 10, benches at row 12
-addDeskStation(2, 10, 'dev-desk-04'); // eng-04 M.Yamamoto (center-left)
+addDeskStation(2, 10, 'dev-desk-04'); // eng-04 Kaizen Akio (center-left)
 addDeskStation(5, 10, 'dev-desk-05'); // eng-05 R.Fujii (down-left)
-addDeskStation(8, 10, 'dev-desk-06'); // eng-06 S.Kuroda (down-right)
+addDeskStation(8, 10, 'dev-desk-06'); // eng-06 黒田 翔太 (down-right)
 
 // ━━━ MARKETING ZONE (11 desks, cols 13-24, rows 7-13) ━━━
 // Row A: 4 desks, tables at row 7, benches at row 9
-addDeskStation(14, 7, 'mkt-desk-01'); // mkt-01 R.Kuroda (Director)
-addDeskStation(17, 7, 'mkt-desk-02'); // mkt-02 N.Shimizu (Strategy)
-addDeskStation(20, 7, 'mkt-desk-03'); // mkt-03 T.Vega (Strategy)
-addDeskStation(23, 7, 'mkt-desk-04'); // mkt-04 S.Brennan (Strategy)
+addDeskStation(14, 7, 'mkt-desk-01'); // mkt-01 Steve Job (Director)
+addDeskStation(17, 7, 'mkt-desk-02'); // mkt-02 Kamei (Strategy)
+addDeskStation(20, 7, 'mkt-desk-03'); // mkt-03 Nightin Gale (Strategy)
+addDeskStation(23, 7, 'mkt-desk-04'); // mkt-04 Leo Vinci (Strategy)
 // Row B: 4 desks, tables at row 10, benches at row 12
-addDeskStation(14, 10, 'mkt-desk-05'); // mkt-05 K.Adachi (Strategy)
+addDeskStation(14, 10, 'mkt-desk-05'); // mkt-05 Sokura Tetsuo (Strategy)
 addDeskStation(17, 10, 'mkt-desk-06'); // mkt-06 R.Takahashi (Ops)
 addDeskStation(20, 10, 'mkt-desk-07'); // mkt-07 M.Taniguchi (Execution)
 addDeskStation(23, 10, 'mkt-desk-08'); // mkt-08 J.Flores-Ota (Execution)
@@ -148,8 +148,8 @@ furniture.push({ uid: 'mkt-desk-11', type: 'CUSHIONED_BENCH', col: 22, row: 9 })
 
 // ━━━ RESEARCH LAB (6 desks, cols 1-11, rows 15-21) ━━━
 // Row A: tables at row 15, benches at row 17
-addDeskStation(1, 15, 'res-desk-01'); // res-01 Owner/Research Lead (back)
-addDeskStation(4, 15, 'res-desk-02'); // res-02 Sora Miyake (left)
+addDeskStation(1, 15, 'res-desk-01'); // res-01 Kurauchi (back)
+addDeskStation(4, 15, 'res-desk-02'); // res-02 Sen no Kyu (left)
 addDeskStation(7, 15, 'res-desk-03'); // res-03 Marina Ríos-Delgado (center)
 // Row B: tables at row 18, benches at row 20
 addDeskStation(2, 18, 'res-desk-04'); // res-04 Kai Nakamura-Chen (right)
@@ -171,7 +171,7 @@ furniture.push({ uid: fuid('fur'), type: 'WHITEBOARD', col: 14, row: 0 });
 // ━━━ EXEC AREA (cols 1-6, rows 2-5) ━━━
 // Permanent residents: CEO (col 3) and Secretary (col 5)
 addDeskStation(3, 2, 'exec-desk-ceo'); // CEO Kamei
-addDeskStation(5, 2, 'exec-desk-sec'); // Secretary
+addDeskStation(5, 2, 'exec-desk-sec'); // Miyamoto
 // Decorations
 furniture.push({ uid: fuid('fur'), type: 'LARGE_PAINTING', col: 2, row: 0 }); // wall art
 furniture.push({ uid: fuid('fur'), type: 'CLOCK', col: 6, row: 0 }); // wall clock

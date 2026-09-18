@@ -108,7 +108,6 @@ const activeDeskIds = [
   'mkt-desk-02',
   'mkt-desk-03',
   'mkt-desk-04',
-  'mkt-desk-12',
   'mkt-desk-05',
   'res-desk-01',
   'res-desk-02',
@@ -217,7 +216,7 @@ test('live members and owner reclaim registered seats when switching compact and
   const officeState = new OfficeState(legacyLayout);
   const legacySeats = new Map([
     ['res-07', 'res-bench-07'],
-    ['mkt-12', 'mkt-bench-09'],
+    ['mkt-05', 'mkt-bench-05'],
     ['codex-01', 'eng-bench-05'],
   ]);
   let agentId = 1;
@@ -232,7 +231,7 @@ test('live members and owner reclaim registered seats when switching compact and
   // registered target is currently occupied by another registered character.
   for (const seat of officeState.seats.values()) seat.assigned = false;
   const compactPermutation = [
-    [1, 'mkt-bench-05'],
+    [1, 'mkt-bench-06'],
     [2, 'eng-bench-07'],
     [3, 'owner-chair'],
     [-9999, 'res-bench-03'],
@@ -247,14 +246,14 @@ test('live members and owner reclaim registered seats when switching compact and
     officeState,
     new Map([
       ['res-07', 'res-bench-03'],
-      ['mkt-12', 'mkt-bench-05'],
+      ['mkt-05', 'mkt-bench-06'],
       ['codex-01', 'eng-bench-07'],
     ]),
     -9999,
     'owner-chair',
   );
   assert.equal(officeState.characters.get(1)?.seatId, 'res-bench-03');
-  assert.equal(officeState.characters.get(2)?.seatId, 'mkt-bench-05');
+  assert.equal(officeState.characters.get(2)?.seatId, 'mkt-bench-06');
   assert.equal(officeState.characters.get(3)?.seatId, 'eng-bench-07');
   assert.equal(officeState.characters.get(-9999)?.seatId, 'owner-chair');
   assert.deepEqual(officeState.characters.get(1)?.path, []);
@@ -263,6 +262,6 @@ test('live members and owner reclaim registered seats when switching compact and
   officeState.rebuildFromLayout(legacyLayout);
   reconcileRegisteredSeats(officeState, legacySeats);
   assert.equal(officeState.characters.get(1)?.seatId, 'res-bench-07');
-  assert.equal(officeState.characters.get(2)?.seatId, 'mkt-bench-09');
+  assert.equal(officeState.characters.get(2)?.seatId, 'mkt-bench-05');
   assert.equal(officeState.characters.get(3)?.seatId, 'eng-bench-05');
 });

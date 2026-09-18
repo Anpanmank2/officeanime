@@ -35,9 +35,9 @@ function ok(name: string, cond: boolean, detail = ''): void {
 const config = {
   organization: 'test',
   members: [
-    { id: 'eng-01', name: '田中', nameEn: 'Kenta', role: 'Tech Lead', department: 'engineering', zone: 'dev', hueShift: 0, deskId: 'dev-desk-01' },
+    { id: 'eng-01', name: '伊藤', nameEn: 'Ito', role: 'Tech Lead', department: 'engineering', zone: 'dev', hueShift: 0, deskId: 'dev-desk-01' },
     { id: 'eng-03', name: '中村', nameEn: 'Hina', role: 'Frontend', department: 'engineering', zone: 'dev', hueShift: 0, deskId: 'dev-desk-03' },
-    { id: 'res-01', name: '古賀', nameEn: 'Haruki', role: 'Director', department: 'research', zone: 'research', hueShift: 0, deskId: 'res-desk-01' },
+    { id: 'res-01', name: '倉内', nameEn: 'Kurauchi', role: 'Director', department: 'research', zone: 'research', hueShift: 0, deskId: 'res-desk-01' },
   ],
   exec: [],
 } as unknown as JCConfigData;

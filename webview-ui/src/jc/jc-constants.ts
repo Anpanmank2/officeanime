@@ -408,17 +408,17 @@ export const MOMENTUM_BAR_CAP = 8;
 /** ステータスバーの段数 (filled = round(pct/10))。5 本共通。 */
 export const STAT_BAR_SEGMENTS = 10;
 
-// ── コンペバッジ (2026-07-25 藤井design v1 §3・古賀design §6 反映・eng-03 実装) ──
+// ── コンペバッジ (2026-07-25 藤井design v1 §3・倉内design §6 反映・eng-03 実装) ──
 // 全社稼働可視化ボード (CompanyActivationBoard) のロースター行に表示する絶対件数
-// バッジ。%表示・相対順位は一切実装しない (古賀design §6「相対max禁止」思想を踏襲)。
+// バッジ。%表示・相対順位は一切実装しない (倉内design §6「相対max禁止」思想を踏襲)。
 // 報酬=演出のみ (評価接続ロジックは一切実装しない・2026-07-25 Owner GO)。
-/** 3件到達で🥉。古賀design §3 例値をそのまま暫定採用 (Owner未決・値はここで独立差替え可)。 */
+/** 3件到達で🥉。倉内design §3 例値をそのまま暫定採用 (Owner未決・値はここで独立差替え可)。 */
 export const COMP_BADGE_BRONZE = 3;
 /** 7件到達で🥈。 */
 export const COMP_BADGE_SILVER = 7;
 /** 15件到達で🥇。 */
 export const COMP_BADGE_GOLD = 15;
-/** バッジ対象外 (既定=除外・古賀design §5「二重インセンティブ回避・PM中立性維持」):
+/** バッジ対象外 (既定=除外・倉内design §5「二重インセンティブ回避・PM中立性維持」):
  *  Lead 3名 (eng-01/mkt-01/res-01)・PM (eng-04)・秘書 (exec-sec)。
  *  行表示 (顔/名前/状態dot) は維持し、badge 列のみ固定表示に差し替える。 */
 export const COMP_BADGE_EXCLUDED_IDS: ReadonlySet<string> = new Set([
