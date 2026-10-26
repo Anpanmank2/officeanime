@@ -27,8 +27,8 @@ const config = {
   organization: 'test',
   version: 1,
   members: [
-    { id: 'res-01', name: 'Kurauchi', department: 'research' },
-    { id: 'eng-01', name: 'Ito', department: 'engineering' },
+    { id: 'res-01', name: 'Kuramae', department: 'research' },
+    { id: 'eng-01', name: 'Mutou', department: 'engineering' },
   ],
   exec: [],
   mapping: { rules: [], fallback: 'prompt' },

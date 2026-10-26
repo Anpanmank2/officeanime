@@ -24,7 +24,7 @@ function ok(name: string, cond: boolean, detail = ''): void {
 
 console.log('§2 persona reactions (◎ enthusiastic vs ✗ reluctant, persona-fit)');
 {
-  // eng-01 田中 has an explicit hand-authored voice (not archetype).
+  // eng-01 Mutou has an explicit hand-authored voice (not archetype).
   ok('eng-01 has explicit voice', hasExplicitVoice('eng-01'));
   const great = reactionLine('eng-01', 'engineering', 'great', 0);
   const bad = reactionLine('eng-01', 'engineering', 'bad', 0);
