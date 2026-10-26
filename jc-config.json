@@ -4,8 +4,8 @@
   "members": [
     {
       "id": "eng-01",
-      "name": "伊藤",
-      "nameEn": "Ito",
+      "name": "Mutou",
+      "nameEn": "Mutou",
       "role": "開発部長",
       "department": "engineering",
       "layer": "L1",
@@ -27,7 +27,7 @@
     },
     {
       "id": "eng-04",
-      "name": "カイゼン・アキオ",
+      "name": "Kaizen Akio",
       "nameEn": "Kaizen Akio",
       "role": "PM・検証専任",
       "department": "engineering",
@@ -50,8 +50,8 @@
     },
     {
       "id": "mkt-02",
-      "name": "亀井",
-      "nameEn": "Kamei",
+      "name": "Got of turtle",
+      "nameEn": "Got of turtle",
       "role": "反証係 / Systematicレンズ",
       "department": "marketing",
       "layer": "L2",
@@ -64,7 +64,7 @@
     },
     {
       "id": "mkt-03",
-      "name": "ナイチン・ゲイル",
+      "name": "Nightin Gale",
       "nameEn": "Nightin Gale",
       "role": "反証係 / Empathyレンズ",
       "department": "marketing",
@@ -78,7 +78,7 @@
     },
     {
       "id": "mkt-01",
-      "name": "スティーブ・ジョブ",
+      "name": "Steve Job",
       "nameEn": "Steve Job",
       "role": "Marketing Director",
       "department": "marketing",
@@ -101,7 +101,7 @@
     },
     {
       "id": "mkt-04",
-      "name": "レオ・ヴィンチ",
+      "name": "Leo Vinci",
       "nameEn": "Leo Vinci",
       "role": "反証係 / Craftレンズ",
       "department": "marketing",
@@ -115,7 +115,7 @@
     },
     {
       "id": "mkt-05",
-      "name": "ソクラ・テツオ",
+      "name": "Sokura Tetsuo",
       "nameEn": "Sokura Tetsuo",
       "role": "反証係 / Purposeレンズ",
       "department": "marketing",
@@ -129,8 +129,8 @@
     },
     {
       "id": "res-01",
-      "name": "倉内",
-      "nameEn": "Kurauchi",
+      "name": "Kuramae",
+      "nameEn": "Kuramae",
       "role": "リサーチ部長",
       "department": "research",
       "layer": "L1",
@@ -152,7 +152,7 @@
     },
     {
       "id": "res-02",
-      "name": "千の休",
+      "name": "Sen no Kyu",
       "nameEn": "Sen no Kyu",
       "role": "SNS担当",
       "department": "research",
@@ -171,7 +171,7 @@
     },
     {
       "id": "res-07",
-      "name": "シバセン",
+      "name": "Shibasen",
       "nameEn": "Shibasen",
       "role": "マクロ・業界インテリジェンス",
       "department": "research",
@@ -185,7 +185,7 @@
     },
     {
       "id": "res-09",
-      "name": "はにゃ",
+      "name": "Hanya",
       "nameEn": "Hanya",
       "role": "レポート統合",
       "department": "research",
@@ -199,8 +199,8 @@
     },
     {
       "id": "exec-sec",
-      "name": "宮本",
-      "nameEn": "Miyamoto",
+      "name": "Niyamoto",
+      "nameEn": "Niyamoto",
       "role": "副社長",
       "department": "exec",
       "layer": "L2",
@@ -222,7 +222,7 @@
     },
     {
       "id": "codex-01",
-      "name": "るあ（お茶汲み）",
+      "name": "Rua (Tea Runner)",
       "nameEn": "Rua (Tea Runner)",
       "role": "実装ボット・お茶汲み兼務",
       "department": "engineering",
@@ -244,7 +244,7 @@
     },
     {
       "id": "exec-03",
-      "name": "宮本",
+      "name": "Niyamoto",
       "role": "副社長",
       "zone": "exec"
     },

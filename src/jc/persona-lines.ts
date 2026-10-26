@@ -28,7 +28,7 @@ interface PersonaVoice {
 // ── Per-member voices (real personas — visible / resident members) ─────
 // Kept short: pixel speech bubbles truncate ~24 chars, so lines are punchy.
 const VOICES: Record<string, PersonaVoice> = {
-  // exec-sec 宮本 — 段取りを整える進行役
+  // exec-sec Niyamoto — 段取りを整える進行役
   'exec-sec': {
     react: {
       great: ['承知しました、最適な担当へ', 'いいですね、すぐ回します'],
@@ -42,7 +42,7 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['ひとまず完了です', '次はもっと適材で'],
     },
   },
-  // eng-01 伊藤 — 動く形にする進行役
+  // eng-01 Mutou — 動く形にする進行役
   'eng-01': {
     react: {
       great: ['任せてください、設計します', '得意な領域です'],
@@ -84,7 +84,7 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['一応できました', '専門の人に見てほしい'],
     },
   },
-  // eng-04 カイゼン・アキオ — 現場を丁寧に見て回るチェック役
+  // eng-04 Kaizen Akio — 現場を丁寧に見て回るチェック役
   'eng-04': {
     react: {
       great: ['この人選、活きますよ', '検証まで見ます'],
@@ -112,7 +112,7 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['形にはしました', '本領は別領域で'],
     },
   },
-  // eng-06 黒田 翔太 — 情熱的だが論理的、プレイヤー体験
+  // eng-06 — 情熱的だが論理的、プレイヤー体験
   'eng-06': {
     react: {
       great: ['面白くします！', 'プレイヤー体験、任せて'],
@@ -126,7 +126,7 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['一応できた', '得意領域で活きたい'],
     },
   },
-  // codex-01 るあ（お茶汲み） — 気配りが得意なお茶汲み担当
+  // codex-01 Rua (Tea Runner) — 気配りが得意なお茶汲み担当
   'codex-01': {
     react: {
       great: ['実装を開始します', '仕様を確認して着手します'],
@@ -140,7 +140,7 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['結果を記録しました', '確認が必要です'],
     },
   },
-  // mkt-01 スティーブ・ジョブ — 一言で言い切る旗振り役
+  // mkt-01 Steve Job — 一言で言い切る旗振り役
   'mkt-01': {
     react: {
       great: ['方向性は明確です、やります', '効く施策にします'],
@@ -154,7 +154,7 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['ひとまず完了', '本来は別担当が適任'],
     },
   },
-  // mkt-02 亀井 — 物事を整理するのが得意な人
+  // mkt-02 Got of turtle — 物事を整理するのが得意な人
   'mkt-02': {
     react: {
       great: ['仮説を崩せるか見ます'],
@@ -168,7 +168,7 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['懸念を残して共有します'],
     },
   },
-  // mkt-03 ナイチン・ゲイル — 相手の気持ちを一番大事にする人
+  // mkt-03 Nightin Gale — 相手の気持ちを一番大事にする人
   'mkt-03': {
     react: {
       great: ['受け手の目線で見ます'],
@@ -187,7 +187,7 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['気になる声を共有します'],
     },
   },
-  // mkt-05 ソクラ・テツオ — 目的を問い直すのが得意な人
+  // mkt-05 Sokura Tetsuo — 目的を問い直すのが得意な人
   'mkt-05': {
     react: {
       great: ['目的に照らして進めます'],
@@ -201,7 +201,7 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['目的とのズレを残します'],
     },
   },
-  // mkt-04 レオ・ヴィンチ — 見た目の細部まで詰める職人
+  // mkt-04 Leo Vinci — 見た目の細部まで詰める職人
   'mkt-04': {
     react: {
       great: ['これは燃えるわね、やる', '良いクラフトにする'],
@@ -215,7 +215,7 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['ひとまず形に', '本気は得意領域で'],
     },
   },
-  // res-01 倉内 — データを一言でまとめる進行役
+  // res-01 Kuramae — データを一言でまとめる進行役
   'res-01': {
     react: {
       great: ['得意領域です、精査します', '確度まで見ます'],
@@ -229,7 +229,7 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['一応まとめた', '本領は分析で'],
     },
   },
-  // res-02 千の休 — 場の空気を読むのが早い人
+  // res-02 Sen no Kyu — 場の空気を読むのが早い人
   'res-02': {
     react: { great: ['流れを追います'], ok: ['話題を確認します'], bad: ['一次情報から見ます'] },
     think: ['今、この空気が全部', '今、何が動いてる？', '反応の温度は？'],
@@ -249,7 +249,7 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['ひとまず完了', '本領は分析で'],
     },
   },
-  // res-07 シバセン — 長い目で物事を見る記録役
+  // res-07 Shibasen — 長い目で物事を見る記録役
   'res-07': {
     react: {
       great: ['市場の構造から読みます', '期待値で語ります'],
@@ -263,7 +263,7 @@ const VOICES: Record<string, PersonaVoice> = {
       bad: ['ひとまず完了', '本領は業界分析で'],
     },
   },
-  // res-09 はにゃ — 小さくてかわいいまとめ役
+  // res-09 Hanya — 小さくてかわいいまとめ役
   'res-09': {
     react: { great: ['全体像にまとめます'], ok: ['論点を並べます'], bad: ['構造から見直します'] },
     think: ['まとめました！', 'つながりはどこ？', '順番を整えよう'],
