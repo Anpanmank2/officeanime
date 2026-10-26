@@ -1,157 +1,154 @@
 import { PNG } from 'pngjs';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const args = process.argv.slice(2), options = {};
 for (let i = 0; i < args.length; i += 2) {
-  if (!['--cell-h', '--out'].includes(args[i]) || !args[i + 1]) throw Error('Expected --cell-h 44|48 or --out <path>');
+  if (!['--cell-h', '--out'].includes(args[i]) || !args[i + 1] || args[i + 1].startsWith('--')) throw Error('Usage: --cell-h 44|48 --out path');
   options[args[i]] = args[i + 1];
 }
 const CELL_W = 32, CELL_H = Number(options['--cell-h'] ?? 48), ART_H = CELL_H - 8;
-const BODY_LEFT = 4, BODY_W = 24, HEAD_TOP = 8, HEAD_H = 15, EYE_Y = 16;
-if (![44, 48].includes(CELL_H)) throw Error('Cell height must be 44 or 48');
-const root = fileURLToPath(new URL('../', import.meta.url));
-const out = resolve(options['--out'] ?? resolve(root, 'artifacts/persona-characters/r3-sample-3members.png'));
-const roster = JSON.parse(readFileSync(resolve(root, 'webview-ui/public/assets/default-avatars.json'), 'utf8')).avatars;
-const members = [
-  { id: 'eng-01', width: 18, coat: '#a99249', dark: '#746333', light: '#cabb75', hair: '#44382e' },
-  { id: 'mkt-01', width: 12, coat: '#34373e', dark: '#25282e', light: '#5c6067', hair: '#44454a' },
-  { id: 'res-01', width: 24, coat: '#e6b836', dark: '#b68723', light: '#f8d966', hair: '#493c32' },
-];
-const ink = '#20212a', skin = '#e4b58c', skinDark = '#be8564', pants = '#586373', paper = '#eee6c8';
-const blank = (w = CELL_W, h = CELL_H) => new PNG({ width: w, height: h });
-function rect(p, x, y, w, h, color) {
-  const rgb = color.match(/[a-f\d]{2}/gi).map(v => parseInt(v, 16));
-  for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) {
-    if (xx < 0 || yy < 0 || xx >= p.width || yy >= p.height) throw Error('Drawing outside cell');
-    p.data.set([...rgb, 255], (yy * p.width + xx) * 4);
+const BODY_LEFT = 4, BODY_W = 24, HEAD_TOP = 8, HEAD_H = 19, EYE_Y = 18;
+if (![44, 48].includes(CELL_H)) throw Error('cell-h must be 44 or 48');
+const OUT = resolve(ROOT, options['--out'] ?? 'artifacts/persona-characters/r5-sample-13members.png');
+const SLOT_ORDER = ['base', 'bottom', 'top', 'face', 'hair', 'accessory'];
+const members = JSON.parse(readFileSync(resolve(ROOT,'scripts/sample-characters-heads.json'),'utf8')).members;
+const ink = '#2e2324', skin = '#fcd8a4', skinShadow = '#e9b585', blush = '#f4a0a0', mouth = '#e8505a';
+const eyeBrown = '#6b5040', eyeDark = '#2a2430', glass = '#e4edf2';
+const white = '#e3eaf0', pants = '#586174', pantsShadow = '#3e4659';
+const colors = person => ({ O:ink, L:person.hair[0], H:person.hair[1], h:person.hair[2], S:skin, s:skinShadow, P:blush, M:mouth, e:eyeBrown, E:eyeDark, G:ink, g:glass, K:person.acc?.[0], A:person.acc?.[1], a:person.acc?.[2], F:person.acc?.[1] });
+const tags = { O:'face', L:'hair', H:'hair', h:'hair', S:'face', s:'face', P:'face', M:'face', e:'eye', E:'eye', G:'glasses', g:'glasses', K:'acc', A:'acc', a:'acc', F:'glasses' };
+const rgb = c => c.match(/[a-f\d]{2}/gi).map(n => parseInt(n, 16));
+const canvas = (w = CELL_W, h = CELL_H) => ({ width: w, height: h, pixels: Array(w * h).fill(null), tags: Array(w * h).fill('') });
+function rect(c, x, y, w, h, color, tag = '') {
+  for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) {
+    if (i < 0 || i >= c.width || j < 0 || j >= c.height) throw Error(`pixel outside canvas: ${i},${j}`);
+    c.pixels[j * c.width + i] = color; c.tags[j * c.width + i] = tag;
   }
 }
-const alpha = (p, x, y) => x >= 0 && y >= 0 && x < p.width && y < p.height ? p.data[(y * p.width + x) * 4 + 3] : 0;
-function blit(dst, src, dx = 0, dy = 0, scale = 1) {
-  for (let y = 0; y < src.height; y++) for (let x = 0; x < src.width; x++) {
-    const s = (y * src.width + x) * 4, a = src.data[s + 3] / 255;
-    if (!a) continue;
-    for (let sy = 0; sy < scale; sy++) for (let sx = 0; sx < scale; sx++) {
-      const d = ((dy + y * scale + sy) * dst.width + dx + x * scale + sx) * 4;
-      const b = dst.data[d + 3] / 255, total = a + b * (1 - a);
-      for (let c = 0; c < 3; c++) dst.data[d + c] = Math.round((src.data[s + c] * a + dst.data[d + c] * b * (1 - a)) / total);
-      dst.data[d + 3] = Math.round(total * 255);
+function draw(person, direction, step = -1) {
+  const c = canvas(), bob = step === 1 || step === 3 ? 2 : 0, s = person.torso;
+  const r = (x, y, w, h, color, tag) => rect(c, x, y, w, h, color, tag);
+  const head = (x, y, w, h, color, tag = 'hair') => r(x, y + bob, w, h, color, tag);
+  const legTop = CELL_H - 8, gait = step === 0 ? -1 : step === 2 ? 1 : 0;
+  for (const [side, x, shift] of [['L', 9, gait], ['R', 18, -gait]]) {
+    r(x + shift, legTop, 5, 8, ink, side); r(x + shift + 1, legTop, 3, 6, pants, side);
+    r(x + shift + 3, legTop, 1, 6, pantsShadow, side); r(x + shift - 1, CELL_H - 2, 6, 2, ink, side);
+  }
+  r(7, 27, 18, legTop - 27, ink, 'top'); r(8, 28, 16, legTop - 29, person.top[0], 'top');
+  r(8, 29, 3, legTop - 30, person.top[1], 'top'); r(12, 28, 10, 2, person.top[2], 'top');
+  r(5, 30, 3, 7, ink, 'body'); r(6, 31, 2, 5, skin, 'body');
+  r(24, 30, 3, 7, ink, 'body'); r(24, 31, 2, 5, skinShadow, 'body');
+  if (s === 0) { r(14, 28, 3, legTop - 29, skinShadow, 'top'); r(9, 33, 4, 2, person.top[2], 'top'); }
+  if (s === 1) r(12, 26 + bob, 8, 3, person.top[1], 'top');
+  if (s === 2) { r(12, 28, 3, 3, white, 'top'); r(18, 28, 3, 3, white, 'top'); r(16, 31, 1, 6, ink, 'top'); }
+  if (direction === 'up') r(12, 30, 10, 2, person.top[1], 'top');
+  if (direction === 'right') r(20, 30, 3, 7, person.top[1], 'top');
+  const eyes = canvas(), palette = colors(person), template = person.front;
+  const side = direction === 'right' && person.right;
+  const grid = (side || template).map((row,dy) => [...row].map((symbol,dx) => ({ symbol,
+    tag: side && tags[symbol] === 'hair' && tags[template[dy][dx]] !== 'hair' ? 'profile' : tags[symbol] })));
+  (side || template).forEach((row,dy) => [...row].forEach((symbol,dx) => {
+    if (tags[symbol] === 'eye') rect(eyes,6+dx,HEAD_TOP+dy+bob,1,1,palette[symbol],'eye');
+  }));
+  const paint = (x,y,symbol,tag) => { grid[y-HEAD_TOP][x-6] = {symbol,tag}; };
+  if (direction === 'right' && !side) {
+    for (let y=13;y<=22;y++) for (let x=8;x<=14;x++) {
+      if ('SsPeEGgF'.includes(template[y-HEAD_TOP][x-6])) paint(x,y,'H','profile');
     }
+    for (const x of [15,16]) paint(x,23,'S','profile');
+    for (const x of [18,19]) paint(x,23,'M','profile');
   }
-}
-const mask = p => Array.from({ length: p.width * p.height }, (_, i) => Number(p.data[i * 4 + 3] > 0));
-const distance = (a, b) => a.reduce((n, v, i) => n + Number(v !== b[i]), 0);
-function paint(maskImage, color, outlined) {
-  const p = blank();
-  for (let y = 0; y < CELL_H; y++) for (let x = 0; x < CELL_W; x++) if (alpha(maskImage, x, y)) {
-    const edge = [[-1, 0], [1, 0], [0, -1], [0, 1]].some(([dx, dy]) => !alpha(maskImage, x + dx, y + dy));
-    rect(p, x, y, 1, 1, outlined && edge ? ink : color);
-  }
-  return p;
-}
-function geometry(m, who, frame) {
-  const bob = frame >= 3 && frame % 2 === 0 ? 2 : 0, direction = frame === 1 ? 'right' : frame === 2 ? 'up' : 'down';
-  const layers = Array.from({ length: 6 }, () => blank()), [base, bottom, top, face, hair, accessory] = layers;
-  const box = (p, x, y, w, h) => rect(p, x, y, w, h, ink), left = (CELL_W - m.width) / 2;
-  box(base, 13, 21 + bob, 6, 7); box(base, left, 29, m.width, 8);
-  box(top, left, 24 + bob, m.width, 13 - bob);
-  const stride = frame === 3 ? -2 : frame === 5 ? 2 : 0, foot = HEAD_TOP + ART_H;
-  box(bottom, 10 + stride, 36, 5, foot - 36); box(bottom, 17 - stride, 36, 5, foot - 36 - (stride ? 2 : 0));
-  box(face, 10, 11 + bob, 12, HEAD_H - 3);
-  if (who === 0) { box(hair, 8, 10 + bob, 16, 4); box(hair, 8, 13 + bob, 3, 5); box(hair, 21, 13 + bob, 3, 4); box(hair, 9, HEAD_TOP + bob, 3, 3); }
-  if (who === 1) { box(hair, 9, HEAD_TOP + bob, 14, 3); box(hair, 3, 11 + bob, 8, 8); box(hair, 1, 13 + bob, 4, 4); box(hair, 21, 10 + bob, 3, 4); }
-  if (who === 2) { box(hair, 4, HEAD_TOP + bob, 24, 6); box(hair, 5, 14 + bob, 5, 5); box(hair, 22, 14 + bob, 5, 5); box(hair, 7, 19 + bob, 3, 2); box(hair, 22, 19 + bob, 3, 2); }
-  // Held objects are rigid across views; glasses are drawn on the face, never held.
-  if (who === 0) { box(accessory, 23, 33 + bob, 7, 9); box(accessory, 25, 31 + bob, 3, 2); }
-  if (who === 2) box(accessory, 25, 27 + bob, 5, 13);
-  const silhouette = blank(); layers.slice(0, 5).forEach(p => blit(silhouette, p));
-  return { layers, silhouette, bob, direction, who, m, eyeY: EYE_Y + bob / 2 };
-}
-const frames = members.map((m, who) => Array.from({ length: 7 }, (_, f) => geometry(m, who, f)));
-// 1. Compare undecorated black outlines before adding any colors or objects.
-const distances = [0, 1, 2].flatMap(d => [[0, 1], [0, 2], [1, 2]].map(([a, b]) => distance(mask(frames[a][d].silhouette), mask(frames[b][d].silhouette))));
-function finish(f) {
-  const { layers, who, m, bob, direction, eyeY } = f;
-  f.eyeMask = blank();
-  // A failed silhouette gate still produces a review sheet, without decoration.
-  if (distances.some(n => n < 80)) { f.image = f.silhouette; return; }
-  const colors = [skin, pants, m.coat, direction === 'up' ? m.hair : skin, m.hair, who === 0 ? m.dark : paper];
-  // 2. Flat colors, then 3. black contour, then 4. inset shadow/highlight.
-  const flat = layers.map((p, i) => paint(p, colors[i], false));
-  const edged = flat.map((p, i) => paint(p, colors[i], true));
-  rect(edged[2], (CELL_W - m.width) / 2 + 1, 27 + bob, 2, 7 - bob, m.dark);
-  rect(edged[2], (CELL_W + m.width) / 2 - 3, 27 + bob, 2, 5, m.light);
-  rect(edged[4], who === 2 ? 19 : 12, 10 + bob, who === 2 ? 1 : 4, 1, who === 1 ? '#96999d' : m.hair);
-  const p = blank(); edged.slice(0, 5).forEach(layer => blit(p, layer));
-  // 5. Face and role symbols. Rear views retain a hidden anatomical eye anchor.
-  if (direction !== 'up') {
-    const eyes = direction === 'right' ? [17] : [11, 16];
-    for (const x of eyes) {
-      rect(p, x, eyeY - 1, 3, who === 0 ? 2 : 3, ink);
-      rect(f.eyeMask, x, eyeY - 1, 3, who === 0 ? 2 : 3, ink);
-      if (who === 1) rect(p, x + 1, eyeY - 1, 1, 1, paper);
-      const browY = eyeY - 4 - (who === 2 && x === 16 ? 1 : 0);
-      rect(p, x, browY, 3, 2, ink);
-      if (who === 1) rect(p, x === 11 ? x : x + 2, browY - 1, 1, 2, ink);
-      if (who === 1) { rect(p, x, eyeY - 2, 3, 1, paper); rect(p, x, eyeY + 2, 3, 1, paper); rect(p, x - 1, eyeY - 1, 1, 3, paper); rect(p, x + 3, eyeY - 1, 1, 3, paper); }
+  if (direction === 'up') template.forEach((row,dy) => [...row].forEach((symbol,dx) => {
+    const x = 6+dx, y = HEAD_TOP+dy;
+    if ('SsPMeEGgF'.includes(symbol) && !(person.back === 'bald-top' && y<=12)) {
+      const fill = person.back === 'nape-short' && y>=21 ? (x>=12 && x<=19 ? 's' : 'h') : y>=23 ? 'h' : 'H';
+      paint(x,y,fill,'back');
     }
-    rect(p, direction === 'right' ? 18 : 14, 21 + bob, 3, 1, skinDark);
-  }
-  if (who === 0 && direction !== 'up') { rect(p, 15, 25 + bob, 2, 10 - bob, ink); rect(p, 10, 30, 3, 3, m.dark); rect(p, 19, 30, 3, 3, m.dark); }
-  if (who === 1) rect(p, 12, 23 + bob, 8, 3, m.coat);
-  if (who === 2 && direction !== 'up') { rect(p, 15, 25 + bob, 1, 9 - bob, m.dark); rect(p, 11, 25 + bob, 3, 2, paper); }
-  blit(p, edged[5]);
-  if (who === 0) rect(p, 26, 36 + bob, 1, 2, paper);
-  if (who === 2) rect(p, 27, 30 + bob, 2, 1, m.dark);
-  f.image = p;
+    if (person.back === 'long-hair' && y>=24 && x>=9 && x<=22 && symbol==='O') paint(x,y,'h','back');
+  }));
+  if (direction === 'up' && person.back === 'mirror') grid.forEach(row => row.reverse());
+  grid.forEach((row,dy) => row.forEach(({symbol,tag},dx) => {
+    if (symbol !== '.') head(6+dx,HEAD_TOP+dy,1,1,palette[symbol],tag);
+  }));
+  if (person.prop === 'toolbox') { head(24,32,5,2,ink,'prop'); head(22,34,9,7,ink,'prop'); head(23,35,7,5,person.top[1],'prop'); head(25,36,3,1,person.top[2],'prop'); }
+  if (person.prop === 'papers') { head(1,29,7,11,ink,'prop'); head(2,30,5,9,white,'prop'); head(3,32,3,1,pants,'prop'); head(3,35,3,1,pants,'prop'); }
+  return { ...c, bob, eyes, direction, step };
 }
-frames.flat().forEach(finish);
-const slotOrder = ['base', 'bottom', 'top', 'face', 'hair', 'accessory'];
-function current(id) {
-  const config = roster[id];
-  if (!config) throw Error(`Missing avatar ${id}`);
-  const parts = [{ slot: 'base', ...config.base }, ...config.layers].sort((a, b) => slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot));
-  const cells = Array.from({ length: 3 }, () => blank(16, 32));
-  for (const { slot, part } of parts) {
-    const atlas = PNG.sync.read(readFileSync(resolve(root, `webview-ui/public/assets/avatar-parts/${slot}/${part}/${part}.png`)));
-    if (atlas.width !== 176 || atlas.height !== 96) throw Error(`Unexpected atlas ${part}`);
-    cells.forEach((cell, d) => { const crop = blank(16, 32); PNG.bitblt(atlas, crop, 16, [0, 2, 1][d] * 32, 16, 32, 0, 0); blit(cell, crop); });
-  }
-  return cells;
+const groups = members.map(p => ['down','right','up',0,1,2,3].map(d => typeof d === 'number' ? draw(p,'down',d) : draw(p,d)));
+const frames = groups.flat(), indices = c => c.pixels.flatMap((p,i) => p ? [i] : []);
+const mask = (c,tag,mirror = false) => c.tags.flatMap((t,i) => t === tag ? [`${mirror && tag!=='prop' ? CELL_W-1-i%CELL_W : i%CELL_W},${Math.floor(i/CELL_W)-c.bob}`] : []).sort().join(';');
+const all = f => frames.every(f), counts = groups.map(g => new Set(g.flatMap(c => c.pixels.filter(Boolean))).size);
+const distances = [];
+const category = symbol => ['.','O','LHh','SsPMeE','AaKFGg'].findIndex(group => group.includes(symbol));
+for (let a=0;a<members.length;a++) for (let b=a+1;b<members.length;b++) {
+  const other = [...members[b].front.join('')];
+  distances.push({pair:[members[a].id,members[b].id],distance:[...members[a].front.join('')].filter((symbol,i) => category(symbol)!==category(other[i])).length});
 }
-const rowH = CELL_H * 4 + 2, widths = [3 * 17 + 1, 3 * 65 + 1, 7 * 33 + 1, 7 * 129 + 1];
-const sheet = blank(4 + widths.reduce((a, b) => a + b, 0), rowH * 3);
-members.forEach((m, row) => {
-  const old = current(m.id), blocks = [old, old, frames[row].map(f => f.image), frames[row].map(f => f.image)];
-  rect(sheet, 0, row * rowH, 4, rowH, m.coat); let x = 4;
-  blocks.forEach((cells, block) => {
-    const scale = block % 2 ? 4 : 1, bg = block < 2 ? '#e8e8e8' : '#ffffff';
-    rect(sheet, x, row * rowH, widths[block], rowH, '#b6b6b6');
-    cells.forEach(cell => { rect(sheet, x + 1, row * rowH + 1, cell.width * scale, rowH - 2, bg); blit(sheet, cell, x + 1, (row + 1) * rowH - 1 - cell.height * scale, scale); x += cell.width * scale + 1; }); x++;
-  });
+const minimum = distances.reduce((a,b) => a.distance<=b.distance ? a : b);
+const headHeights = frames.map(c => {
+  const rows = c.tags.flatMap((t,i) => ['hair','face','eye','glasses','acc','back','profile'].includes(t) ? [Math.floor(i/CELL_W)] : []);
+  return Math.max(...rows)-Math.min(...rows)+1;
 });
-const all = frames.flat(), every = fn => all.filter(fn).length;
-const clear = every(f => !mask(f.image).slice(0, CELL_W * HEAD_TOP).some(Boolean));
-const body = every(f => f.layers.slice(0, 3).every(p => mask(p).every((v, i) => !v || (i % CELL_W >= BODY_LEFT && i % CELL_W < BODY_LEFT + BODY_W))));
-const tops = all.map(f => Math.floor(mask(f.image).findIndex(Boolean) / CELL_W));
-const eyes = all.map(f => {
-  if (f.direction === 'up') return f.eyeY;
-  const rows = mask(f.eyeMask).flatMap((v, i) => v ? [Math.floor(i / CELL_W)] : []);
-  return rows.length ? (Math.min(...rows) + Math.max(...rows)) / 2 : NaN;
-});
-const colors = frames.map(group => { const set = new Set(); group.forEach(f => { for (let i = 0; i < f.image.data.length; i += 4) if (f.image.data[i + 3]) set.add(f.image.data.subarray(i, i + 4).toString('hex')); }); return set.size; });
-function normalized(f, slot) { return mask(f.layers[slot]).slice(f.bob * CELL_W).concat(Array(f.bob * CELL_W).fill(0)).join(''); }
-const rigid = frames.every(group => group.every(f => [4, 5].every(slot => normalized(f, slot) === normalized(group[0], slot))));
 let failed = false;
-function check(label, pass, value) { console.log(`${label}: ${pass ? 'PASS' : 'FAIL'} ${value}`); failed ||= !pass; }
-check('check top-transparent', clear === 21, `${clear}/21`);
-check('check body-bounds', body === 21, `${body}/21 x=${BODY_LEFT}..${BODY_LEFT + BODY_W - 1}`);
-check('check head-top', tops.every((y, i) => y === HEAD_TOP + all[i].bob), tops.join(','));
-check('check eye-row', eyes.every(y => Math.abs(y - EYE_Y) <= 1), `${eyes.join(',')} (rear=hidden anchor)`);
-check('check palette', colors.every(n => n <= 16), colors.join(','));
-check('check silhouette', distances.every(n => n >= 80), distances.join(','));
-check('check rigid-parts', rigid, `hair/accessory normalized across 7 frames: ${rigid}`);
-mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, PNG.sync.write(sheet));
+function report(label, pass, value) { console.log(`${label}: ${pass ? 'PASS' : 'FAIL'} ${JSON.stringify(value)}`); failed ||= !pass; }
+report('check top-clear', all(c => c.pixels.slice(0,8*CELL_W).every(p => !p)), {frames:frames.length});
+report('check body-bounds', all(c => c.tags.every((t,i) => !['top','body','L','R'].includes(t) || (i%CELL_W>=BODY_LEFT && i%CELL_W<BODY_LEFT+BODY_W))), {left:BODY_LEFT,width:BODY_W});
+report('check head-top', all(c => Math.floor(indices(c)[0]/CELL_W)===HEAD_TOP+c.bob), frames.map(c => Math.floor(indices(c)[0]/CELL_W)));
+report('check eye-row', all(c => Math.abs(Math.floor(indices(c.eyes)[0]/CELL_W)-c.bob-EYE_Y)<=1), {anchor:EYE_Y,space:'unbobbed eye layer; back/profile occluded'});
+report('check palette', counts.every(n => n<=20), counts);
+report('check silhouettes', distances.every(p => p.distance>=60), {pairs:distances.length,minimum});
+report('check stable-shapes', groups.every((g,k) => g.every(c => (members[k].right && c.direction==='right' && c.step===-1) || ['hair','prop','acc'].every(t => mask(c,t)===mask(g[0],t,members[k].back==='mirror' && c.direction==='up')))), {poses:7,excluded:members.filter(p => p.right).map(p => `${p.id} right`)});
+report('check head-ratio', headHeights.every(h => h===HEAD_H && h/ART_H>=0.45), {heights:headHeights,art:ART_H,ratioMin:Math.min(...headHeights)/ART_H});
+report('check eye-no-white', all(c => [c,c.eyes].every(layer => layer.tags.every((t,i) => t!=='eye' || [eyeBrown,eyeDark].includes(layer.pixels[i])))), {colors:[eyeBrown,eyeDark],space:'visible and construction eye layers'});
+report('check legs-both', groups.every(g => g.slice(3).every(c => ['L','R'].every(t => c.tags.some((v,i) => v===t && c.pixels[i]===pants)))), {walkFrames:members.length*4,legHeight:8,shoeHeight:2});
+const hairTones = groups.map((g,k) => g.slice(0,3).map(c => members[k].hair.filter(color => c.pixels.some((p,i) => p===color && ['hair','back','profile'].includes(c.tags[i])))));
+report('check hair-tones', hairTones.every((views,k) => views.every((tones,d) => (d===2 ? [1,2] : [0,1,2]).every(i => tones.includes(members[k].hair[i])))), {tones:hairTones});
+const templateMismatches = groups.map((g,k) => members[k].front.reduce((n,row,dy) => n+[...row].filter((symbol,dx) => g[0].pixels[(HEAD_TOP+dy)*CELL_W+6+dx] !== (colors(members[k])[symbol] ?? null)).length,0));
+report('check front-template', templateMismatches.every(n => n===0), {mismatches:templateMismatches,pixelsPerMember:HEAD_H*20});
+const sideMismatches = members.flatMap((p,k) => p.right ? [{id:p.id,mismatches:p.right.reduce((n,row,dy) => n+[...row].filter((symbol,dx) => groups[k][1].pixels[(HEAD_TOP+dy)*CELL_W+6+dx] !== (colors(p)[symbol] ?? null)).length,0)}] : []);
+report('check side-template', sideMismatches.every(p => p.mismatches===0), {members:sideMismatches,pixelsPerMember:HEAD_H*20});
+const avatars = JSON.parse(readFileSync(resolve(ROOT,'webview-ui/public/assets/default-avatars.json'),'utf8'));
+if (avatars.avatarRevision!==3) throw Error('Expected avatarRevision 3');
+function legacy(id) {
+  const a = avatars.avatars[id], out = new PNG({width:16,height:32}); out.data.fill(0);
+  if (!a) throw Error(`Missing avatar ${id}`);
+  const layers = [{slot:'base',part:a.base.part},...a.layers].sort((a,b) => SLOT_ORDER.indexOf(a.slot)-SLOT_ORDER.indexOf(b.slot));
+  for (const layer of layers) {
+    const src = PNG.sync.read(readFileSync(resolve(ROOT,`webview-ui/public/assets/avatar-parts/${layer.slot}/${layer.part}/${layer.part}.png`)));
+    if (src.width!==176 || src.height!==96) throw Error(`Unexpected atlas ${layer.part}`);
+    for (let y=0;y<32;y++) for (let x=0;x<16;x++) {
+      const si=(y*176+16+x)*4, di=(y*16+x)*4, sa=src.data[si+3]/255, da=out.data[di+3]/255, alpha=sa+da*(1-sa);
+      for (let k=0;k<3;k++) out.data[di+k]=alpha ? Math.round((src.data[si+k]*sa+out.data[di+k]*da*(1-sa))/alpha) : 0;
+      out.data[di+3]=Math.round(alpha*255);
+    }
+  }
+  return out;
+}
+function raster(c) {
+  const png = new PNG({width:c.width,height:c.height}); png.data.fill(0);
+  c.pixels.forEach((p,i) => { if (p) png.data.set([...rgb(p),255],i*4); }); return png;
+}
+const widths=[16,64,7*CELL_W,7*CELL_W*4], gap=8, rowH=CELL_H*4+16;
+const sheet = new PNG({width:8+widths.reduce((a,b)=>a+b+gap,0),height:rowH*members.length});
+for (let i=0;i<sheet.data.length;i+=4) sheet.data.set([232,235,240,255],i);
+function blit(src,x,y,scale) {
+  for (let sy=0;sy<src.height;sy++) for (let sx=0;sx<src.width;sx++) for (let dy=0;dy<scale;dy++) for (let dx=0;dx<scale;dx++) {
+    const si=(sy*src.width+sx)*4, di=((y+sy*scale+dy)*sheet.width+x+sx*scale+dx)*4, a=src.data[si+3]/255;
+    for (let k=0;k<3;k++) sheet.data[di+k]=Math.round(src.data[si+k]*a+sheet.data[di+k]*(1-a));
+  }
+}
+members.forEach((p,row) => {
+  const y=row*rowH, old=legacy(p.id); let x=8;
+  for (let yy=y;yy<y+rowH;yy++) for (let xx=0;xx<4;xx++) sheet.data.set([...rgb(p.band),255],(yy*sheet.width+xx)*4);
+  [1,4].forEach(scale => { blit(old,x,y+rowH-8-32*scale,scale); x+=16*scale+gap; });
+  [1,4].forEach(scale => { groups[row].forEach((c,i) => blit(raster(c),x+i*CELL_W*scale,y+rowH-8-CELL_H*scale,scale)); x+=7*CELL_W*scale+gap; });
+  let boundary=7;
+  for (const w of widths) { for (let yy=y;yy<y+rowH;yy++) sheet.data.set([163,173,188,255],(yy*sheet.width+boundary)*4); boundary+=w+gap; }
+  for (let xx=4;xx<sheet.width;xx++) sheet.data.set([163,173,188,255],((y+rowH-1)*sheet.width+xx)*4);
+});
+mkdirSync(dirname(OUT),{recursive:true}); writeFileSync(OUT,PNG.sync.write(sheet));
+console.log(`Wrote ${OUT}; legacy colors are unshifted.`);
 process.exitCode = failed ? 1 : 0;
