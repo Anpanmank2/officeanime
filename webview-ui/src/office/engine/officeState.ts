@@ -248,7 +248,7 @@ export class OfficeState {
     const counts = new Array(PALETTE_COUNT).fill(0) as number[];
     for (const ch of this.characters.values()) {
       if (ch.isSubagent) continue;
-      counts[ch.palette]++;
+      counts[ch.palette % PALETTE_COUNT]++;
     }
     const minCount = Math.min(...counts);
     // Available = palettes at the minimum count (least used)
