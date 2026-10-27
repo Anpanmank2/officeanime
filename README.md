@@ -72,6 +72,8 @@ In standalone browser mode, `webview-ui/src/browserAvatarFailsoft.ts` keeps opti
 Run `scripts/generate-avatar-parts.mts` to regenerate the part PNGs and default avatar configurations.
 Run `scripts/render-avatar-gallery.mts` to render a gallery through the loader and `composeAvatar`; its committed output is `artifacts/persona-characters/avatar-gallery.png`.
 Run `scripts/capture-persona-office.mts` against a running standalone office to capture `artifacts/persona-characters/persona-office.png`.
+Chibi character data for the 13 members (32×48 cells, 12 columns × 3 directions) lives in webview-ui/src/office/sprites/chibi/, where chibiFrames.ts draws every frame from heads.json and the poses.json blueprint; it is not yet wired into the office renderer.
+Run scripts/render-chibi-poses.mts to render artifacts/persona-characters/r6-poses-13members.png with its self-checks.
 Coverage for composition, configuration, browser fallback, and development assets is in `webview-ui/test/avatarComposite.test.ts`, `webview-ui/test/avatarConfig.test.ts`, `webview-ui/test/browserMock-avatar-failsoft.test.ts`, and `webview-ui/test/dev-assets.test.ts`.
 
 ### Emotion System
