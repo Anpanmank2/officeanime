@@ -1,6 +1,6 @@
-import { CharacterState, TILE_SIZE } from '../office/types.js';
-import type { Character } from '../office/types.js';
 import type { OfficeState } from '../office/engine/officeState.js';
+import type { Character } from '../office/types.js';
+import { CharacterState, TILE_SIZE } from '../office/types.js';
 
 type SeatAssignment = {
   character: Character;
@@ -31,9 +31,9 @@ function placeAtSeat(officeState: OfficeState, assignment: SeatAssignment): void
  * Reclaim registered seats after a layout rebuild.
  *
  * `rebuildFromLayout` preserves matching UIDs, then fills all other characters
- * into arbitrary free seats. Release every registered character (including the
- * owner) before reserving their new seats so a legacy UID can never block a
- * compact UID, regardless of insertion order.
+ * into arbitrary free seats. Move other occupants out of registered targets,
+ * then release every registered character (including the owner) and reclaim
+ * their seats. Relocate displaced occupants to the remaining free seats.
  */
 export function reconcileRegisteredSeats(
   officeState: OfficeState,
@@ -62,6 +62,18 @@ export function reconcileRegisteredSeats(
     assignments.push({ character: owner, seatId: ownerSeatId, state: CharacterState.IDLE });
   }
 
+  // Pass 0: displace other occupants that block registered targets.
+  const registeredSeats = new Set(assignments.map(({ seatId }) => seatId));
+  const displacedCharacters: Character[] = [];
+  for (const character of officeState.characters.values()) {
+    if (charactersToRelease.has(character) || !character.seatId) continue;
+    if (!registeredSeats.has(character.seatId)) continue;
+    const seat = officeState.seats.get(character.seatId);
+    if (seat) seat.assigned = false;
+    character.seatId = null;
+    displacedCharacters.push(character);
+  }
+
   // Pass 1: relinquish old (or arbitrary fallback) seats and discard stale IDs.
   for (const character of charactersToRelease) {
     if (character.seatId) {
@@ -73,4 +85,20 @@ export function reconcileRegisteredSeats(
 
   // Pass 2: reserve every registered target from the now-free pool.
   for (const assignment of assignments) placeAtSeat(officeState, assignment);
+
+  // Pass 3: relocate displaced occupants without changing their activity state.
+  for (const character of displacedCharacters) {
+    const seatId = officeState.findFreeSeat();
+    if (!seatId) continue;
+    const seat = officeState.seats.get(seatId)!;
+    seat.assigned = true;
+    character.seatId = seatId;
+    character.tileCol = seat.seatCol;
+    character.tileRow = seat.seatRow;
+    character.x = seat.seatCol * TILE_SIZE + TILE_SIZE / 2;
+    character.y = seat.seatRow * TILE_SIZE + TILE_SIZE / 2;
+    character.dir = seat.facingDir;
+    character.path = [];
+    character.moveProgress = 0;
+  }
 }
