@@ -206,4 +206,6 @@ export interface Character {
   jcDesaturated?: boolean;
   /** JC: このキャラが表す member ID (jcMemberArriving で設定。member→char 逆引き用) */
   jcMemberId?: string;
+  /** JC: 絵だけに使う鍵（名簿の照合・席の割り当てには使わない）。分身は exec-01 */
+  spriteKey?: string;
 }

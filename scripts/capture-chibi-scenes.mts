@@ -152,11 +152,26 @@ try {
   }
   await scene('10a-z2-owner-generic', async () => {
     await page.locator('button', { hasText: /^出社する$/ }).click();
+    const deadline = Date.now() + 5000;
+    while (!logs.some(l => l.includes('[Chibi] built sprites for exec-01'))) {
+      if (Date.now() >= deadline) throw new Error('owner chibi sprites not built');
+      await page.waitForTimeout(100);
+    }
+    console.log('owner sprite: chibi exec-01');
     await send({ type: 'agentCreated', id: 9901, folderName: 'qa' });
     await page.waitForTimeout(4000);
     await setZoom(2, ['exec-sec']);
   });
   await scene('10b-z4-owner-generic', async () => { await setZoom(4, ['exec-sec']); });
+  await scene('10c-z4-owner-leave', async () => {
+    await page.locator('button', { hasText: /^退社する$/ }).click();
+    await page.waitForTimeout(600);
+  });
+  await scene('10d-z4-owner-return', async () => {
+    await page.waitForTimeout(2000);
+    await page.locator('button', { hasText: /^出社する$/ }).click();
+    await page.waitForTimeout(900);
+  });
 } catch (error) {
   failures++; console.error(`prepare: ${error.message}`);
 } finally {

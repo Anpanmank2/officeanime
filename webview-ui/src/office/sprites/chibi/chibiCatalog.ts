@@ -3,9 +3,10 @@ import type { ChibiPoses } from './chibiFrames.js';
 import { buildChibiFrames } from './chibiFrames.js';
 import { toChibiCharacterSprites } from './chibiSprites.js';
 import heads from './heads.json';
+import owner from './owner.json';
 import poses from './poses.json';
 
-const members = new Map(heads.members.map((member) => [member.id, member]));
+const members = new Map([...heads.members, ...owner.members].map((member) => [member.id, member]));
 const cache = new Map<string, CharacterSprites | null>();
 
 export function hasChibiMember(id: string): boolean {

@@ -150,7 +150,7 @@ export function renderScene(
       ch.palette,
       ch.hueShift,
       ch.jcDesaturated ? 'idle' : null,
-      ch.jcMemberId,
+      ch.spriteKey ?? ch.jcMemberId,
     );
     const spriteData = getCharacterSprite(ch, sprites);
     const px = zoom * (sprites.pixelScale ?? 1);
@@ -513,7 +513,8 @@ export function renderBubbles(
     const sittingOff = isSittingState(ch.state) ? BUBBLE_SITTING_OFFSET_PX : 0;
     const bubbleX = Math.round(offsetX + ch.x * zoom - cached.width / 2);
     const bubbleOffset =
-      BUBBLE_VERTICAL_OFFSET_PX - getCharacterHeightCorrection(ch.palette, ch.jcMemberId);
+      BUBBLE_VERTICAL_OFFSET_PX -
+      getCharacterHeightCorrection(ch.palette, ch.spriteKey ?? ch.jcMemberId);
     const bubbleY = Math.round(
       offsetY + (ch.y + sittingOff - bubbleOffset) * zoom - cached.height - 1 * zoom,
     );

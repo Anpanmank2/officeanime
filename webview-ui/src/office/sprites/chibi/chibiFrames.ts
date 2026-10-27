@@ -14,6 +14,7 @@ export interface ChibiMember {
   back: string | null;
   front: string[];
   right: string[] | null;
+  up?: string[] | null;
 }
 type Operation =
   | ['r', number, number, number, number, string, string]
@@ -109,7 +110,8 @@ export function buildChibiFrames(member: ChibiMember, poses: ChibiPoses): ChibiF
           case 'head': {
             const [, view, dx, dy] = op;
             const side = view === 'right' && member.right;
-            const grid = (side || member.front).map((row) => [...row]);
+            const back = view === 'up' && member.up;
+            const grid = (side || back || member.front).map((row) => [...row]);
             const paint = (x: number, y: number, symbol: string) => {
               grid[y - 8][x - 6] = symbol;
             };
@@ -121,7 +123,7 @@ export function buildChibiFrames(member: ChibiMember, poses: ChibiPoses): ChibiF
               for (const x of [15, 16]) paint(x, 23, 'S');
               for (const x of [18, 19]) paint(x, 23, 'M');
             }
-            if (view === 'up')
+            if (view === 'up' && !back)
               member.front.forEach((row, rowIndex) =>
                 [...row].forEach((symbol, colIndex) => {
                   const x = 6 + colIndex,
@@ -141,7 +143,8 @@ export function buildChibiFrames(member: ChibiMember, poses: ChibiPoses): ChibiF
                     paint(x, y, 'h');
                 }),
               );
-            if (view === 'up' && member.back === 'mirror') grid.forEach((row) => row.reverse());
+            if (view === 'up' && !back && member.back === 'mirror')
+              grid.forEach((row) => row.reverse());
             grid.forEach((row, rowIndex) =>
               row.forEach((symbol, colIndex) => {
                 if (symbol === '.') return;
