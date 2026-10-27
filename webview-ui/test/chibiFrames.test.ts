@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+
+import type { ChibiFrames } from '../src/office/sprites/chibi/chibiFrames.ts';
 import {
   buildChibiFrames,
   CHIBI_CELL_H,
@@ -58,14 +60,14 @@ test('468 nonempty 32×48 frames with eight transparent top rows', () => {
       assert.equal(group[direction].length, 12);
       for (const frame of group[direction]) {
         assert.equal(frame.length, 48);
-        assert.ok(frame.every((row) => row.length === 32));
+        assert.ok(frame.every((row: string[]) => row.length === 32));
         assert.ok(
           frame
             .slice(0, 8)
             .flat()
-            .every((pixel) => pixel === ''),
+            .every((pixel: string) => pixel === ''),
         );
-        assert.ok(frame.flat().some((pixel) => pixel !== ''));
+        assert.ok(frame.flat().some((pixel: string) => pixel !== ''));
       }
     }
 });
@@ -75,13 +77,15 @@ test('each member uses at most 20 colors', () => {
 });
 test('r5 frame parity', () => {
   assert.equal(
-    hash(groups.map((group) => r5.map(([d, c]) => group[d][poses.columns.indexOf(c)]))),
+    hash(
+      groups.map((group: ChibiFrames) => r5.map(([d, c]) => group[d][poses.columns.indexOf(c)])),
+    ),
     'd30e7fd551d1d5c5c805f85a925d78a09e1b488094054a213cc88f2cfef3fbde',
   );
 });
 test('all frame parity', () => {
   assert.equal(
-    hash(groups.map((group) => directions.map((d) => group[d]))),
+    hash(groups.map((group: ChibiFrames) => directions.map((d) => group[d]))),
     'b45295ab82b234eea91c9d3d19701c94f6ecce7e9a8834877698a657dfbe6115',
   );
 });
@@ -94,6 +98,7 @@ test('frames and rows are independent and rebuilding does not retain mutations',
   const frames = directions.flatMap((d) => group[d]);
   assert.equal(new Set(frames).size, 36);
   assert.equal(new Set(frames.flat()).size, 36 * 48);
+  // eslint-disable-next-line pixel-agents/no-inline-colors -- テスト用の判定色
   group.down[0][0][0] = '#ffffff';
   assert.equal(buildChibiFrames(members[0], poses).down[0][0][0], '');
 });
