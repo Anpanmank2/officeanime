@@ -441,7 +441,7 @@
       "top": ["#3a9a90", "#26685f", "#72c8bd"],
       "torso": 0,
       "prop": "papers",
-      "back": null,
+      "back": "mirror",
       "front": [
         "OO.....OO...........",
         "OKAO.OAKO.OOOOO.....",

@@ -1435,7 +1435,8 @@ function renderMemberStatusIcons(
     const anchorX = offsetX + ch.x * zoom;
     const headY = offsetY + (ch.y + sittingOff) * zoom;
     const iconOffset =
-      STATUS_ICON_OFFSET_PX - getCharacterHeightCorrection(ch.palette, ch.jcMemberId);
+      STATUS_ICON_OFFSET_PX -
+      getCharacterHeightCorrection(ch.palette, ch.spriteKey ?? ch.jcMemberId);
     const anchorY = headY - iconOffset * zoom;
 
     // 一時エフェクト (🎉/👋/🧠/😤ほか) は最優先 — 2秒で消える演出レイヤー

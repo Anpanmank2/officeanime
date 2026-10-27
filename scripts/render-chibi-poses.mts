@@ -16,6 +16,8 @@ if (!Number.isSafeInteger(S) || S < 1) throw Error('scale must be a positive int
 const OUT = resolve(ROOT, options['--out'] ?? 'artifacts/persona-characters/r6-poses-13members.png');
 const read = name => JSON.parse(readFileSync(resolve(ROOT, `webview-ui/src/office/sprites/chibi/${name}.json`), 'utf8'));
 const members = read('heads').members, poses = read('poses');
+const owner = JSON.parse(readFileSync(resolve(ROOT, 'webview-ui/src/office/sprites/chibi/owner.json'), 'utf8')).members[0];
+const ownerGroup = buildChibiFrames(owner, poses);
 const directions = ['down', 'up', 'right'];
 const groups = members.map(member => buildChibiFrames(member, poses));
 const frames = groups.flatMap(group => directions.flatMap(d => group[d]));
@@ -35,18 +37,20 @@ report('top-clear', topClear === frames.length, topClear);
 const nonEmpty = frames.filter(frame => frame.flat().some(pixel => pixel !== '')).length;
 report('non-empty', nonEmpty === frames.length, nonEmpty);
 report('palette', counts.every(count => count <= 20), counts);
-report('r5-parity', r5Hash === 'd30e7fd551d1d5c5c805f85a925d78a09e1b488094054a213cc88f2cfef3fbde', r5Hash);
-report('all-frames', allHash === 'b45295ab82b234eea91c9d3d19701c94f6ecce7e9a8834877698a657dfbe6115', allHash);
+report('r5-parity', r5Hash === 'd2157f9afebfa4215c10ee056c0152a71dee3fd07e8df85e17dee39869e72ce3', r5Hash);
+report('all-frames', allHash === 'fc86eb4328260ba981195609ebf689e86b7ee010fce0226fe169c4e0927bc438', allHash);
 
-const sheet = new PNG({ width: 8 + 12 * 32 * S, height: members.length * 3 * 48 * S });
+report('owner-frames', hash(directions.map((d) => ownerGroup[d])) === 'cd684b6a9d4bb88af959cea87c714dbfe57a0099dc71f86e057a32961c9204ab', hash(directions.map((d) => ownerGroup[d])));
+const sheetMembers = [...members, owner], sheetGroups = [...groups, ownerGroup];
+const sheet = new PNG({ width: 8 + 12 * 32 * S, height: sheetMembers.length * 3 * 48 * S });
 for (let i = 0; i < sheet.data.length; i += 4) sheet.data.set([232, 235, 240, 255], i);
 const rgb = color => color.match(/[a-f\d]{2}/gi).map(value => parseInt(value, 16));
-members.forEach((member, k) => {
+sheetMembers.forEach((member, k) => {
   const band = [...rgb(member.band), 255];
   for (let y = k * 3 * 48 * S; y < (k + 1) * 3 * 48 * S; y++) {
     for (let x = 0; x < 4; x++) sheet.data.set(band, (y * sheet.width + x) * 4);
   }
-  directions.forEach((direction, i) => groups[k][direction].forEach((frame, c) => {
+  directions.forEach((direction, i) => sheetGroups[k][direction].forEach((frame, c) => {
     frame.forEach((row, y) => row.forEach((color, x) => {
       if (color === '') return;
       const pixel = [...rgb(color), 255];

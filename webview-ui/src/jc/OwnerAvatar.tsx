@@ -3,8 +3,7 @@
 // Uses reserved agent ID OWNER_AGENT_ID = -9999.
 // Position lifecycle: entrance → secretary_desk → <member target> → exit
 //
-// Sprite placeholder: palette 0 + gold hue shift.
-// Drop webview-ui/public/assets/characters/owner.png for the real sprite.
+// Sprite: chibi frames for OWNER_SPRITE_KEY (owner.json); palette 0 + gold hue shift remain the legacy fallback.
 
 import { useEffect, useRef } from 'react';
 
@@ -13,14 +12,14 @@ import { TILE_SIZE } from '../office/types.js';
 import {
   JC_ENTRANCE,
   jcGetDeskPosition,
-  jcGetOwnerDeskAnchor,
   jcGetMemberRuntime,
   jcGetOwnerAvatarState,
+  jcGetOwnerDeskAnchor,
   jcSetOwnerAvatarState,
   subscribeOwnerAvatar,
 } from './jc-state.js';
 import type { OwnerAvatarState } from './jc-types.js';
-import { OWNER_AGENT_ID } from './owner-avatar-constants.js';
+import { OWNER_AGENT_ID, OWNER_SPRITE_KEY } from './owner-avatar-constants.js';
 
 /** Owner character palette + hue shift (gold tint) */
 const OWNER_PALETTE = 0;
@@ -90,6 +89,7 @@ export function OwnerAvatar({ officeState, onExited }: OwnerAvatarProps) {
       officeState.addAgent(OWNER_AGENT_ID, OWNER_PALETTE, OWNER_HUE_SHIFT, ownerDesk.seatId);
       const ch = officeState.characters.get(OWNER_AGENT_ID);
       if (ch) {
+        ch.spriteKey = OWNER_SPRITE_KEY;
         ch.x = JC_ENTRANCE.col * TILE_SIZE + TILE_SIZE / 2;
         ch.y = JC_ENTRANCE.row * TILE_SIZE + TILE_SIZE / 2;
         ch.tileCol = JC_ENTRANCE.col;

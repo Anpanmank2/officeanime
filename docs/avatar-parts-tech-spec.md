@@ -495,7 +495,8 @@ today**. Composition CPU/memory cost is a one-time hit per unique config, not a 
 
 
 ## 11. Chibi sprites for the roster (2026-10)
-- IDs in heads.json and their subagents use bundled chibi frames; owner and generic agents retain legacy sprites.
+- IDs in heads.json and their subagents use bundled chibi frames; the owner avatar uses the exec-01 entry in owner.json through Character.spriteKey (never jcMemberId); generic agents retain their legacy sprites.
+- An optional up head template overrides the derived back view (owner badge hidden from behind); res-09 uses back "mirror".
 - 32×48 cells render at 0.5 pixel scale, preserving the bottom-center foot anchor and 16×24 world size.
 - Walk columns: walk1, walkpass, walk3, walkpass; idle: stand; typing: type1/type2; reading: read1/read2.
 - Thinking uses think1/think2/think3; error uses down/up/right error frames shared across all directions.

@@ -80,17 +80,17 @@ test('r5 frame parity', () => {
     hash(
       groups.map((group: ChibiFrames) => r5.map(([d, c]) => group[d][poses.columns.indexOf(c)])),
     ),
-    'd30e7fd551d1d5c5c805f85a925d78a09e1b488094054a213cc88f2cfef3fbde',
+    'd2157f9afebfa4215c10ee056c0152a71dee3fd07e8df85e17dee39869e72ce3',
   );
 });
 test('all frame parity', () => {
   assert.equal(
     hash(groups.map((group: ChibiFrames) => directions.map((d) => group[d]))),
-    'b45295ab82b234eea91c9d3d19701c94f6ecce7e9a8834877698a657dfbe6115',
+    'fc86eb4328260ba981195609ebf689e86b7ee010fce0226fe169c4e0927bc438',
   );
 });
 test('head and blueprint data hashes', () => {
-  assert.equal(hash(heads), '0699a9702f65abcb9b5a0327846c9e7234d01a8c4394c32c081a84f7bcc38c8b');
+  assert.equal(hash(heads), '320e2b7d0456418c60fea489d25402fa3ec6bf9071cfaadaedc3e6086b28193d');
   assert.equal(hash(poses), 'f0b0ec5d4ab678f36637394b53248df9d9baa108c13cfd926e9340ace1fadcec');
 });
 test('frames and rows are independent and rebuilding does not retain mutations', () => {
