@@ -894,8 +894,8 @@ function AppContent() {
         />
       )}
 
-      {/* ── Owner Avatar (always mounted when active, renders via canvas) ── */}
-      {ownerAvatarState.active && <OwnerAvatar officeState={officeState} onExited={() => {}} />}
+      {/* ── Owner Avatar (always mounted, renders via canvas) ── */}
+      <OwnerAvatar officeState={officeState} onExited={() => {}} />
     </div>
   );
 }
