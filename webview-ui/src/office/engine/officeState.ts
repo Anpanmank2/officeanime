@@ -180,7 +180,7 @@ export class OfficeState {
     return result;
   }
 
-  private findFreeSeat(): string | null {
+  findFreeSeat(): string | null {
     // Build set of tiles occupied by electronics (PCs, monitors, etc.)
     const electronicsTiles = new Set<string>();
     for (const item of this.layout.furniture) {

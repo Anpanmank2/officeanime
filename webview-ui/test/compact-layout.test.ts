@@ -21,6 +21,28 @@ import {
 import { findPath } from '../src/office/layout/tileMap.js';
 import type { OfficeLayout } from '../src/office/types.js';
 
+function seededRandom(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+const SEAT_FALLBACK_SEEDS = Array.from({ length: 200 }, (_, index) => index + 1);
+function assertSeatBookkeeping(officeState: OfficeState, label: string) {
+  const holders = new Map<string, number>();
+  for (const character of officeState.characters.values()) {
+    if (!character.seatId) continue;
+    holders.set(character.seatId, (holders.get(character.seatId) ?? 0) + 1);
+  }
+  for (const [seatId, count] of holders) assert.equal(count, 1, `${label}: ${seatId} held twice`);
+  for (const [seatId, seat] of officeState.seats)
+    assert.equal(seat.assigned, holders.has(seatId), `${label}: ${seatId} assigned flag`);
+}
+
 type ManifestNode = {
   type: 'asset' | 'group';
   id?: string;
@@ -212,56 +234,130 @@ test('real catalog footprints do not intersect, and every seat and shelf approac
   assertReachable({ col: 9, row: 1 });
 });
 
-test('live members and owner reclaim registered seats when switching compact and legacy layouts', () => {
-  const officeState = new OfficeState(legacyLayout);
+test('live members and owner reclaim registered seats when switching compact and legacy layouts', (t) => {
+  let random = seededRandom(1);
+  t.mock.method(Math, 'random', () => random());
+  const legacyTargets = new Set(['res-bench-07', 'mkt-bench-05', 'eng-bench-05']);
+  const contestedTargets = new Set<string>();
+  for (const seed of SEAT_FALLBACK_SEEDS) {
+    random = seededRandom(seed);
+    const officeState = new OfficeState(legacyLayout);
+    const legacySeats = new Map([
+      ['res-07', 'res-bench-07'],
+      ['mkt-05', 'mkt-bench-05'],
+      ['codex-01', 'eng-bench-05'],
+    ]);
+    let agentId = 1;
+    for (const [memberId, seatId] of legacySeats) {
+      officeState.addAgent(agentId, 0, 0, seatId, true);
+      officeState.characters.get(agentId++)!.jcMemberId = memberId;
+    }
+    officeState.addAgent(-9999, 0, 0, 'mkt-bench-10', true);
+
+    officeState.rebuildFromLayout(layout);
+    // Model the arbitrary fallback permutation created by rebuildFromLayout: every
+    // registered target is currently occupied by another registered character.
+    for (const seat of officeState.seats.values()) seat.assigned = false;
+    const compactPermutation = [
+      [1, 'mkt-bench-06'],
+      [2, 'eng-bench-07'],
+      [3, 'owner-chair'],
+      [-9999, 'res-bench-03'],
+    ] as const;
+    for (const [id, seatId] of compactPermutation) {
+      const character = officeState.characters.get(id)!;
+      character.seatId = seatId;
+      character.path = [{ col: 0, row: 0 }];
+      officeState.seats.get(seatId)!.assigned = true;
+    }
+    reconcileRegisteredSeats(
+      officeState,
+      new Map([
+        ['res-07', 'res-bench-03'],
+        ['mkt-05', 'mkt-bench-06'],
+        ['codex-01', 'eng-bench-07'],
+      ]),
+      -9999,
+      'owner-chair',
+    );
+    assert.equal(officeState.characters.get(1)?.seatId, 'res-bench-03', `seed ${seed}`);
+    assert.equal(officeState.characters.get(2)?.seatId, 'mkt-bench-06', `seed ${seed}`);
+    assert.equal(officeState.characters.get(3)?.seatId, 'eng-bench-07', `seed ${seed}`);
+    assert.equal(officeState.characters.get(-9999)?.seatId, 'owner-chair', `seed ${seed}`);
+    assert.deepEqual(officeState.characters.get(1)?.path, [], `seed ${seed}`);
+    assert.deepEqual(officeState.characters.get(-9999)?.path, [], `seed ${seed}`);
+
+    officeState.rebuildFromLayout(legacyLayout);
+    const fallbackSeat = officeState.characters.get(-9999)?.seatId;
+    if (fallbackSeat && legacyTargets.has(fallbackSeat)) contestedTargets.add(fallbackSeat);
+    reconcileRegisteredSeats(officeState, legacySeats);
+    assert.equal(officeState.characters.get(1)?.seatId, 'res-bench-07', `seed ${seed}`);
+    assert.equal(officeState.characters.get(2)?.seatId, 'mkt-bench-05', `seed ${seed}`);
+    assert.equal(officeState.characters.get(3)?.seatId, 'eng-bench-05', `seed ${seed}`);
+    const ownerSeat = officeState.characters.get(-9999)!.seatId;
+    assert.notEqual(ownerSeat, null, `seed ${seed}`);
+    assert.equal(legacyTargets.has(ownerSeat!), false, `seed ${seed}`);
+    assertSeatBookkeeping(officeState, `seed ${seed}`);
+  }
+  assert.deepEqual(contestedTargets, legacyTargets);
+});
+
+test('registered members and owner keep their seats over unregistered agents and sub-agents across layout switches', (t) => {
+  let random = seededRandom(1);
+  t.mock.method(Math, 'random', () => random());
+  let contested = 0;
+  const compactSeats = new Map([
+    ['res-07', 'res-bench-03'],
+    ['mkt-05', 'mkt-bench-06'],
+    ['codex-01', 'eng-bench-07'],
+  ]);
   const legacySeats = new Map([
     ['res-07', 'res-bench-07'],
     ['mkt-05', 'mkt-bench-05'],
     ['codex-01', 'eng-bench-05'],
   ]);
-  let agentId = 1;
-  for (const [memberId, seatId] of legacySeats) {
-    officeState.addAgent(agentId, 0, 0, seatId, true);
-    officeState.characters.get(agentId++)!.jcMemberId = memberId;
-  }
-  officeState.addAgent(-9999, 0, 0, 'mkt-bench-10', true);
+  for (const seed of SEAT_FALLBACK_SEEDS) {
+    random = seededRandom(seed);
+    const officeState = new OfficeState(layout);
+    officeState.addAgent(-9999, 0, 0, 'owner-chair', true);
+    let agentId = 1;
+    for (const [memberId, seatId] of compactSeats) {
+      officeState.addAgent(agentId, 0, 0, seatId, true);
+      officeState.characters.get(agentId++)!.jcMemberId = memberId;
+    }
+    officeState.addAgent(50);
+    officeState.addAgent(51);
+    officeState.addSubagent(51, 'tool-1');
+    officeState.addSubagent(51, 'tool-2');
+    reconcileRegisteredSeats(officeState, compactSeats, -9999, 'owner-chair');
 
-  officeState.rebuildFromLayout(layout);
-  // Model the arbitrary fallback permutation created by rebuildFromLayout: every
-  // registered target is currently occupied by another registered character.
-  for (const seat of officeState.seats.values()) seat.assigned = false;
-  const compactPermutation = [
-    [1, 'mkt-bench-06'],
-    [2, 'eng-bench-07'],
-    [3, 'owner-chair'],
-    [-9999, 'res-bench-03'],
-  ] as const;
-  for (const [id, seatId] of compactPermutation) {
-    const character = officeState.characters.get(id)!;
-    character.seatId = seatId;
-    character.path = [{ col: 0, row: 0 }];
-    officeState.seats.get(seatId)!.assigned = true;
+    for (let round = 1; round <= 3; round++) {
+      for (const [name, nextLayout, memberSeats, ownerSeat] of [
+        ['legacy', legacyLayout, legacySeats, undefined],
+        ['compact', layout, compactSeats, 'owner-chair'],
+      ] as const) {
+        const label = `seed ${seed}, round ${round}, ${name}`;
+        const targets = new Set(memberSeats.values());
+        if (ownerSeat) targets.add(ownerSeat);
+        officeState.rebuildFromLayout(nextLayout);
+        const others = [...officeState.characters.values()].filter(
+          (character) => character.id !== -9999 && !character.jcMemberId,
+        );
+        for (const character of others) {
+          if (character.seatId && targets.has(character.seatId)) contested++;
+        }
+        reconcileRegisteredSeats(officeState, memberSeats, -9999, ownerSeat);
+        let id = 1;
+        for (const seatId of memberSeats.values()) {
+          assert.equal(officeState.characters.get(id++)?.seatId, seatId, label);
+        }
+        assert.equal(officeState.characters.get(-9999)?.seatId, ownerSeat ?? null, label);
+        for (const character of others) {
+          assert.equal(targets.has(character.seatId!), false, label);
+        }
+        assertSeatBookkeeping(officeState, label);
+      }
+    }
   }
-  reconcileRegisteredSeats(
-    officeState,
-    new Map([
-      ['res-07', 'res-bench-03'],
-      ['mkt-05', 'mkt-bench-06'],
-      ['codex-01', 'eng-bench-07'],
-    ]),
-    -9999,
-    'owner-chair',
-  );
-  assert.equal(officeState.characters.get(1)?.seatId, 'res-bench-03');
-  assert.equal(officeState.characters.get(2)?.seatId, 'mkt-bench-06');
-  assert.equal(officeState.characters.get(3)?.seatId, 'eng-bench-07');
-  assert.equal(officeState.characters.get(-9999)?.seatId, 'owner-chair');
-  assert.deepEqual(officeState.characters.get(1)?.path, []);
-  assert.deepEqual(officeState.characters.get(-9999)?.path, []);
-
-  officeState.rebuildFromLayout(legacyLayout);
-  reconcileRegisteredSeats(officeState, legacySeats);
-  assert.equal(officeState.characters.get(1)?.seatId, 'res-bench-07');
-  assert.equal(officeState.characters.get(2)?.seatId, 'mkt-bench-05');
-  assert.equal(officeState.characters.get(3)?.seatId, 'eng-bench-05');
+  assert.ok(contested > 0, 'unregistered agents must contest registered seats');
 });
