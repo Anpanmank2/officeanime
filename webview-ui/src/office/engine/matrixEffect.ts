@@ -4,13 +4,13 @@ import {
   MATRIX_FLICKER_VISIBILITY_THRESHOLD,
   MATRIX_HEAD_COLOR,
   MATRIX_SPRITE_COLS,
-  MATRIX_SPRITE_ROWS,
   MATRIX_TRAIL_DIM_THRESHOLD,
   MATRIX_TRAIL_EMPTY_ALPHA,
   MATRIX_TRAIL_LENGTH,
   MATRIX_TRAIL_MID_THRESHOLD,
   MATRIX_TRAIL_OVERLAY_ALPHA,
 } from '../../constants.js';
+import { scaledEdge } from '../sprites/spriteCache.js';
 import type { Character, SpriteData } from '../types.js';
 import { MATRIX_EFFECT_DURATION } from '../types.js';
 
@@ -46,23 +46,29 @@ export function renderMatrixEffect(
   const progress = ch.matrixEffectTimer / MATRIX_EFFECT_DURATION;
   const isSpawn = ch.matrixEffect === 'spawn';
   const time = ch.matrixEffectTimer;
-  const totalSweep = MATRIX_SPRITE_ROWS + MATRIX_TRAIL_LENGTH;
+  const rows = spriteData.length;
+  const cols = spriteData[0]?.length ?? 0;
+  const totalSweep = rows + MATRIX_TRAIL_LENGTH;
 
-  for (let col = 0; col < MATRIX_SPRITE_COLS; col++) {
+  for (let col = 0; col < cols; col++) {
     // Stagger: each column starts at a slightly different time
-    const stagger = (ch.matrixEffectSeeds[col] ?? 0) * MATRIX_COLUMN_STAGGER_RANGE;
+    const stagger =
+      (ch.matrixEffectSeeds[col % ch.matrixEffectSeeds.length] ?? 0) * MATRIX_COLUMN_STAGGER_RANGE;
     const colProgress = Math.max(
       0,
       Math.min(1, (progress - stagger) / (1 - MATRIX_COLUMN_STAGGER_RANGE)),
     );
     const headRow = colProgress * totalSweep;
 
-    for (let row = 0; row < MATRIX_SPRITE_ROWS; row++) {
+    for (let row = 0; row < rows; row++) {
       const pixel = spriteData[row]?.[col];
       const hasPixel = pixel && pixel !== '';
       const distFromHead = headRow - row;
-      const px = drawX + col * zoom;
-      const py = drawY + row * zoom;
+      const px = drawX + scaledEdge(col, zoom);
+      const py = drawY + scaledEdge(row, zoom);
+      const width = scaledEdge(col + 1, zoom) - scaledEdge(col, zoom);
+      const height = scaledEdge(row + 1, zoom) - scaledEdge(row, zoom);
+      if (width === 0 || height === 0) continue;
 
       if (isSpawn) {
         // Spawn: head sweeps down revealing character pixels
@@ -72,19 +78,19 @@ export function renderMatrixEffect(
         } else if (distFromHead < 1) {
           // Head pixel: bright white-green
           ctx.fillStyle = MATRIX_HEAD_COLOR;
-          ctx.fillRect(px, py, zoom, zoom);
+          ctx.fillRect(px, py, width, height);
         } else if (distFromHead < MATRIX_TRAIL_LENGTH) {
           // Trail zone: show character pixel with green overlay, or just green if no pixel
           const trailPos = distFromHead / MATRIX_TRAIL_LENGTH;
           if (hasPixel) {
             // Draw original pixel
             ctx.fillStyle = pixel;
-            ctx.fillRect(px, py, zoom, zoom);
+            ctx.fillRect(px, py, width, height);
             // Green overlay that fades as trail progresses
             const greenAlpha = (1 - trailPos) * MATRIX_TRAIL_OVERLAY_ALPHA;
             if (flickerVisible(col, row, time)) {
               ctx.fillStyle = `rgba(0, 255, 65, ${greenAlpha})`;
-              ctx.fillRect(px, py, zoom, zoom);
+              ctx.fillRect(px, py, width, height);
             }
           } else {
             // No character pixel: fading green trail
@@ -96,14 +102,14 @@ export function renderMatrixEffect(
                   : trailPos < MATRIX_TRAIL_DIM_THRESHOLD
                     ? `rgba(0, 170, 40, ${alpha})`
                     : `rgba(0, 85, 20, ${alpha})`;
-              ctx.fillRect(px, py, zoom, zoom);
+              ctx.fillRect(px, py, width, height);
             }
           }
         } else {
           // Below trail: normal character pixel
           if (hasPixel) {
             ctx.fillStyle = pixel;
-            ctx.fillRect(px, py, zoom, zoom);
+            ctx.fillRect(px, py, width, height);
           }
         }
       } else {
@@ -112,12 +118,12 @@ export function renderMatrixEffect(
           // Above head: normal character pixel (not yet consumed)
           if (hasPixel) {
             ctx.fillStyle = pixel;
-            ctx.fillRect(px, py, zoom, zoom);
+            ctx.fillRect(px, py, width, height);
           }
         } else if (distFromHead < 1) {
           // Head pixel: bright white-green
           ctx.fillStyle = MATRIX_HEAD_COLOR;
-          ctx.fillRect(px, py, zoom, zoom);
+          ctx.fillRect(px, py, width, height);
         } else if (distFromHead < MATRIX_TRAIL_LENGTH) {
           // Trail zone: fading green
           if (flickerVisible(col, row, time)) {
@@ -129,7 +135,7 @@ export function renderMatrixEffect(
                 : trailPos < MATRIX_TRAIL_DIM_THRESHOLD
                   ? `rgba(0, 170, 40, ${alpha})`
                   : `rgba(0, 85, 20, ${alpha})`;
-            ctx.fillRect(px, py, zoom, zoom);
+            ctx.fillRect(px, py, width, height);
           }
         }
         // Below trail: nothing (consumed)

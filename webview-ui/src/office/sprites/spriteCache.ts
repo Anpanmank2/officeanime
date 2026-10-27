@@ -45,6 +45,10 @@ export function getOutlineSprite(sprite: SpriteData): SpriteData {
   return outline;
 }
 
+export function scaledEdge(index: number, scale: number): number {
+  return Math.round(index * scale);
+}
+
 export function getCachedSprite(sprite: SpriteData, zoom: number): HTMLCanvasElement {
   let cache = zoomCaches.get(zoom);
   if (!cache) {
@@ -58,8 +62,8 @@ export function getCachedSprite(sprite: SpriteData, zoom: number): HTMLCanvasEle
   const rows = sprite.length;
   const cols = sprite[0].length;
   const canvas = document.createElement('canvas');
-  canvas.width = cols * zoom;
-  canvas.height = rows * zoom;
+  canvas.width = scaledEdge(cols, zoom);
+  canvas.height = scaledEdge(rows, zoom);
   const ctx = canvas.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
 
@@ -67,8 +71,13 @@ export function getCachedSprite(sprite: SpriteData, zoom: number): HTMLCanvasEle
     for (let c = 0; c < cols; c++) {
       const color = sprite[r][c];
       if (color === '') continue;
+      const x = scaledEdge(c, zoom),
+        y = scaledEdge(r, zoom);
+      const width = scaledEdge(c + 1, zoom) - x,
+        height = scaledEdge(r + 1, zoom) - y;
+      if (width === 0 || height === 0) continue;
       ctx.fillStyle = color;
-      ctx.fillRect(c * zoom, r * zoom, zoom, zoom);
+      ctx.fillRect(x, y, width, height);
     }
   }
 

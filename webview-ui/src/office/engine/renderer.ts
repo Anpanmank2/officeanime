@@ -32,10 +32,11 @@ import {
   VOID_TILE_OUTLINE_COLOR,
 } from '../../constants.js';
 import { getColorizedFloorSprite, hasFloorSprites, WALL_COLOR } from '../floorTiles.js';
-import { getCachedSprite, getOutlineSprite } from '../sprites/spriteCache.js';
+import { getCachedSprite, getOutlineSprite, scaledEdge } from '../sprites/spriteCache.js';
 import {
   BUBBLE_PERMISSION_SPRITE,
   BUBBLE_WAITING_SPRITE,
+  getCharacterHeightCorrection,
   getCharacterSprites,
 } from '../sprites/spriteData.js';
 import type {
@@ -152,7 +153,8 @@ export function renderScene(
       ch.jcMemberId,
     );
     const spriteData = getCharacterSprite(ch, sprites);
-    const cached = getCachedSprite(spriteData, zoom);
+    const px = zoom * (sprites.pixelScale ?? 1);
+    const cached = getCachedSprite(spriteData, px);
     // Sitting offset: shift character down when seated so they visually sit in the chair
     const sittingOffset = isSittingState(ch.state) ? CHARACTER_SITTING_OFFSET_PX : 0;
     // Anchor at bottom-center of character — round to integer device pixels
@@ -173,7 +175,7 @@ export function renderScene(
       drawables.push({
         zY: charZY,
         draw: (c) => {
-          renderMatrixEffect(c, mCh, mSpriteData, mDrawX, mDrawY, zoom);
+          renderMatrixEffect(c, mCh, mSpriteData, mDrawX, mDrawY, px);
         },
       });
       continue;
@@ -185,9 +187,9 @@ export function renderScene(
     if (isSelected || isHovered) {
       const outlineAlpha = isSelected ? SELECTED_OUTLINE_ALPHA : HOVERED_OUTLINE_ALPHA;
       const outlineData = getOutlineSprite(spriteData);
-      const outlineCached = getCachedSprite(outlineData, zoom);
-      const olDrawX = drawX - zoom; // 1 sprite-pixel offset, scaled
-      const olDrawY = drawY - zoom; // outline follows sitting offset via drawY
+      const outlineCached = getCachedSprite(outlineData, px);
+      const olDrawX = drawX - scaledEdge(1, px); // 1 sprite-pixel offset, scaled
+      const olDrawY = drawY - scaledEdge(1, px); // outline follows sitting offset via drawY
       drawables.push({
         zY: charZY - OUTLINE_Z_SORT_OFFSET, // sort just before character
         draw: (c) => {
@@ -510,8 +512,10 @@ export function renderBubbles(
     // Place bubble above head with a small gap; follow sitting offset
     const sittingOff = isSittingState(ch.state) ? BUBBLE_SITTING_OFFSET_PX : 0;
     const bubbleX = Math.round(offsetX + ch.x * zoom - cached.width / 2);
+    const bubbleOffset =
+      BUBBLE_VERTICAL_OFFSET_PX - getCharacterHeightCorrection(ch.palette, ch.jcMemberId);
     const bubbleY = Math.round(
-      offsetY + (ch.y + sittingOff - BUBBLE_VERTICAL_OFFSET_PX) * zoom - cached.height - 1 * zoom,
+      offsetY + (ch.y + sittingOff - bubbleOffset) * zoom - cached.height - 1 * zoom,
     );
 
     ctx.save();

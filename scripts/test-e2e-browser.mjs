@@ -225,6 +225,14 @@ async function run() {
       return nonBg > 20; // At least some non-background content
     });
     assert(hasContent, 'Canvas has visible content (not blank)');
+    assert(
+      logs.some((l) => l.includes('[Chibi] built sprites for exec-sec')),
+      'exec-sec chibi built',
+    );
+    assert(
+      logs.some((l) => l.includes('[Chibi] built sprites for eng-04')),
+      'eng-04 chibi built',
+    );
 
     // Test 6: Event push works
     console.log('  [Test 6] Event push');

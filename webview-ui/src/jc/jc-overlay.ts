@@ -3,6 +3,7 @@
 // Called after the base renderFrame() to add nameplates, exec icons,
 // absence indicators, zone labels, and state bubbles.
 // v2: Neon startup aesthetic — "who, where, what" management dashboard
+import { getCharacterHeightCorrection } from '../office/sprites/spriteData.js';
 import type { Character } from '../office/types.js';
 import { isSittingState, TILE_SIZE } from '../office/types.js';
 import {
@@ -1433,7 +1434,9 @@ function renderMemberStatusIcons(
     const sittingOff = isSittingState(ch.state) ? -4 : 0;
     const anchorX = offsetX + ch.x * zoom;
     const headY = offsetY + (ch.y + sittingOff) * zoom;
-    const anchorY = headY - STATUS_ICON_OFFSET_PX * zoom;
+    const iconOffset =
+      STATUS_ICON_OFFSET_PX - getCharacterHeightCorrection(ch.palette, ch.jcMemberId);
+    const anchorY = headY - iconOffset * zoom;
 
     // 一時エフェクト (🎉/👋/🧠/😤ほか) は最優先 — 2秒で消える演出レイヤー
     if (runtime.emotionEmoji && now < runtime.emotionUntil) {

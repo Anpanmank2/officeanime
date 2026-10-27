@@ -492,3 +492,14 @@ today**. Composition CPU/memory cost is a one-time hit per unique config, not a 
    pre-colored-PNG fallback coexist, the branch inside `getCharacterSprites` gets more complex.
    Mitigation: keep the fallback condition to exactly one thing — "no parts loaded, or no config
    for this member" — nothing more.
+
+
+## 11. Chibi sprites for the roster (2026-10)
+- IDs in heads.json and their subagents use bundled chibi frames; owner and generic agents retain legacy sprites.
+- 32×48 cells render at 0.5 pixel scale, preserving the bottom-center foot anchor and 16×24 world size.
+- Walk columns: walk1, walkpass, walk3, walkpass; idle: stand; typing: type1/type2; reading: read1/read2.
+- Thinking uses think1/think2/think3; error uses down/up/right error frames shared across all directions.
+- Left frames mirror right frames; idle desaturation uses the existing color adjustment.
+- Rounded pixel edges support fractional zoom while preserving integer-scale coordinates.
+- Bubbles and status icons share a correction computed from legacy and chibi visible standing heights.
+- Legacy avatar parts remain frozen as the fallback on build failure or when CHIBI_CHARACTERS_ENABLED is false.

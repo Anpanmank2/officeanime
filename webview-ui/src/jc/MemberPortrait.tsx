@@ -64,12 +64,13 @@ export function MemberPortrait({ memberId, palette, hueShift, present }: MemberP
     const canvas = ref.current;
     if (!canvas) return;
     const sprites = getCharacterSprites(palette, hueShift, null, memberId);
-    const frame = sprites.walk[Direction.DOWN][1]; // walk2 = 正面立ち姿
+    const frame = sprites.idle?.[Direction.DOWN] ?? sprites.walk[Direction.DOWN][1]; // walk2 = 正面立ち姿
+    const scale = (sprites.pixelScale ?? 1) < 1 ? 2 : PORTRAIT_SCALE;
     const b = contentBounds(frame);
     const cols = b.maxC - b.minC + 1;
     const rows = b.maxR - b.minR + 1;
-    canvas.width = cols * PORTRAIT_SCALE;
-    canvas.height = rows * PORTRAIT_SCALE;
+    canvas.width = cols * scale;
+    canvas.height = rows * scale;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.imageSmoothingEnabled = false;
@@ -79,12 +80,7 @@ export function MemberPortrait({ memberId, palette, hueShift, present }: MemberP
         const color = frame[r][c];
         if (color === '') continue;
         ctx.fillStyle = color;
-        ctx.fillRect(
-          (c - b.minC) * PORTRAIT_SCALE,
-          (r - b.minR) * PORTRAIT_SCALE,
-          PORTRAIT_SCALE,
-          PORTRAIT_SCALE,
-        );
+        ctx.fillRect((c - b.minC) * scale, (r - b.minR) * scale, scale, scale);
       }
     }
   }, [memberId, palette, hueShift, spriteRevision]);

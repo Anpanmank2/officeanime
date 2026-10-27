@@ -2,6 +2,7 @@ import type {
   AvatarPartAsset,
   CharacterDirectionSprites,
 } from '../../../../shared/assets/types.js';
+import { CHIBI_CHARACTERS_ENABLED } from '../../constants.js';
 import { adjustSprite, clearColorizeCache } from '../colorize.js';
 import type { Direction, FloorColor, SpriteData } from '../types.js';
 import { Direction as Dir } from '../types.js';
@@ -9,6 +10,7 @@ import { avatarConfigCacheKey, composeAvatar } from './avatarComposite.js';
 import type { AvatarConfigFile, LoadedAvatarParts } from './avatarTypes.js';
 import bubblePermissionData from './bubble-permission.json';
 import bubbleWaitingData from './bubble-waiting.json';
+import { getChibiCharacterSprites, hasChibiMember } from './chibi/chibiCatalog.js';
 
 // ── Speech Bubble Sprites ───────────────────────────────────────
 
@@ -118,6 +120,8 @@ export function flipSpriteHorizontal(sprite: SpriteData): SpriteData {
 // ════════════════════════════════════════════════════════════════
 
 export interface CharacterSprites {
+  idle?: Record<Direction, SpriteData>;
+  pixelScale?: number;
   walk: Record<Direction, [SpriteData, SpriteData, SpriteData, SpriteData]>;
   typing: Record<Direction, [SpriteData, SpriteData]>;
   reading: Record<Direction, [SpriteData, SpriteData]>;
@@ -146,6 +150,17 @@ function adjustCharacterSprites(sprites: CharacterSprites, color: FloorColor): C
     arr: [SpriteData, SpriteData, SpriteData],
   ): [SpriteData, SpriteData, SpriteData] => [shift(arr[0]), shift(arr[1]), shift(arr[2])];
   return {
+    pixelScale: sprites.pixelScale,
+    ...(sprites.idle
+      ? {
+          idle: {
+            [Dir.DOWN]: shift(sprites.idle[Dir.DOWN]),
+            [Dir.LEFT]: shift(sprites.idle[Dir.LEFT]),
+            [Dir.RIGHT]: shift(sprites.idle[Dir.RIGHT]),
+            [Dir.UP]: shift(sprites.idle[Dir.UP]),
+          },
+        }
+      : {}),
     walk: {
       [Dir.DOWN]: shiftWalk(sprites.walk[Dir.DOWN]),
       [Dir.UP]: shiftWalk(sprites.walk[Dir.UP]),
@@ -197,6 +212,18 @@ export function getCharacterSprites(
   variant: 'idle' | null = null,
   avatarKey?: string,
 ): CharacterSprites {
+  if (CHIBI_CHARACTERS_ENABLED && avatarKey && hasChibiMember(avatarKey)) {
+    const chibiKey = variant ? `chibi:${avatarKey}:${variant}` : `chibi:${avatarKey}`;
+    const cachedChibi = spriteCache.get(chibiKey);
+    if (cachedChibi) return cachedChibi;
+    const chibi = getChibiCharacterSprites(avatarKey);
+    if (chibi) {
+      const sprites =
+        variant === 'idle' ? adjustCharacterSprites(chibi, IDLE_VARIANT_ADJUST) : chibi;
+      spriteCache.set(chibiKey, sprites);
+      return sprites;
+    }
+  }
   const avatarConfig = avatarKey ? loadedAvatarConfigs?.avatars[avatarKey] : undefined;
   const canComposeAvatar = !!(
     avatarConfig && loadedAvatarParts?.sprites.has(avatarConfig.base.part)
@@ -320,4 +347,18 @@ export function getCharacterSprites(
 
   spriteCache.set(cacheKey, sprites);
   return sprites;
+}
+
+/** Difference in visible standing height, measured from the bottom-center foot anchor. */
+export function getCharacterHeightCorrection(palette: number, avatarKey?: string): number {
+  const sprites = getCharacterSprites(palette, 0, null, avatarKey);
+  if ((sprites.pixelScale ?? 1) >= 1) return 0;
+  const legacy = getCharacterSprites(palette);
+  const visibleHeight = (set: CharacterSprites) => {
+    const frame = set.idle?.[Dir.DOWN] ?? set.walk[Dir.DOWN][1];
+    const first = frame.findIndex((row) => row.some((pixel) => pixel !== ''));
+    return first < 0 ? 0 : (frame.length - first) * (set.pixelScale ?? 1);
+  };
+  const oldHeight = visibleHeight(legacy);
+  return oldHeight === 0 ? 0 : oldHeight - visibleHeight(sprites);
 }

@@ -52,6 +52,8 @@ export const BUTTON_LINE_WIDTH_MIN = 1.5;
 export const BUTTON_LINE_WIDTH_ZOOM_FACTOR = 0.5;
 export const BUBBLE_FADE_DURATION_SEC = 0.5;
 export const BUBBLE_SITTING_OFFSET_PX = 10;
+export const CHIBI_CHARACTERS_ENABLED = true;
+
 export const BUBBLE_VERTICAL_OFFSET_PX = 24;
 export const FALLBACK_FLOOR_COLOR = '#808080';
 
