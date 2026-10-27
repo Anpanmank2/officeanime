@@ -14,7 +14,7 @@ const BODY_LEFT = 4, BODY_W = 24, HEAD_TOP = 8, HEAD_H = 19, EYE_Y = 18;
 if (![44, 48].includes(CELL_H)) throw Error('cell-h must be 44 or 48');
 const OUT = resolve(ROOT, options['--out'] ?? 'artifacts/persona-characters/r5-sample-13members.png');
 const SLOT_ORDER = ['base', 'bottom', 'top', 'face', 'hair', 'accessory'];
-const members = JSON.parse(readFileSync(resolve(ROOT,'scripts/sample-characters-heads.json'),'utf8')).members;
+const members = JSON.parse(readFileSync(resolve(ROOT,'webview-ui/src/office/sprites/chibi/heads.json'),'utf8')).members;
 const ink = '#2e2324', skin = '#fcd8a4', skinShadow = '#e9b585', blush = '#f4a0a0', mouth = '#e8505a';
 const eyeBrown = '#6b5040', eyeDark = '#2a2430', glass = '#e4edf2';
 const white = '#e3eaf0', pants = '#586174', pantsShadow = '#3e4659';
